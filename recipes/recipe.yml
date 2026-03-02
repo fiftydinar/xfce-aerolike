@@ -91,7 +91,7 @@ modules:
       - "cd /tmp/arch-tools && /tmp/arch-tools/make-aur-package.sh emerald"
       ## Install xscreensaver
       - |
-        cd /tmp/arch-tools && PRE_BUILD_CMDS="sed -i 's|--prefix=/usr|--prefix=/usr --without-dpms-ext|g' ./PKGBUILD; sed -i '/build() {/i prepare() {\\n  sed -i \"s| (on ?| (on_p ?|g\" ./\$pkgname-\$pkgver/driver/dpms.c\\n  sed -i \"s|# define dpms_init (dpy)|# define dpms_init(dpy) ((void)0)|g\" ./\$pkgname-\$pkgver/driver/xscreensaver-auth.c\\n}' ./PKGBUILD" /tmp/arch-tools/make-aur-package.sh --archlinux-pkg xscreensaver
+        cd /tmp/arch-tools && PRE_BUILD_CMDS='sed -i "s|--prefix=/usr|--prefix=/usr --without-dpms-ext|g" ./PKGBUILD; sed -i '\''s/(on \? "on" : "off")/(on_p ? "on" : "off")/g'\'' ./\$pkgname-\$pkgver/driver/dpms.c; sed -E -i '\''s/^[[:space:]]*#[[:space:]]*define[[:space:]]+dpms_init[[:space:]]*\([^)]*\).*/#define dpms_init(dpy) ((void)0)/'\'' ./\$pkgname-\$pkgver/driver/xscreensaver-auth.c' /tmp/arch-tools/make-aur-package.sh --archlinux-pkg xscreensaver
       ## Install networkmanager-dispatcher-chrony
       - "cd /tmp/arch-tools && /tmp/arch-tools/make-aur-package.sh networkmanager-dispatcher-chrony"
       - |
