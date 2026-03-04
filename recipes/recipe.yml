@@ -128,7 +128,7 @@ modules:
       - "sed -i 's|Exec=nm-applet|Exec=nm-applet --indicator|g' /etc/xdg/autostart/nm-applet.desktop"
       # Replace XFCE xsettings.xml stuff like theme, icons, cursors, fonts (to not overwrite the existing default config)
       - |
-        sed -i 's|<property name="ThemeName" type="string" value=".*"/>|<property name="ThemeName" type="string" value="Aeroish"/>|' /etc/xdg/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml
+        sed -i 's|<property name="ThemeName" type="string" value=".*"/>|<property name="ThemeName" type="string" value="Aerolike"/>|' /etc/xdg/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml
       - |
         sed -i 's|<property name="IconThemeName" type="string" value=".*"/>|<property name="IconThemeName" type="string" value="Obsidian-Teal"/>|' /etc/xdg/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml
       - |
@@ -138,7 +138,7 @@ modules:
       - |
         sed -i 's|<property name="MonospaceFontName" type="string" value=".*"/>|<property name="MonospaceFontName" type="string" value="Noto Sans Mono 9"/>|' /etc/xdg/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml
       # Modify LightDM defaults
-      - "echo -e '\n\ntheme-name=Aeroish\nicon-theme-name=Obsidian-Teal\ncursor-theme-name=aero-drop\nfont-name=Noto Sans\nbackground=/usr/share/backgrounds/frosted-glass.webp' >> /etc/lightdm/lightdm-gtk-greeter.conf"
+      - "echo -e '\n\ntheme-name=Aerolike\nicon-theme-name=Obsidian-Teal\ncursor-theme-name=aero-drop\nfont-name=Noto Sans\nbackground=/usr/share/backgrounds/frosted-glass.webp' >> /etc/lightdm/lightdm-gtk-greeter.conf"
       # Fix bootc-image-builder not liking 2 dots in VERSION_ID for some reason
       - |
         sed -E -i "s/^(VERSION_ID=)(['\"]?)([0-9]{8}\.[0-9]+)\.([0-9]+)(['\"]?)/\\1\"\\3-\\4\"/" /etc/os-release
