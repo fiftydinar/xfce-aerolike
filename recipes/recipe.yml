@@ -1,4 +1,4 @@
-name: xfce-aeroish
+name: xfce-aerolike
 description: XFCE with Aero-like theme.
 base-image: ghcr.io/bootcrew/arch-bootc
 image-version: latest
@@ -83,7 +83,7 @@ modules:
         pacman -Rns --noconfirm xfdesktop && cd /tmp/arch-tools && PRE_BUILD_CMDS="sed -i 's|--prefix=/usr|--prefix=/usr --with-default-backdrop-filename=/usr/share/backgrounds/frosted-glass.webp|g' ./PKGBUILD" /tmp/arch-tools/make-aur-package.sh --archlinux-pkg xfdesktop
       ## Install xfce4-screensaver
       - |
-        wget --directory-prefix=/tmp/arch-tools/xfce4-screensaver https://raw.githubusercontent.com/fiftydinar/xfce-aeroish/refs/heads/main/patches/xfce4-screensaver/0001-set-default-wallpaper.patch && wget --directory-prefix=/tmp/arch-tools/xfce4-screensaver https://gitlab.archlinux.org/archlinux/packaging/packages/xfce4-screensaver/-/raw/main/PKGBUILD && awk -v b='prepare() {\n  # copy any provided patch into srcdir so it is available to apply\n  if [ -f \"${srcdir}/../0001-set-default-wallpaper.patch\" ]; then\n    cp \"${srcdir}/../0001-set-default-wallpaper.patch\" \"${srcdir}/\" || return 1\n  fi\n\n  # find the extracted top-level source directory inside ${srcdir}\n  extracted_dir=$(find \"${srcdir}\" -maxdepth 1 -type d -name \"${pkgname}*\" | sed -n \"1p\")\n  if [ -z \"$extracted_dir\" ]; then\n    echo \"ERROR: cannot find extracted source dir in ${srcdir}\" >&2\n    ls -la \"${srcdir}\" || true\n    return 1\n  fi\n\n  cd \"$extracted_dir\" || return 1\n\n  if [ -f \"${srcdir}/0001-set-default-wallpaper.patch\" ]; then\n    patch -p1 < \"${srcdir}/0001-set-default-wallpaper.patch\" || {\n      echo \"patch failed\" >&2; ls -la \"$PWD\"; return 1\n    }\n  fi\n\n  cd - >/dev/null || return 1\n}\n' '/^build[[:space:]]*\(\)/ && !ins { printf "%s", b; ins=1 } { print } END{ if(!ins){ print "ERROR: build() not found in PKGBUILD" > "/dev/stderr"; exit 2 } }' /tmp/arch-tools/xfce4-screensaver/PKGBUILD > /tmp/arch-tools/xfce4-screensaver/PKGBUILD.new && mv /tmp/arch-tools/xfce4-screensaver/PKGBUILD.new /tmp/arch-tools/xfce4-screensaver/PKGBUILD && cd /tmp/arch-tools/xfce4-screensaver && /tmp/arch-tools/make-aur-package.sh
+        wget --directory-prefix=/tmp/arch-tools/xfce4-screensaver https://raw.githubusercontent.com/fiftydinar/xfce-aerolike/refs/heads/main/patches/xfce4-screensaver/0001-set-default-wallpaper.patch && wget --directory-prefix=/tmp/arch-tools/xfce4-screensaver https://gitlab.archlinux.org/archlinux/packaging/packages/xfce4-screensaver/-/raw/main/PKGBUILD && awk -v b='prepare() {\n  # copy any provided patch into srcdir so it is available to apply\n  if [ -f \"${srcdir}/../0001-set-default-wallpaper.patch\" ]; then\n    cp \"${srcdir}/../0001-set-default-wallpaper.patch\" \"${srcdir}/\" || return 1\n  fi\n\n  # find the extracted top-level source directory inside ${srcdir}\n  extracted_dir=$(find \"${srcdir}\" -maxdepth 1 -type d -name \"${pkgname}*\" | sed -n \"1p\")\n  if [ -z \"$extracted_dir\" ]; then\n    echo \"ERROR: cannot find extracted source dir in ${srcdir}\" >&2\n    ls -la \"${srcdir}\" || true\n    return 1\n  fi\n\n  cd \"$extracted_dir\" || return 1\n\n  if [ -f \"${srcdir}/0001-set-default-wallpaper.patch\" ]; then\n    patch -p1 < \"${srcdir}/0001-set-default-wallpaper.patch\" || {\n      echo \"patch failed\" >&2; ls -la \"$PWD\"; return 1\n    }\n  fi\n\n  cd - >/dev/null || return 1\n}\n' '/^build[[:space:]]*\(\)/ && !ins { printf "%s", b; ins=1 } { print } END{ if(!ins){ print "ERROR: build() not found in PKGBUILD" > "/dev/stderr"; exit 2 } }' /tmp/arch-tools/xfce4-screensaver/PKGBUILD > /tmp/arch-tools/xfce4-screensaver/PKGBUILD.new && mv /tmp/arch-tools/xfce4-screensaver/PKGBUILD.new /tmp/arch-tools/xfce4-screensaver/PKGBUILD && cd /tmp/arch-tools/xfce4-screensaver && /tmp/arch-tools/make-aur-package.sh
       ## Install gtk2
       - "cd /tmp/arch-tools && /tmp/arch-tools/make-aur-package.sh gtk2"
       ## Install libwnck
@@ -117,7 +117,7 @@ modules:
       # Set QT apps to use qt{5-6}ct as platform theme (setting it to qt5ct works on both qt5 and qt6)
       - "echo 'QT_QPA_PLATFORMTHEME=qt5ct' >> /etc/environment"
       # Set default compiz config to use ours
-      - "echo 'COMPIZ_CONFIG_PROFILE=aeroish' >> /etc/environment"
+      - "echo 'COMPIZ_CONFIG_PROFILE=aerolike' >> /etc/environment"
       # Set compiz as the default window manager and compositor
       - |
         sed -i 's/value="xfwm4"/value="compiz"/g' /etc/xdg/xfce4/xfconf/xfce-perchannel-xml/xfce4-session.xml

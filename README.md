@@ -1,4 +1,4 @@
-# xfce-aeroish
+# xfce-aerolike
 
 ![](assets/showcase.png)
 
@@ -12,7 +12,7 @@ Aero-like XFCE custom image based on Arch Linux base bootc image.
 
 ## Theming Credits and Base
 
-For the Aeroish GTK2, GTK3, GTK4 and LightDM theme, I credit:
+For the Aerolike GTK2, GTK3, GTK4 and LightDM theme, I credit:
 - ['ReVista' - x35gaming](https://github.com/x35gaming/revista), [slightly modified version by contrarybaton60](https://github.com/contrarybaton60/vista-stuff-xfce4/tree/main/gtk-theme)
 
 For the Qt5 and Qt6 Kvantum theme, I credit:
@@ -51,12 +51,12 @@ Now that we know what's the theming base and other defaults, I'll highlight what
 ## How to install
 
 1. Download Fedora Vauxite ISO from [this URL](https://github.com/winblues/vauxite) and install it regularly
-2. When you boot to Vauxite, run this command below in terminal to switch to `xfce-aeroish` (requires internet connection):
-  - `sudo bootc switch ghcr.io/fiftydinar/xfce-aeroish:latest`
+2. When you boot to Vauxite, run this command below in terminal to switch to `xfce-aerolike` (requires internet connection):
+  - `sudo bootc switch ghcr.io/fiftydinar/xfce-aerolike:latest`
 3. Reboot the system
 4. Boot the Arch entry
-5. Run this command in terminal, installs the container signatures required for signed image of `xfce-aeroish` (requires internet connection):
-  - `sudo bootc switch --enforce-container-sigpolicy ghcr.io/fiftydinar/xfce-aeroish:latest`
+5. Run this command in terminal, installs the container signatures required for signed image of `xfce-aerolike` (requires internet connection):
+  - `sudo bootc switch --enforce-container-sigpolicy ghcr.io/fiftydinar/xfce-aerolike:latest`
 6. Run these commands to create the new user and set password for it (replace `[new_username]` with what you desire):
   - `sudo useradd -m -G wheel [new_username] && sudo passwd [new_username]`
 7. Log out
