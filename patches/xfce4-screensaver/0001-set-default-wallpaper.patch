@@ -1,0 +1,58 @@
+diff --git a/src/xfce-bg.c b/src/xfce-bg.c
+--- a/src/xfce-bg.c
++++ b/src/xfce-bg.c
+@@ -49,9 +49,11 @@
+ #define XFCE_BG_CACHE_DIR "xfce/background"
+ /* Default wallpaper in Xfce 4.20 */
+ #define XFCE_BG_FALLBACK_IMG "xfce-x.svg"
+ /* For legacy xfdesktop, this is no longer shipped in 4.20 */
+ #define XFCE_BG_FALLBACK_IMG_4_18 "xfce-teal.jpg"
++/* Force a system default wallpaper when no user wallpaper is specified */
++#define XFCE_BG_DEFAULT_WALLPAPER "/usr/share/backgrounds/frosted-glass.webp"
+ 
+ /* We keep the large pixbufs around if the next update
+    in the slideshow is less than 60 seconds away */
+ #define KEEP_EXPENSIVE_CACHE_SECS 60
+@@ -305,22 +305,26 @@
+ static gchar *
+ find_system_default_background (void) {
+     const gchar *const *dirs;
+     gint i;
+ 
+-    dirs = g_get_system_data_dirs ();
+-    for (i = 0; dirs[i]; i++) {
+-        gchar *path;
+-
+-        path = g_build_filename (dirs[i], "backgrounds", "xfce", XFCE_BG_FALLBACK_IMG, NULL);
+-        if (g_file_test (path, G_FILE_TEST_EXISTS))
+-            return path;
+-        g_free (path);
+-
+-        path = g_build_filename (dirs[i], "backgrounds", "xfce", XFCE_BG_FALLBACK_IMG_4_18, NULL);
+-        if (g_file_test (path, G_FILE_TEST_EXISTS))
+-            return path;
+-        g_free (path);
+-    }
+-
+-    return NULL;
++    /* If the requested absolute default wallpaper exists, use it. */
++    if (g_file_test (XFCE_BG_DEFAULT_WALLPAPER, G_FILE_TEST_EXISTS))
++        return g_strdup (XFCE_BG_DEFAULT_WALLPAPER);
++
++    dirs = g_get_system_data_dirs ();
++    for (i = 0; dirs[i]; i++) {
++        gchar *path;
++
++        path = g_build_filename (dirs[i], "backgrounds", "xfce", XFCE_BG_FALLBACK_IMG, NULL);
++        if (g_file_test (path, G_FILE_TEST_EXISTS))
++            return path;
++        g_free (path);
++
++        path = g_build_filename (dirs[i], "backgrounds", "xfce", XFCE_BG_FALLBACK_IMG_4_18, NULL);
++        if (g_file_test (path, G_FILE_TEST_EXISTS))
++            return path;
++        g_free (path);
++    }
++
++    return NULL;
+ }
