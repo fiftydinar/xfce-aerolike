@@ -1,0 +1,22 @@
+--- a/src/xfce-bg.c	2026-03-02 13:45:04.000000000 +0100
++++ b/src/xfce-bg.c	2026-03-04 09:37:23.247231874 +0100
+@@ -51,6 +51,8 @@
+ #define XFCE_BG_FALLBACK_IMG "xfce-x.svg"
+ /* For legacy xfdesktop, this is no longer shipped in 4.20 */
+ #define XFCE_BG_FALLBACK_IMG_4_18 "xfce-teal.jpg"
++/* Force a system default wallpaper when no user wallpaper is specified */
++#define XFCE_BG_DEFAULT_WALLPAPER "/usr/share/backgrounds/frosted-glass.webp"
+ 
+ /* We keep the large pixbufs around if the next update
+    in the slideshow is less than 60 seconds away */
+@@ -307,6 +309,10 @@
+     const gchar *const *dirs;
+     gint i;
+ 
++    /* If the requested absolute default wallpaper exists, use it. */
++    if (g_file_test (XFCE_BG_DEFAULT_WALLPAPER, G_FILE_TEST_EXISTS))
++        return g_strdup (XFCE_BG_DEFAULT_WALLPAPER);
++
+     dirs = g_get_system_data_dirs ();
+     for (i = 0; dirs[i]; i++) {
+         gchar *path;
