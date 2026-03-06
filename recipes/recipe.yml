@@ -74,6 +74,8 @@ modules:
         # AppImage thumbnailer dependencies
         - squashfuse
         - imagemagick
+        # usb-storage-optimized-async dependency
+        - usbutils
         # Debugging
         - strace
   - type: script
