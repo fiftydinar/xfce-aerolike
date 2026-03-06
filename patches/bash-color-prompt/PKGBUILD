@@ -10,9 +10,17 @@ source=("https://github.com/juhp/bash-color-prompt/archive/refs/heads/main.tar.g
 sha256sums=('SKIP')
 
 pkgver() {
-  local ver
-  ver=$(<"${srcdir}/bash-color-prompt-main/VERSION")
-  echo "$ver"
+  for d in "${srcdir}"/*bash-color-prompt* "${srcdir}"/bash-color-prompt*; do
+    if [ -f "${d}/VERSION" ]; then
+      cat "${d}/VERSION"
+      return 0
+    fi
+  done
+  if [ -f "${srcdir}/VERSION" ]; then
+    cat "${srcdir}/VERSION"
+    return 0
+  fi
+  echo "0.0.0"
 }
 
 prepare() {
