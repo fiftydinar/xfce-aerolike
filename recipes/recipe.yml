@@ -167,6 +167,8 @@ modules:
         - chronyd.service # Time-sync
         - bluetooth.service # Bluez Bluetooth service
         - lightdm.service # Display manager
+        - memory-tweaks-aerolike.service
+        - dirty-centisecs-aerolike.service
   # This needs to run after pacman or makepkg transactions, because those can install files to /etc and somehow, /usr/etc to /etc begin to conflict
   - type: files
     files:
