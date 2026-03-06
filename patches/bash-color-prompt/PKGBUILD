@@ -1,4 +1,5 @@
 pkgname=bash-color-prompt
+pkgver="0.95.1"
 pkgrel=1
 pkgdesc="Customizable color prompt for bash (bcp)"
 arch=('any')
@@ -6,35 +7,8 @@ url="https://github.com/juhp/bash-color-prompt"
 license=('GPL3')
 depends=('bash')
 makedepends=('perl')
-
-# Try to fetch upstream VERSION at parse time so pkgver is never empty.
-# Store it in PARSE_PKGVER (do not name it pkgver to avoid conflicting with the pkgver() function).
-PARSE_PKGVER=$(wget -qO- https://raw.githubusercontent.com/juhp/bash-color-prompt/main/VERSION 2>/dev/null || echo "")
-
 source=("https://github.com/juhp/bash-color-prompt/archive/refs/heads/main.tar.gz")
 sha256sums=('SKIP')
-
-# pkgver() returns the parse-time value if we fetched it; otherwise fall back to scanning the extracted sources.
-pkgver() {
-  if [ -n "${PARSE_PKGVER}" ]; then
-    echo "${PARSE_PKGVER}"
-    return 0
-  fi
-
-  for d in "${srcdir}"/*bash-color-prompt* "${srcdir}"/bash-color-prompt*; do
-    if [ -f "${d}/VERSION" ]; then
-      cat "${d}/VERSION"
-      return 0
-    fi
-  done
-
-  if [ -f "${srcdir}/VERSION" ]; then
-    cat "${srcdir}/VERSION"
-    return 0
-  fi
-
-  echo "0.0.0"
-}
 
 prepare() {
   cd "${srcdir}/bash-color-prompt-main"
