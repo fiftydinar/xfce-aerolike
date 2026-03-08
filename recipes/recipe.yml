@@ -62,6 +62,7 @@ modules:
         - lightdm-gtk-greeter
         - pavucontrol
         - network-manager-applet
+        - blueman
         - xfce4-whiskermenu-plugin
         - xfce4-pulseaudio-plugin
         - xfce4-docklike-plugin
