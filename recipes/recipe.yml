@@ -87,6 +87,9 @@ modules:
         - strace
   - type: script
     snippets:
+      # Install xlibre
+      - |
+        sh -c "PACMAN_CONFIRMATION=false $(curl -fsSL https://raw.githubusercontent.com/fiftydinar/pkgbuilds-arch-based/refs/heads/patch-1/install-xlibre.sh)"
       # Install script to make AUR package easily
       - "wget --retry-connrefused --tries=30 --directory-prefix=/tmp/arch-tools/ https://raw.githubusercontent.com/pkgforge-dev/Anylinux-AppImages/refs/heads/main/useful-tools/make-aur-package.sh"
       - "chmod +x /tmp/arch-tools/make-aur-package.sh"
