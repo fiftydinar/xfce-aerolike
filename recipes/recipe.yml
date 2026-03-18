@@ -198,6 +198,6 @@ modules:
         dracut --force "$(find /usr/lib/modules -maxdepth 1 -type d | grep -v "\.img$" | tail -n 1)"/initramfs.img
       # Show all installed packages sorted by size
       - |
-        LC_ALL=C pacman -Qi | awk '/^Name/ {p=$3} /^Installed Size/ {s=$4; u=$5; if(u=="B") s/=1048576; else if(u=="KiB") s/=1024; else if(u=="GiB") s*=1024; t+=s; printf "%.2f MiB %s\n", s, p} END {printf "999999.99 MiB TOTAL: %.2f MiB\n", t}' | sort -n | sed 's/999999.99 MiB //'
+        LC_ALL=C pacman -Qi | awk '/^Name/ {p=$3} /^Installed Size/ {s=$4; u=$5; if(u=="B") s/=1048576; else if(u=="KiB") s/=1024; else if(u=="GiB") s*=1024; t+=s; printf "999999.99 MiB %-30s %.2f MiB\n", p, s} END {printf "999999.99.1 MiB %-30s %.2f MiB\n", "TOTAL:", t}' | sort -n | sed -E 's/999999.99(.1)? MiB //'
       # Clear pacman cache, saves about 800MB
       - "rm -r /usr/lib/sysimage/cache/pacman"
