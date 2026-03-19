@@ -88,85 +88,85 @@ modules:
   - type: script
     snippets:
       # Install script to make AUR package easily
-      - "wget --retry-connrefused --tries=30 --directory-prefix=/tmp/arch-tools/ https://raw.githubusercontent.com/pkgforge-dev/Anylinux-AppImages/refs/heads/main/useful-tools/make-aur-package.sh"
-      - "chmod +x /tmp/arch-tools/make-aur-package.sh"
+      - "set -eu; wget --retry-connrefused --tries=30 --directory-prefix=/tmp/arch-tools/ https://raw.githubusercontent.com/pkgforge-dev/Anylinux-AppImages/refs/heads/main/useful-tools/make-aur-package.sh"
+      - "set -eu; chmod +x /tmp/arch-tools/make-aur-package.sh"
       # Install XLibre, patched xfdesktop, xfce4-screensaver, compiz, emerald, networkmanager-dispatcher-chrony, gtk-nocsd-git, spice-guest-tools-windows, dwarfs
       ## Build and install XLibre
       - |
-        XLIBRE_GIT=0; cd /tmp/arch-tools; xlbpkgs=""; xlbxf86pkgs=""; xorgpkgs=$(pacman -Qq|grep '^xorg-server'); for p in $xorgpkgs; do if [ "$p" != "xorg-server" ] && [ "$p" != "xorg-server-src" ]; then if [ $XLIBRE_GIT = 1 ]; then xlbpkgs+=" ${p/xorg-/xlibre-x}-git"; else xlbpkgs+=" ${p/xorg-/xlibre-x}"; fi; fi; done; xf86pkgs=$(pacman -Qq|grep '^xf86-'); for p in $xf86pkgs; do if [ "$p" != "xf86-input-libinput" ]; then if [ $XLIBRE_GIT = 1 ]; then xlbxf86pkgs+=' '${p/xf86-/xlibre-}-git; else xlbxf86pkgs+=' '${p/xf86-/xlibre-}; fi; fi; done; xorgallpkgs="$xorgpkgs $xf86pkgs"; xlballpkgs="$xlbpkgs $xlbxf86pkgs"; pacman -Rdd --noconfirm $xorgallpkgs; if [ $XLIBRE_GIT = 1 ]; then /tmp/arch-tools/make-aur-package.sh xlibre-xserver-git; /tmp/arch-tools/make-aur-package.sh xlibre-input-libinput-git; yes | pacman -U /tmp/arch-tools/xlibre-xserver-git/xlibre-xserver-git-[0-9]*.pkg.tar.*; else /tmp/arch-tools/make-aur-package.sh xlibre-xserver; /tmp/arch-tools/make-aur-package.sh xlibre-input-libinput; yes | pacman -U /tmp/arch-tools/xlibre-xserver/xlibre-xserver-[0-9]*.pkg.tar.*; fi; for pkg in $xlballpkgs; do if ! pacman -Qi $pkg >/dev/null 2>&1; then /tmp/arch-tools/make-aur-package.sh $pkg; else echo "$pkg is already installed, skipping."; fi; done
+        set -eu; XLIBRE_GIT=0; cd /tmp/arch-tools; xlbpkgs=""; xlbxf86pkgs=""; xorgpkgs=$(pacman -Qq|grep '^xorg-server'); for p in $xorgpkgs; do if [ "$p" != "xorg-server" ] && [ "$p" != "xorg-server-src" ]; then if [ $XLIBRE_GIT = 1 ]; then xlbpkgs+=" ${p/xorg-/xlibre-x}-git"; else xlbpkgs+=" ${p/xorg-/xlibre-x}"; fi; fi; done; xf86pkgs=$(pacman -Qq|grep '^xf86-'); for p in $xf86pkgs; do if [ "$p" != "xf86-input-libinput" ]; then if [ $XLIBRE_GIT = 1 ]; then xlbxf86pkgs+=' '${p/xf86-/xlibre-}-git; else xlbxf86pkgs+=' '${p/xf86-/xlibre-}; fi; fi; done; xorgallpkgs="$xorgpkgs $xf86pkgs"; xlballpkgs="$xlbpkgs $xlbxf86pkgs"; pacman -Rdd --noconfirm $xorgallpkgs; if [ $XLIBRE_GIT = 1 ]; then /tmp/arch-tools/make-aur-package.sh xlibre-xserver-git; /tmp/arch-tools/make-aur-package.sh xlibre-input-libinput-git; yes | pacman -U /tmp/arch-tools/xlibre-xserver-git/xlibre-xserver-git-[0-9]*.pkg.tar.*; else /tmp/arch-tools/make-aur-package.sh xlibre-xserver; /tmp/arch-tools/make-aur-package.sh xlibre-input-libinput; yes | pacman -U /tmp/arch-tools/xlibre-xserver/xlibre-xserver-[0-9]*.pkg.tar.*; fi; for pkg in $xlballpkgs; do if ! pacman -Qi $pkg >/dev/null 2>&1; then /tmp/arch-tools/make-aur-package.sh $pkg; else echo "$pkg is already installed, skipping."; fi; done
         ## Build and install xfdesktop with patch to use the default wallpaper
       - |
-        pacman -Rns --noconfirm xfdesktop && cd /tmp/arch-tools && PRE_BUILD_CMDS="sed -i 's|--prefix=/usr|--prefix=/usr --with-default-backdrop-filename=/usr/share/backgrounds/frosted-glass.webp|g' ./PKGBUILD" /tmp/arch-tools/make-aur-package.sh --archlinux-pkg xfdesktop
+        set -eu; pacman -Rns --noconfirm xfdesktop && cd /tmp/arch-tools && PRE_BUILD_CMDS="sed -i 's|--prefix=/usr|--prefix=/usr --with-default-backdrop-filename=/usr/share/backgrounds/frosted-glass.webp|g' ./PKGBUILD" /tmp/arch-tools/make-aur-package.sh --archlinux-pkg xfdesktop
       ## Build and install xfce4-screensaver with patch to use the default wallpaper
       - |
-        wget --retry-connrefused --tries=30 --directory-prefix=/tmp/arch-tools/xfce4-screensaver https://raw.githubusercontent.com/fiftydinar/xfce-aerolike/refs/heads/main/patches/xfce4-screensaver/0001-set-default-wallpaper.patch && wget --retry-connrefused --tries=30 --directory-prefix=/tmp/arch-tools/xfce4-screensaver https://gitlab.archlinux.org/archlinux/packaging/packages/xfce4-screensaver/-/raw/main/PKGBUILD && awk -v b='prepare() {\n  # copy any provided patch into srcdir so it is available to apply\n  if [ -f \"${srcdir}/../0001-set-default-wallpaper.patch\" ]; then\n    cp \"${srcdir}/../0001-set-default-wallpaper.patch\" \"${srcdir}/\" || return 1\n  fi\n\n  # find the extracted top-level source directory inside ${srcdir}\n  extracted_dir=$(find \"${srcdir}\" -maxdepth 1 -type d -name \"${pkgname}*\" | sed -n \"1p\")\n  if [ -z \"$extracted_dir\" ]; then\n    echo \"ERROR: cannot find extracted source dir in ${srcdir}\" >&2\n    ls -la \"${srcdir}\" || true\n    return 1\n  fi\n\n  cd \"$extracted_dir\" || return 1\n\n  if [ -f \"${srcdir}/0001-set-default-wallpaper.patch\" ]; then\n    patch -p1 < \"${srcdir}/0001-set-default-wallpaper.patch\" || {\n      echo \"patch failed\" >&2; ls -la \"$PWD\"; return 1\n    }\n  fi\n\n  cd - >/dev/null || return 1\n}\n' '/^build[[:space:]]*\(\)/ && !ins { printf "%s", b; ins=1 } { print } END{ if(!ins){ print "ERROR: build() not found in PKGBUILD" > "/dev/stderr"; exit 2 } }' /tmp/arch-tools/xfce4-screensaver/PKGBUILD > /tmp/arch-tools/xfce4-screensaver/PKGBUILD.new && mv /tmp/arch-tools/xfce4-screensaver/PKGBUILD.new /tmp/arch-tools/xfce4-screensaver/PKGBUILD && cd /tmp/arch-tools/xfce4-screensaver && /tmp/arch-tools/make-aur-package.sh
+        set -eu; wget --retry-connrefused --tries=30 --directory-prefix=/tmp/arch-tools/xfce4-screensaver https://raw.githubusercontent.com/fiftydinar/xfce-aerolike/refs/heads/main/patches/xfce4-screensaver/0001-set-default-wallpaper.patch && wget --retry-connrefused --tries=30 --directory-prefix=/tmp/arch-tools/xfce4-screensaver https://gitlab.archlinux.org/archlinux/packaging/packages/xfce4-screensaver/-/raw/main/PKGBUILD && awk -v b='prepare() {\n  # copy any provided patch into srcdir so it is available to apply\n  if [ -f \"${srcdir}/../0001-set-default-wallpaper.patch\" ]; then\n    cp \"${srcdir}/../0001-set-default-wallpaper.patch\" \"${srcdir}/\" || return 1\n  fi\n\n  # find the extracted top-level source directory inside ${srcdir}\n  extracted_dir=$(find \"${srcdir}\" -maxdepth 1 -type d -name \"${pkgname}*\" | sed -n \"1p\")\n  if [ -z \"$extracted_dir\" ]; then\n    echo \"ERROR: cannot find extracted source dir in ${srcdir}\" >&2\n    ls -la \"${srcdir}\" || true\n    return 1\n  fi\n\n  cd \"$extracted_dir\" || return 1\n\n  if [ -f \"${srcdir}/0001-set-default-wallpaper.patch\" ]; then\n    patch -p1 < \"${srcdir}/0001-set-default-wallpaper.patch\" || {\n      echo \"patch failed\" >&2; ls -la \"$PWD\"; return 1\n    }\n  fi\n\n  cd - >/dev/null || return 1\n}\n' '/^build[[:space:]]*\(\)/ && !ins { printf "%s", b; ins=1 } { print } END{ if(!ins){ print "ERROR: build() not found in PKGBUILD" > "/dev/stderr"; exit 2 } }' /tmp/arch-tools/xfce4-screensaver/PKGBUILD > /tmp/arch-tools/xfce4-screensaver/PKGBUILD.new && mv /tmp/arch-tools/xfce4-screensaver/PKGBUILD.new /tmp/arch-tools/xfce4-screensaver/PKGBUILD && cd /tmp/arch-tools/xfce4-screensaver && /tmp/arch-tools/make-aur-package.sh
       ## Build and install gtk2 (dependency of libwnck)
-      - "cd /tmp/arch-tools && /tmp/arch-tools/make-aur-package.sh gtk2"
+      - "set -eu; cd /tmp/arch-tools && /tmp/arch-tools/make-aur-package.sh gtk2"
       ## Build and install libwnck (dependency of emerald)
-      - "cd /tmp/arch-tools && /tmp/arch-tools/make-aur-package.sh libwnck"
+      - "set -eu; cd /tmp/arch-tools && /tmp/arch-tools/make-aur-package.sh libwnck"
       ## Build and install compiz with patch to use emerald decorator
-      - "cd /tmp/arch-tools && /tmp/arch-tools/make-aur-package.sh compiz"
+      - "set -eu; cd /tmp/arch-tools && /tmp/arch-tools/make-aur-package.sh compiz"
       - |
-        sed -i 's|USE_EMERALD="no"|USE_EMERALD="yes"|g' /usr/bin/compiz-decorator
+        set -eu; sed -i 's|USE_EMERALD="no"|USE_EMERALD="yes"|g' /usr/bin/compiz-decorator
       ## Build and install emerald
-      - "cd /tmp/arch-tools && /tmp/arch-tools/make-aur-package.sh emerald"
+      - "set -eu; cd /tmp/arch-tools && /tmp/arch-tools/make-aur-package.sh emerald"
       ## Install networkmanager-dispatcher-chrony
-      - "cd /tmp/arch-tools && /tmp/arch-tools/make-aur-package.sh networkmanager-dispatcher-chrony"
+      - "set -eu; cd /tmp/arch-tools && /tmp/arch-tools/make-aur-package.sh networkmanager-dispatcher-chrony"
       ## Build and install gtk-nocsd
       - |
-        cd /tmp/arch-tools && PRE_BUILD_CMDS="sed -i 's|LIBDIR=\"/usr/lib\"|LIBDIR=\"/usr/lib\" NOOPT=1|' ./PKGBUILD" /tmp/arch-tools/make-aur-package.sh gtk-nocsd-git
+        set -eu; cd /tmp/arch-tools && PRE_BUILD_CMDS="sed -i 's|LIBDIR=\"/usr/lib\"|LIBDIR=\"/usr/lib\" NOOPT=1|' ./PKGBUILD" /tmp/arch-tools/make-aur-package.sh gtk-nocsd-git
       ## Install spice-guest-tools-windows
-      - "cd /tmp/arch-tools && /tmp/arch-tools/make-aur-package.sh spice-guest-tools-windows"
+      - "set -eu; cd /tmp/arch-tools && /tmp/arch-tools/make-aur-package.sh spice-guest-tools-windows"
       ## Install dwarfs (for AppImage thumbnailer)
-      - "cd /tmp/arch-tools && /tmp/arch-tools/make-aur-package.sh dwarfs-bin"
+      - "set -eu; cd /tmp/arch-tools && /tmp/arch-tools/make-aur-package.sh dwarfs-bin"
       # Cleanup
-      - "rm -r /tmp/arch-tools/"
+      - "set -eu; rm -r /tmp/arch-tools/"
       # Install AppImage Thumbnailer (sat)
-      - "wget --retry-connrefused --tries=30 -O /usr/bin/sat https://raw.githubusercontent.com/Samueru-sama/simple-appimage-thumbnailer/refs/heads/main/sat.sh && chmod +x /usr/bin/sat && wget --retry-connrefused --tries=30 --directory-prefix=/usr/share/thumbnailers https://raw.githubusercontent.com/Samueru-sama/simple-appimage-thumbnailer/refs/heads/main/simple-appimage-thumbnailer.thumbnailer"
+      - "set -eu; wget --retry-connrefused --tries=30 -O /usr/bin/sat https://raw.githubusercontent.com/Samueru-sama/simple-appimage-thumbnailer/refs/heads/main/sat.sh && chmod +x /usr/bin/sat && wget --retry-connrefused --tries=30 --directory-prefix=/usr/share/thumbnailers https://raw.githubusercontent.com/Samueru-sama/simple-appimage-thumbnailer/refs/heads/main/simple-appimage-thumbnailer.thumbnailer"
       # Install usb-storage-optimized-async
-      - "wget --tries=30 --retry-connrefused https://raw.githubusercontent.com/fiftydinar/usb-storage-optimized-async/refs/heads/main/usb-storage-optimized-async-service -O /usr/bin/usb-storage-optimized-async-service && chmod +x /usr/bin/usb-storage-optimized-async-service && wget --tries=30 --retry-connrefused https://raw.githubusercontent.com/fiftydinar/usb-storage-optimized-async/refs/heads/main/usb-storage-optimized-async-udev -O /usr/bin/usb-storage-optimized-async-udev && chmod +x /usr/bin/usb-storage-optimized-async-udev && wget --tries=30 --retry-connrefused https://raw.githubusercontent.com/fiftydinar/usb-storage-optimized-async/refs/heads/main/usb-storage-optimized-async-service.service -O /usr/lib/systemd/system/usb-storage-optimized-async-service.service && wget --tries=30 --retry-connrefused https://raw.githubusercontent.com/fiftydinar/usb-storage-optimized-async/refs/heads/main/zz1-usb-storage-optimized-async-udev.rules -O /usr/lib/udev/rules.d/zz1-usb-storage-optimized-async-udev.rules && systemctl --system enable usb-storage-optimized-async-service.service"
+      - "set -eu; wget --tries=30 --retry-connrefused https://raw.githubusercontent.com/fiftydinar/usb-storage-optimized-async/refs/heads/main/usb-storage-optimized-async-service -O /usr/bin/usb-storage-optimized-async-service && chmod +x /usr/bin/usb-storage-optimized-async-service && wget --tries=30 --retry-connrefused https://raw.githubusercontent.com/fiftydinar/usb-storage-optimized-async/refs/heads/main/usb-storage-optimized-async-udev -O /usr/bin/usb-storage-optimized-async-udev && chmod +x /usr/bin/usb-storage-optimized-async-udev && wget --tries=30 --retry-connrefused https://raw.githubusercontent.com/fiftydinar/usb-storage-optimized-async/refs/heads/main/usb-storage-optimized-async-service.service -O /usr/lib/systemd/system/usb-storage-optimized-async-service.service && wget --tries=30 --retry-connrefused https://raw.githubusercontent.com/fiftydinar/usb-storage-optimized-async/refs/heads/main/zz1-usb-storage-optimized-async-udev.rules -O /usr/lib/udev/rules.d/zz1-usb-storage-optimized-async-udev.rules && systemctl --system enable usb-storage-optimized-async-service.service"
       # Sudo for wheel group # https://github.com/ExistingPerson08/arch-base
       - |
-        sed -i 's/^# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' /etc/sudoers || echo "%wheel ALL=(ALL:ALL) ALL" >> /etc/sudoers
+        set -eu; sed -i 's/^# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' /etc/sudoers || echo "%wheel ALL=(ALL:ALL) ALL" >> /etc/sudoers
       # XFCE doesn't have language settings, so set the default language to English and generate locale
       - |
-        sed -i 's/^#\s*\(en_US.UTF-8 UTF-8\)/\1/' /etc/locale.gen
-      - "locale-gen"
-      - "echo 'LANG=en_US.UTF-8' > /etc/locale.conf"
+        set -eu; sed -i 's/^#\s*\(en_US.UTF-8 UTF-8\)/\1/' /etc/locale.gen
+      - "set -eu; locale-gen"
+      - "set -eu; echo 'LANG=en_US.UTF-8' > /etc/locale.conf"
       # Set nano as the default editor
-      - "echo -e 'VISUAL=nano\nEDITOR=nano' >> /etc/environment"
+      - "set -eu; echo -e 'VISUAL=nano\nEDITOR=nano' >> /etc/environment"
       # Set gtk-nocsd by default
-      - "echo 'LD_PRELOAD=/usr/lib/libgtk-nocsd.so' >> /etc/environment"
+      - "set -eu; echo 'LD_PRELOAD=/usr/lib/libgtk-nocsd.so' >> /etc/environment"
       # Needed for gtk-nocsd to work in sharun AppImages (we don't preload tons of various libs like SteamOS, so we are safe)
-      - "echo 'SHARUN_ALLOW_LD_PRELOAD=1' >> /etc/environment"
+      - "set -eu; echo 'SHARUN_ALLOW_LD_PRELOAD=1' >> /etc/environment"
       # Set QT apps to use qt{5-6}ct as platform theme (setting it to qt5ct works on both qt5 and qt6)
-      - "echo 'QT_QPA_PLATFORMTHEME=qt5ct' >> /etc/environment"
+      - "set -eu; echo 'QT_QPA_PLATFORMTHEME=qt5ct' >> /etc/environment"
       # Set default compiz config to use ours
-      - "echo 'COMPIZ_CONFIG_PROFILE=aerolike' >> /etc/environment"
+      - "set -eu; echo 'COMPIZ_CONFIG_PROFILE=aerolike' >> /etc/environment"
       # Set compiz as the default window manager and compositor
       - |
-        sed -i 's/value="xfwm4"/value="compiz"/g' /etc/xdg/xfce4/xfconf/xfce-perchannel-xml/xfce4-session.xml
+        set -eu; sed -i 's/value="xfwm4"/value="compiz"/g' /etc/xdg/xfce4/xfconf/xfce-perchannel-xml/xfce4-session.xml
       # Hide xfwm4 stuff in settings, since we don't use it
-      - "echo 'Hidden=true' >> /usr/share/applications/xfce-wm-settings.desktop"
-      - "echo 'Hidden=true' >> /usr/share/applications/xfce-wmtweaks-settings.desktop"
+      - "set -eu; echo 'Hidden=true' >> /usr/share/applications/xfce-wm-settings.desktop"
+      - "set -eu; echo 'Hidden=true' >> /usr/share/applications/xfce-wmtweaks-settings.desktop"
       # Set nm-applet to use StatusNotifier (--indicator) instead of legacy XEmbed systray
-      - "sed -i 's|Exec=nm-applet|Exec=nm-applet --indicator|g' /etc/xdg/autostart/nm-applet.desktop"
+      - "set -eu; sed -i 's|Exec=nm-applet|Exec=nm-applet --indicator|g' /etc/xdg/autostart/nm-applet.desktop"
       # Replace XFCE xsettings.xml stuff like theme, icons, cursors, fonts (to not overwrite the existing default config)
       - |
-        sed -i 's|<property name="ThemeName" type="string" value=".*"/>|<property name="ThemeName" type="string" value="Aerolike"/>|' /etc/xdg/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml
+        set -eu; sed -i 's|<property name="ThemeName" type="string" value=".*"/>|<property name="ThemeName" type="string" value="Aerolike"/>|' /etc/xdg/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml
       - |
-        sed -i 's|<property name="IconThemeName" type="string" value=".*"/>|<property name="IconThemeName" type="string" value="Obsidian-Teal"/>|' /etc/xdg/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml
+        set -eu; sed -i 's|<property name="IconThemeName" type="string" value=".*"/>|<property name="IconThemeName" type="string" value="Obsidian-Teal"/>|' /etc/xdg/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml
       - |
-        sed -i 's|<property name="CursorThemeName" type="string" value=".*"/>|<property name="CursorThemeName" type="string" value="aero-drop"/>|' /etc/xdg/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml
+        set -eu; sed -i 's|<property name="CursorThemeName" type="string" value=".*"/>|<property name="CursorThemeName" type="string" value="aero-drop"/>|' /etc/xdg/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml
       - |
-        sed -i 's|<property name="FontName" type="string" value=".*"/>|<property name="FontName" type="string" value="Noto Sans 9"/>|' /etc/xdg/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml
+        set -eu; sed -i 's|<property name="FontName" type="string" value=".*"/>|<property name="FontName" type="string" value="Noto Sans 9"/>|' /etc/xdg/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml
       - |
-        sed -i 's|<property name="MonospaceFontName" type="string" value=".*"/>|<property name="MonospaceFontName" type="string" value="Noto Sans Mono 9"/>|' /etc/xdg/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml
+        set -eu; sed -i 's|<property name="MonospaceFontName" type="string" value=".*"/>|<property name="MonospaceFontName" type="string" value="Noto Sans Mono 9"/>|' /etc/xdg/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml
       # Modify LightDM defaults
-      - "echo -e '\n\ntheme-name=Aerolike\nicon-theme-name=Obsidian-Teal\ncursor-theme-name=aero-drop\nfont-name=Noto Sans\nbackground=/usr/share/backgrounds/frosted-glass.webp' >> /etc/lightdm/lightdm-gtk-greeter.conf"
+      - "set -eu; echo -e '\n\ntheme-name=Aerolike\nicon-theme-name=Obsidian-Teal\ncursor-theme-name=aero-drop\nfont-name=Noto Sans\nbackground=/usr/share/backgrounds/frosted-glass.webp' >> /etc/lightdm/lightdm-gtk-greeter.conf"
       # Fix bootc-image-builder not liking 2 dots in VERSION_ID for some reason
       - |
-        sed -E -i "s/^(VERSION_ID=)(['\"]?)([0-9]{8}\.[0-9]+)\.([0-9]+)(['\"]?)/\\1\"\\3-\\4\"/" /etc/os-release
+        set -eu; sed -E -i "s/^(VERSION_ID=)(['\"]?)([0-9]{8}\.[0-9]+)\.([0-9]+)(['\"]?)/\\1\"\\3-\\4\"/" /etc/os-release
   - type: systemd
     system:
       disabled:
@@ -195,9 +195,9 @@ modules:
     snippets:
       # Generate initramfs
       - |
-        dracut --force "$(find /usr/lib/modules -maxdepth 1 -type d | grep -v "\.img$" | tail -n 1)"/initramfs.img
+        set -eu; dracut --force "$(find /usr/lib/modules -maxdepth 1 -type d | grep -v "\.img$" | tail -n 1)"/initramfs.img
       # Show all installed packages sorted by size
       - |
-        LC_ALL=C pacman -Qi | awk '/^Name/ {p=$3} /^Installed Size/ {s=$4; u=$5; if(u=="B") s/=1048576; else if(u=="KiB") s/=1024; else if(u=="GiB") s*=1024; t+=s; printf "%015.2f\t%-35s %.2f MiB\n", s, p, s} END {printf "%015.2f\t%s\n", 999999999.98, "────────────────────────────────────────────────"; printf "%015.2f\t%-35s %.2f MiB\n", 999999999.99, "TOTAL:", t}' | sort -n | cut -f2-
+        set -eu; LC_ALL=C pacman -Qi | awk '/^Name/ {p=$3} /^Installed Size/ {s=$4; u=$5; if(u=="B") s/=1048576; else if(u=="KiB") s/=1024; else if(u=="GiB") s*=1024; t+=s; printf "%015.2f\t%-35s %.2f MiB\n", s, p, s} END {printf "%015.2f\t%s\n", 999999999.98, "────────────────────────────────────────────────"; printf "%015.2f\t%-35s %.2f MiB\n", 999999999.99, "TOTAL:", t}' | sort -n | cut -f2-
       # Clear pacman cache, saves about 800MB
-      - "rm -r /usr/lib/sysimage/cache/pacman"
+      - "set -eu; rm -r /usr/lib/sysimage/cache/pacman"
