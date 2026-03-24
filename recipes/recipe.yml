@@ -200,4 +200,4 @@ modules:
       - |
         set -eu; LC_ALL=C pacman -Qi | awk '/^Name/ {p=$3} /^Installed Size/ {s=$4; u=$5; if(u=="B") s/=1048576; else if(u=="KiB") s/=1024; else if(u=="GiB") s*=1024; t+=s; printf "%015.2f\t%-35s %.2f MiB\n", s, p, s} END {printf "%015.2f\t%s\n", 999999999.98, "────────────────────────────────────────────────"; printf "%015.2f\t%-35s %.2f MiB\n", 999999999.99, "TOTAL:", t}' | sort -n | cut -f2-
       # Clear pacman cache, saves about 800MB
-      - "set -eu; rm -r /usr/lib/sysimage/cache/pacman"
+      - "set -eu; pacman -S --clean --noconfirm"
