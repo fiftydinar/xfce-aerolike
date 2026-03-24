@@ -1,13 +1,9 @@
 name: xfce-aerolike
 description: XFCE with Aero-like theme.
-base-image: ghcr.io/bootcrew/arch-bootc
+base-image: ghcr.io/fiftydinar/arch-bootc
 image-version: latest
 
 modules:
-  - type: script
-    snippets:
-      # Initialize pacman-key to generate a default secret key in cases a 3rd party repo is used
-      - "set -eu; pacman-key --init"
   - type: pacman
     install:
       packages:
