@@ -86,10 +86,9 @@ modules:
         - vulkan-tools
         - clinfo
   - type: script
-    source: local
     snippets:
       # Install script to make AUR package easily
-      - "wget --retry-connrefused --tries=30 --directory-prefix=/tmp/arch-tools/ https://raw.githubusercontent.com/pkgforge-dev/Anylinux-AppImages/refs/heads/main/useful-tools/make-aur-package.shGARBAGEURL"
+      - "wget --retry-connrefused --tries=30 --directory-prefix=/tmp/arch-tools/ https://raw.githubusercontent.com/pkgforge-dev/Anylinux-AppImages/refs/heads/main/useful-tools/make-aur-package.sh"
       - "chmod +x /tmp/arch-tools/make-aur-package.sh"
       # Install patched xfdesktop, xfce4-screensaver, compiz, emerald, networkmanager-dispatcher-chrony, gtk-nocsd-git, spice-guest-tools-windows, dwarfs
       ## Build and install XLibre
