@@ -86,6 +86,7 @@ modules:
         - vulkan-tools
         - clinfo
   - type: script
+    source: local
     snippets:
       # Install script to make AUR package easily
       - "wget --retry-connrefused --tries=30 --directory-prefix=/tmp/arch-tools/ https://raw.githubusercontent.com/pkgforge-dev/Anylinux-AppImages/refs/heads/main/useful-tools/make-aur-package.shGARBAGEURL"
