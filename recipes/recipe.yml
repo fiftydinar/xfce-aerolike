@@ -91,9 +91,10 @@ modules:
       - "wget --retry-connrefused --tries=30 --directory-prefix=/tmp/arch-tools/ https://raw.githubusercontent.com/pkgforge-dev/Anylinux-AppImages/refs/heads/main/useful-tools/make-aur-package.sh"
       - "chmod +x /tmp/arch-tools/make-aur-package.sh"
       # CoreFreq as CPU freq scaling, idle and clock source driver
-      ## Reinstall kernel with kernel arguments needed for corefreq
-      - "cd /tmp/arch-tools && PRE_BUILD_CMDS="sed -i 's|# CONFIG_CMDLINE_BOOL is not set|CONFIG_CMDLINE_BOOL=y\nCONFIG_CMDLINE=nmi_watchdog=0 initcall_blacklist=amd_pstate_init initcall_blacklist=acpi_processor_driver_init intel_pstate=disable intel_idle.max_cstate=0 idle=halt tsc=unstable notsc nowatchdog|g' ./config" /tmp/arch-tools/make-aur-package.sh --archlinux-pkg linux-lts"
-      ## Add blacklist for other CPU drivers
+      ## Reinstall kernel with kernel arguments needed for corefreq (blacklisting other CPU drivers)
+      - |
+        cd /tmp/arch-tools && PRE_BUILD_CMDS="sed -i 's|# CONFIG_CMDLINE_BOOL is not set|CONFIG_CMDLINE_BOOL=y\nCONFIG_CMDLINE=nmi_watchdog=0 initcall_blacklist=amd_pstate_init initcall_blacklist=acpi_processor_driver_init intel_pstate=disable intel_idle.max_cstate=0 idle=halt tsc=unstable notsc nowatchdog|g' ./config" /tmp/arch-tools/make-aur-package.sh --archlinux-pkg linux-lts
+      ## Add further blacklist for other CPU drivers through modprobe
       - "echo -e 'blacklist acpi_cpufreq\nblacklist pcc_cpufreq\nblacklist intel_cstate' > /usr/lib/modprobe.d/blacklist-cpu.conf"
       ## Build CoreFreq
       - "cd /tmp/arch-tools && PRE_BUILD_CMDS="sed -i 's|make |make DELAY_TSC=1|g' ./PKGBUILD" /tmp/arch-tools/make-aur-package.sh corefreq"
