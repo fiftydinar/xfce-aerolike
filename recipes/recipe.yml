@@ -90,6 +90,22 @@ modules:
       # Install script to make AUR package easily
       - "wget --retry-connrefused --tries=30 --directory-prefix=/tmp/arch-tools/ https://raw.githubusercontent.com/pkgforge-dev/Anylinux-AppImages/refs/heads/main/useful-tools/make-aur-package.sh"
       - "chmod +x /tmp/arch-tools/make-aur-package.sh"
+      # CoreFreq as CPU freq scaling, idle and clock source driver
+      ## Reinstall kernel with kernel arguments needed for corefreq
+      - "cd /tmp/arch-tools && PRE_BUILD_CMDS="sed -i 's|# CONFIG_CMDLINE_BOOL is not set|CONFIG_CMDLINE_BOOL=y\nCONFIG_CMDLINE=nmi_watchdog=0 initcall_blacklist=amd_pstate_init initcall_blacklist=acpi_processor_driver_init intel_pstate=disable intel_idle.max_cstate=0 idle=halt tsc=unstable notsc nowatchdog|g' ./config" /tmp/arch-tools/make-aur-package.sh --archlinux-pkg linux-lts"
+      ## Add blacklist for other CPU drivers
+      - "echo -e 'blacklist acpi_cpufreq\nblacklist pcc_cpufreq\nblacklist intel_cstate' > /usr/lib/modprobe.d/blacklist-cpu.conf"
+      ## Build CoreFreq
+      - "cd /tmp/arch-tools && PRE_BUILD_CMDS="sed -i 's|make |make DELAY_TSC=1|g' ./PKGBUILD" /tmp/arch-tools/make-aur-package.sh corefreq"
+      ## Set options and autoload the corefreq module
+      - "echo 'options corefreqk Register_ClockSource=1 Register_Governor=1 Register_CPU_Freq=1 Register_CPU_Idle=1 Idle_Route=1 RDPMC_Enable=1' > /usr/lib/modprobe.d/corefreqk.conf"
+      - "echo > 'corefreqk' /usr/lib/modules-load.d/corefreq.conf"
+      ## Set default clock source to to corefreq
+      "- echo 'w /sys/devices/system/clocksource/clocksource0/current_clocksource - - - - corefreq' > /usr/lib/tmpfiles.d/corefreq-clock.conf"
+      ## Set higher perms for RDPMC so corefreq daemon doesn't have any interruptions
+      "- echo 'w /sys/devices/cpu/rdpmc - - - - 2' > /usr/lib/tmpfiles.d/corefreq-rdpmc.conf"
+      ## Enable systemd service for corefreq daemon
+      - "systemctl --system enable corefreqd"
       # Install patched xfdesktop, xfce4-screensaver, compiz, emerald, networkmanager-dispatcher-chrony, gtk-nocsd-git, spice-guest-tools-windows, dwarfs
       ## Build and install XLibre
       #- |
