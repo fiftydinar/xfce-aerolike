@@ -102,9 +102,9 @@ modules:
       - "echo 'options corefreqk Register_ClockSource=1 Register_Governor=1 Register_CPU_Freq=1 Register_CPU_Idle=1 Idle_Route=1 RDPMC_Enable=1' > /usr/lib/modprobe.d/corefreqk.conf"
       - "echo > 'corefreqk' /usr/lib/modules-load.d/corefreq.conf"
       ## Set default clock source to to corefreq
-      "- echo 'w /sys/devices/system/clocksource/clocksource0/current_clocksource - - - - corefreq' > /usr/lib/tmpfiles.d/corefreq-clock.conf"
+      - "echo 'w /sys/devices/system/clocksource/clocksource0/current_clocksource - - - - corefreq' > /usr/lib/tmpfiles.d/corefreq-clock.conf"
       ## Set higher perms for RDPMC so corefreq daemon doesn't have any interruptions
-      "- echo 'w /sys/devices/cpu/rdpmc - - - - 2' > /usr/lib/tmpfiles.d/corefreq-rdpmc.conf"
+      - "echo 'w /sys/devices/cpu/rdpmc - - - - 2' > /usr/lib/tmpfiles.d/corefreq-rdpmc.conf"
       ## Enable systemd service for corefreq daemon
       - "systemctl --system enable corefreqd"
       # Install patched xfdesktop, xfce4-screensaver, compiz, emerald, networkmanager-dispatcher-chrony, gtk-nocsd-git, spice-guest-tools-windows, dwarfs
