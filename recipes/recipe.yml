@@ -97,7 +97,8 @@ modules:
       ## Add further blacklist for other CPU drivers through modprobe
       - "echo -e 'blacklist acpi_cpufreq\nblacklist pcc_cpufreq\nblacklist intel_cstate' > /usr/lib/modprobe.d/blacklist-cpu.conf"
       ## Build CoreFreq
-      - "cd /tmp/arch-tools && PRE_BUILD_CMDS="sed -i 's|make |make DELAY_TSC=1|g' ./PKGBUILD" /tmp/arch-tools/make-aur-package.sh corefreq"
+      - |
+        cd /tmp/arch-tools && PRE_BUILD_CMDS="sed -i 's|make |make DELAY_TSC=1|g' ./PKGBUILD" /tmp/arch-tools/make-aur-package.sh corefreq
       ## Set options and autoload the corefreq module
       - "echo 'options corefreqk Register_ClockSource=1 Register_Governor=1 Register_CPU_Freq=1 Register_CPU_Idle=1 Idle_Route=1 RDPMC_Enable=1' > /usr/lib/modprobe.d/corefreqk.conf"
       - "echo > 'corefreqk' /usr/lib/modules-load.d/corefreq.conf"
