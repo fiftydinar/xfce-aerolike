@@ -93,7 +93,7 @@ modules:
       # CoreFreq as CPU freq scaling, idle and clock source driver
       ## Reinstall kernel with kernel arguments needed for corefreq (blacklisting other CPU drivers)
       - |
-        cd /tmp/arch-tools && PRE_BUILD_CMDS="sed -i 's|# CONFIG_CMDLINE_BOOL is not set|CONFIG_CMDLINE_BOOL=y\nCONFIG_CMDLINE="nmi_watchdog=0 initcall_blacklist=amd_pstate_init initcall_blacklist=acpi_processor_driver_init intel_pstate=disable intel_idle.max_cstate=0 idle=halt tsc=unstable notsc nowatchdog"|g' ./config" /tmp/arch-tools/make-aur-package.sh --archlinux-pkg linux-lts
+        cd /tmp/arch-tools && PRE_BUILD_CMDS="sed -i 's|# CONFIG_CMDLINE_BOOL is not set|CONFIG_CMDLINE_BOOL=y\nCONFIG_CMDLINE="nmi_watchdog=0 modprobe.blacklist=i5500_temp,coretemp,intel_idle,intel_cstate,intel_uncore,acpi_cpufreq,pcc_cpufreq,intel_powerclamp,i7core_edac,intel_rapl_msr,intel_rapl_common,intel_pmc_bxt,k10temp,rapl,sp5100_tco,wmi,eeepc_wmi,asus_wmi amd_pstate=disable idle=halt intel_pstate=disable intel_idle.max_cstate=0 tsc=unstable nowatchdog"|g' ./config" /tmp/arch-tools/make-aur-package.sh --archlinux-pkg linux-lts
       ## Add further blacklist for other CPU drivers through modprobe
       - "echo -e 'blacklist acpi_cpufreq\nblacklist pcc_cpufreq\nblacklist intel_cstate' > /usr/lib/modprobe.d/blacklist-cpu.conf"
       ## Build CoreFreq
