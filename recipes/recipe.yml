@@ -89,17 +89,17 @@ modules:
     snippets:
       # Install script to make AUR package easily
       - "wget --retry-connrefused --tries=30 --directory-prefix=/tmp/arch-tools/ https://raw.githubusercontent.com/pkgforge-dev/Anylinux-AppImages/refs/heads/main/useful-tools/make-aur-package.sh"
-      - "sed -i 's|makepkg -fs|makepkg -fs --skipinteg|g' /tmp/arch-tools/make-aur-package.sh"
       - "chmod +x /tmp/arch-tools/make-aur-package.sh"
       # CoreFreq as CPU freq scaling, idle and clock source driver
       ## Reinstall kernel with kernel arguments needed for corefreq (blacklisting other CPU drivers)
+      - "cp -v /tmp/arch-tools/make-aur-package.sh /tmp/arch-tools/make-aur-package.sh.bak"
+      - "sed -i 's|makepkg -fs|makepkg -fs --skipinteg|g' /tmp/arch-tools/make-aur-package.sh"
       - |
         cd /tmp/arch-tools && PRE_BUILD_CMDS="sed -i 's|# CONFIG_CMDLINE_BOOL is not set|CONFIG_CMDLINE_BOOL=y\nCONFIG_CMDLINE=\"nmi_watchdog=0 modprobe.blacklist=i5500_temp,coretemp,intel_idle,intel_cstate,intel_uncore,acpi_cpufreq,pcc_cpufreq,intel_powerclamp,i7core_edac,intel_rapl_msr,intel_rapl_common,intel_pmc_bxt,k10temp,rapl,sp5100_tco,wmi,eeepc_wmi,asus_wmi amd_pstate=disable idle=halt intel_pstate=disable intel_idle.max_cstate=0 tsc=unstable nowatchdog\"|g' ./config" /tmp/arch-tools/make-aur-package.sh --archlinux-pkg linux-lts
-      ## Add further blacklist for other CPU drivers through modprobe
-      - "echo -e 'blacklist acpi_cpufreq\nblacklist pcc_cpufreq\nblacklist intel_cstate' > /usr/lib/modprobe.d/blacklist-cpu.conf"
+      - "mv -v /tmp/arch-tools/make-aur-package.sh.bak /tmp/arch-tools/make-aur-package.sh"
       ## Build CoreFreq
       - |
-        cd /tmp/arch-tools && PRE_BUILD_CMDS="sed -i 's|make |make DELAY_TSC=1|g' ./PKGBUILD" /tmp/arch-tools/make-aur-package.sh corefreq
+        cd /tmp/arch-tools && PRE_BUILD_CMDS="sed -i 's|make |make DELAY_TSC=1 |g' ./PKGBUILD" /tmp/arch-tools/make-aur-package.sh corefreq
       ## Set options and autoload the corefreq module
       - "echo 'options corefreqk Register_ClockSource=1 Register_Governor=1 Register_CPU_Freq=1 Register_CPU_Idle=1 Idle_Route=1 RDPMC_Enable=1' > /usr/lib/modprobe.d/corefreqk.conf"
       - "echo > 'corefreqk' /usr/lib/modules-load.d/corefreq.conf"
