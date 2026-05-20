@@ -92,7 +92,7 @@ modules:
       - "chmod +x /tmp/arch-tools/make-aur-package.sh"
       ## Fix problem with corefreq-dkms failing on fakeroot for some reason
       - |
-        sed -i '/enter_fakeroot() {/,/}/c\enter_fakeroot() {\n\tmsg "$(gettext "Entering %s environment...")" "fakeroot (Bypassed as True Root)"\n\texport FAKEROOTKEY=1\n\tbash -\$- "${BASH_SOURCE[0]}" -F "${ARGLIST[@]}" || exit $?\n}' /usr/bin/makepkg
+        sed -i '/enter_fakeroot() {/,/fakeroot -- bash/ { s|msg "$(gettext "Entering %s environment...")" "fakeroot"|msg "$(gettext "Entering %s environment...")" "fakeroot (Bypassed)"|; s|fakeroot -- bash|export FAKEROOTKEY=1\n\tbash| }' /usr/bin/makepkg
       # CoreFreq as CPU freq scaling, idle and clock source driver
       ## Reinstall kernel with kernel arguments needed for corefreq (blacklisting other CPU drivers)
       - "cp -v /tmp/arch-tools/make-aur-package.sh /tmp/arch-tools/make-aur-package.sh.bak"
