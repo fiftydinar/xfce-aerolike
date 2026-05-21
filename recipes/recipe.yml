@@ -91,12 +91,12 @@ modules:
   - type: script
     snippets:
       # Install script to make AUR package easily
-      - "wget --retry-connrefused --tries=30 --directory-prefix=/tmp/arch-tools/ https://raw.githubusercontent.com/fiftydinar/Anylinux-AppImages/84a86ef43a89f563caed6aac6094a3571823af69/useful-tools/make-aur-package.sh"
+      - "wget --retry-connrefused --tries=30 --directory-prefix=/tmp/arch-tools/ https://raw.githubusercontent.com/pkgforge-dev/Anylinux-AppImages/refs/heads/main/useful-tools/make-aur-package.sh"
       - "chmod +x /tmp/arch-tools/make-aur-package.sh"
       # CoreFreq as CPU freq scaling, idle and clock source driver
       ## Reinstall kernel with kernel arguments needed for corefreq (blacklisting other CPU drivers)
       - |
-        cd /tmp/arch-tools && SKIPSIGNATURECHECK=1 PRE_BUILD_CMDS="sed -i 's|# CONFIG_CMDLINE_BOOL is not set|CONFIG_CMDLINE_BOOL=y\nCONFIG_CMDLINE=\"nmi_watchdog=0 modprobe.blacklist=i5500_temp,coretemp,intel_idle,intel_cstate,intel_uncore,acpi_cpufreq,pcc_cpufreq,intel_powerclamp,i7core_edac,intel_rapl_msr,intel_rapl_common,intel_pmc_bxt,k10temp,rapl,sp5100_tco,wmi,eeepc_wmi,asus_wmi amd_pstate=disable idle=halt intel_pstate=disable intel_idle.max_cstate=0 tsc=unstable nowatchdog\"|g' ./config" /tmp/arch-tools/make-aur-package.sh --archlinux-pkg linux-lts
+        cd /tmp/arch-tools && SKIP_INTEGRITY_CHECK=1 PRE_BUILD_CMDS="sed -i 's|# CONFIG_CMDLINE_BOOL is not set|CONFIG_CMDLINE_BOOL=y\nCONFIG_CMDLINE=\"nmi_watchdog=0 modprobe.blacklist=i5500_temp,coretemp,intel_idle,intel_cstate,intel_uncore,acpi_cpufreq,pcc_cpufreq,intel_powerclamp,i7core_edac,intel_rapl_msr,intel_rapl_common,intel_pmc_bxt,k10temp,rapl,sp5100_tco,wmi,eeepc_wmi,asus_wmi amd_pstate=disable idle=halt intel_pstate=disable intel_idle.max_cstate=0 tsc=unstable nowatchdog\"|g' ./config" /tmp/arch-tools/make-aur-package.sh --archlinux-pkg linux-lts
       ## Build CoreFreq
       ### For some reason, kernel module doesn't install at all here in container, so I install it manually.
       - |
