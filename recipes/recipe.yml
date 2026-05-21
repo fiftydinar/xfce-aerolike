@@ -79,6 +79,8 @@ modules:
         # usb-storage-optimized-async dependencies
         - usbutils
         - bc
+        # am dependency
+        - unzip
         # Debugging
         - strace
         - libva-utils
@@ -90,7 +92,10 @@ modules:
       # Install script to make AUR package easily
       - "wget --retry-connrefused --tries=30 --directory-prefix=/tmp/arch-tools/ https://raw.githubusercontent.com/pkgforge-dev/Anylinux-AppImages/refs/heads/main/useful-tools/make-aur-package.sh"
       - "chmod +x /tmp/arch-tools/make-aur-package.sh"
-      ## Fix problem with corefreq-dkms failing on fakeroot for some reason
+      ## Use --noconfirm for pacman instead of yes pipe
+      - |
+      sed -i 's#yes | pacman -U ./\*.pkg.tar.\*#pacman -U ./\*.pkg.tar.\* --noconfirm#g' /tmp/arch-tools/make-aur-package.sh
+      ## No need for fakeroot when this runs as root - reduces chances of build problems
       - |
         sed -i '/enter_fakeroot() {/,/fakeroot -- bash/ { s|msg "$(gettext "Entering %s environment...")" "fakeroot"|msg "$(gettext "Entering %s environment...")" "fakeroot (Bypassed)"|; s|fakeroot -- bash|export FAKEROOTKEY=1\n\tbash| }' /usr/bin/makepkg
       # CoreFreq as CPU freq scaling, idle and clock source driver
