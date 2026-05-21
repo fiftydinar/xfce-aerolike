@@ -81,6 +81,7 @@ modules:
         - bc
         # am dependency
         - unzip
+        - 7zip
         # Debugging
         - strace
         - libva-utils
