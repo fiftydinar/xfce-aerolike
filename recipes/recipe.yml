@@ -95,7 +95,7 @@ modules:
       - "chmod +x /tmp/arch-tools/make-aur-package.sh"
       ## Use --noconfirm for pacman instead of yes pipe
       - |
-      sed -i 's#yes | pacman -U ./\*.pkg.tar.\*#pacman -U ./\*.pkg.tar.\* --noconfirm#g' /tmp/arch-tools/make-aur-package.sh
+        sed -i 's#yes | pacman -U ./\*.pkg.tar.\*#pacman -U ./\*.pkg.tar.\* --noconfirm#g' /tmp/arch-tools/make-aur-package.sh
       ## No need for fakeroot when this runs as root - reduces chances of build problems
       - |
         sed -i '/enter_fakeroot() {/,/fakeroot -- bash/ { s|msg "$(gettext "Entering %s environment...")" "fakeroot"|msg "$(gettext "Entering %s environment...")" "fakeroot (Bypassed)"|; s|fakeroot -- bash|export FAKEROOTKEY=1\n\tbash| }' /usr/bin/makepkg
