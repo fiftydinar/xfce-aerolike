@@ -68,28 +68,32 @@ modules:
         - xfce4-pulseaudio-plugin
         - xfce4-docklike-plugin
         - xfce4-xkb-plugin
+        - thunar-archive-plugin
         - xdg-user-dirs
         - gvfs
         - zram-generator
         # CLI editor
         - nano
+        # Archives GUI
+        - xarchiver
         # AppImage thumbnailer dependencies
         - squashfuse
         - imagemagick
         # usb-storage-optimized-async dependencies
         - usbutils
         - bc
-        # am dependency
-        - unzip
-        - 7zip
         # Debugging
         - strace
         - libva-utils
         - mesa-utils
         - vulkan-tools
         - clinfo
+        # Other
+        - expac
   - type: script
     snippets:
+      # Install all optional dependencies for xarchiver
+      - "pacman -Syu --needed --noconfirm --asdeps $(expac -Ss '%o' xarchiver)"
       # Install script to make AUR package easily
       - "wget --retry-connrefused --tries=30 --directory-prefix=/tmp/arch-tools/ https://raw.githubusercontent.com/pkgforge-dev/Anylinux-AppImages/refs/heads/main/useful-tools/make-aur-package.sh"
       - "chmod +x /tmp/arch-tools/make-aur-package.sh"
@@ -146,7 +150,7 @@ modules:
       # Install AppImage Sandbox (sas)
       - "wget --retry-connrefused --tries=30 -O /usr/bin/sas https://raw.githubusercontent.com/Samueru-sama/simple-appimage-sandbox/refs/heads/main/sas.sh && chmod +x /usr/bin/sas"
       # Install usb-storage-optimized-async
-      - "wget --tries=30 --retry-connrefused https://raw.githubusercontent.com/fiftydinar/usb-storage-optimized-async/refs/heads/main/usb-storage-optimized-async-service -O /usr/bin/usb-storage-optimized-async-service && chmod +x /usr/bin/usb-storage-optimized-async-service && wget --tries=30 --retry-connrefused https://raw.githubusercontent.com/fiftydinar/usb-storage-optimized-async/refs/heads/main/usb-storage-optimized-async-udev -O /usr/bin/usb-storage-optimized-async-udev && chmod +x /usr/bin/usb-storage-optimized-async-udev && wget --tries=30 --retry-connrefused https://raw.githubusercontent.com/fiftydinar/usb-storage-optimized-async/refs/heads/main/usb-storage-optimized-async-service.service -O /usr/lib/systemd/system/usb-storage-optimized-async-service.service && wget --tries=30 --retry-connrefused https://raw.githubusercontent.com/fiftydinar/usb-storage-optimized-async/refs/heads/main/zz1-usb-storage-optimized-async-udev.rules -O /usr/lib/udev/rules.d/zz1-usb-storage-optimized-async-udev.rules && systemctl --system enable usb-storage-optimized-async-service.service"
+      - "wget --retry-connrefused --tries=30 https://raw.githubusercontent.com/fiftydinar/usb-storage-optimized-async/refs/heads/main/usb-storage-optimized-async-service -O /usr/bin/usb-storage-optimized-async-service && chmod +x /usr/bin/usb-storage-optimized-async-service && wget --tries=30 --retry-connrefused https://raw.githubusercontent.com/fiftydinar/usb-storage-optimized-async/refs/heads/main/usb-storage-optimized-async-udev -O /usr/bin/usb-storage-optimized-async-udev && chmod +x /usr/bin/usb-storage-optimized-async-udev && wget --tries=30 --retry-connrefused https://raw.githubusercontent.com/fiftydinar/usb-storage-optimized-async/refs/heads/main/usb-storage-optimized-async-service.service -O /usr/lib/systemd/system/usb-storage-optimized-async-service.service && wget --tries=30 --retry-connrefused https://raw.githubusercontent.com/fiftydinar/usb-storage-optimized-async/refs/heads/main/zz1-usb-storage-optimized-async-udev.rules -O /usr/lib/udev/rules.d/zz1-usb-storage-optimized-async-udev.rules && systemctl --system enable usb-storage-optimized-async-service.service"
       # Sudo for wheel group # https://github.com/ExistingPerson08/arch-base
       - |
         sed -i 's/^# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' /etc/sudoers || echo "%wheel ALL=(ALL:ALL) ALL" >> /etc/sudoers
@@ -157,6 +161,8 @@ modules:
       - "echo 'LANG=en_US.UTF-8' > /etc/locale.conf"
       # Set nano as the default editor
       - "echo -e 'VISUAL=nano\nEDITOR=nano' >> /etc/environment"
+      # Download and install aerothemeplasma Kvantum theme
+      - "wget --retry-connrefused --tries=30 https://gitgud.io/aeroshell/atp/aerothemeplasma/-/raw/Plasma/6.6/misc/kvantum/Windows7Aero/Windows7Aero.kvconfig -P /usr/share/Kvantum/Windows7Aero && wget --retry-connrefused --tries=30 https://gitgud.io/aeroshell/atp/aerothemeplasma/-/raw/Plasma/6.6/misc/kvantum/Windows7Aero/Windows7Aero.svg -P /usr/share/Kvantum/Windows7Aero"
       # Set gtk-nocsd by default
       - "echo 'LD_PRELOAD=/usr/lib/libgtk-nocsd.so' >> /etc/environment"
       # Needed for gtk-nocsd to work in sharun AppImages (we don't preload tons of various libs like SteamOS, so we are safe)
