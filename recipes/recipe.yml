@@ -108,7 +108,7 @@ modules:
         Target = bash
         
         [Action]
-        Description = Symblinking /usr/bin/sh to dash...
+        Description = Symlinking /usr/bin/sh to dash...
         When = PostTransaction
         Exec = /usr/bin/ln -sfT /usr/bin/dash /usr/bin/sh
         EOF
