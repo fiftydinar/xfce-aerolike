@@ -89,6 +89,7 @@ modules:
         - mesa-utils
         - vulkan-tools
         - clinfo
+        - xdotool
         # Other
         - expac
   - type: script
