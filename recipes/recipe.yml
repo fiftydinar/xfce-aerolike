@@ -91,7 +91,6 @@ modules:
         - clinfo
         # Other
         - expac
-        - dash
   - type: script
     snippets:
       # Install all optional dependencies for xarchiver
@@ -99,8 +98,6 @@ modules:
       # Install script to make AUR package easily
       - "wget --retry-connrefused --tries=30 --directory-prefix=/tmp/arch-tools/ https://raw.githubusercontent.com/pkgforge-dev/Anylinux-AppImages/refs/heads/main/useful-tools/make-aur-package.sh"
       - "chmod +x /tmp/arch-tools/make-aur-package.sh"
-      # Symlink dash to sh
-      - "ln -sfT /usr/bin/dash /usr/bin/sh && cd /tmp/arch-tools && /tmp/arch-tools/make-aur-package.sh dashbinsh"
       # CoreFreq as CPU freq scaling, idle and clock source driver
       ## Reinstall kernel with kernel arguments needed for corefreq (blacklisting other CPU drivers)
       - |
