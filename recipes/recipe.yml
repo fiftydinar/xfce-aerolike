@@ -71,6 +71,7 @@ modules:
         - thunar-archive-plugin
         - xdg-user-dirs
         - gvfs
+        - gvfs-mtp
         - zram-generator
         # CLI editor
         - nano
