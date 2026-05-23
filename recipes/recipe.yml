@@ -98,6 +98,9 @@ modules:
       # Install script to make AUR package easily
       - "wget --retry-connrefused --tries=30 --directory-prefix=/tmp/arch-tools/ https://raw.githubusercontent.com/pkgforge-dev/Anylinux-AppImages/refs/heads/main/useful-tools/make-aur-package.sh"
       - "chmod +x /tmp/arch-tools/make-aur-package.sh"
+      - "sed -i -e 's|EUID == 0|EUID == 69|g' /usr/bin/makepkg"
+      - |
+        sed -i -e 's|MAKEFLAGS=.*|MAKEFLAGS="-j$(nproc)"|' -e 's|#MAKEFLAGS|MAKEFLAGS|' /etc/makepkg.conf
       # CoreFreq as CPU freq scaling, idle and clock source driver
       ## Reinstall kernel with kernel arguments needed for corefreq (blacklisting other CPU drivers)
       - |
