@@ -92,10 +92,30 @@ modules:
         - xdotool
         # Other
         - expac
+        - dash
   - type: script
     snippets:
       # Install all optional dependencies for xarchiver
       - "pacman -Syu --needed --noconfirm --asdeps $(expac -Ss '%o' xarchiver)"
+      # Symlink dash to sh
+      - "ln -sfT /usr/bin/dash /usr/bin/sh"
+      - |
+        cat > /usr/share/libalpm/hooks/sh-to-dash.hook << 'EOF'
+        [Trigger]
+        Operation = Install
+        Operation = Upgrade
+        Type = Package
+        Target = bash
+        
+        [Action]
+        Description = Symblinking /usr/bin/sh to dash...
+        When = PostTransaction
+        Exec = /usr/bin/ln -sfT /usr/bin/dash /usr/bin/sh
+        EOF
+      - |
+        cat > /usr/lib/dracut/dracut.conf.d/10-dash-shell.conf << 'EOF'
+        add_dracutmodules+=" dash "
+        EOF
       # Install script to make AUR package easily
       - "wget --retry-connrefused --tries=30 --directory-prefix=/tmp/arch-tools/ https://raw.githubusercontent.com/pkgforge-dev/Anylinux-AppImages/refs/heads/main/useful-tools/make-aur-package.sh"
       - "chmod +x /tmp/arch-tools/make-aur-package.sh"
