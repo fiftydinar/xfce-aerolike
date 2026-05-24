@@ -108,7 +108,7 @@ modules:
       - "cd /tmp/arch-tools && /tmp/arch-tools/make-aur-package.sh dashbinsh"
       ## Fix dracut's lib hang on finding root device due to dash's hex escape
       - |
-      sed -i 's/\[ -f "$hook" \] && echo "$hook"/[ -f "$hook" ] \&\& printf '\''%s\\n'\'' "$hook"/g' /usr/lib/dracut/modules.d/80base/dracut-lib.sh
+        sed -i 's/echo "\$hook"/printf '\''%s\\n'\'' "$hook"/g' /usr/lib/dracut/modules.d/80base/dracut-lib.sh
       # CoreFreq as CPU freq scaling, idle and clock source driver
       ## Reinstall kernel with kernel arguments needed for corefreq (blacklisting other CPU drivers)
       - |
