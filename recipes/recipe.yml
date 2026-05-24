@@ -165,7 +165,7 @@ modules:
       - |
         cd /tmp/arch-tools && PRE_BUILD_CMDS="sed -i 's|LIBDIR=\"/usr/lib\"|LIBDIR=\"/usr/lib\" NOOPT=1|' ./PKGBUILD" /tmp/arch-tools/make-aur-package.sh gtk-nocsd-git
       ## Install spice-guest-tools-windows
-      - "cd /tmp/arch-tools && /tmp/arch-tools/make-aur-package.sh spice-guest-tools-windows"
+      #- "cd /tmp/arch-tools && /tmp/arch-tools/make-aur-package.sh spice-guest-tools-windows"
       ## Install dwarfs (for AppImage thumbnailer)
       - "cd /tmp/arch-tools && /tmp/arch-tools/make-aur-package.sh dwarfs-bin"
       # Cleanup
