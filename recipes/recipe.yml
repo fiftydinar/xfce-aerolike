@@ -144,11 +144,6 @@ modules:
       - "cd /tmp/arch-tools && /tmp/arch-tools/make-aur-package.sh compiz"
       - |
         sed -i 's|USE_EMERALD="no"|USE_EMERALD="yes"|g' /usr/bin/compiz-decorator
-      ## Fix CCSM Preferences bug: don't trigger ResetProfile() on dialog open
-      - |
-        CCSM_DIR=$(python3 -c "import ccm; import os; print(os.path.dirname(ccm.__file__))") && \
-        sed -i 'self.ProfileComboBox.set_active(active+1)/d; /self.ProfileHandler = self.ProfileComboBox.connect/i\        self.ProfileComboBox.set_active(active+1)' "$CCSM_DIR/Pages.py"
-
       ## Build and install emerald
       - "cd /tmp/arch-tools && /tmp/arch-tools/make-aur-package.sh emerald"
       ## Install networkmanager-dispatcher-chrony
