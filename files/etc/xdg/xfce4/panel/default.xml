@@ -6,7 +6,7 @@
     <value type="int" value="1"/>
     <property name="dark-mode" type="bool" value="true"/>
     <property name="panel-1" type="empty">
-      <property name="position" type="string" value="p=8;x=640;y=779"/>
+      <property name="position" string="true" value="p=8;x=640;y=779"/>
       <property name="length" type="uint" value="100"/>
       <property name="position-locked" type="bool" value="true"/>
       <property name="icon-size" type="uint" value="16"/>
@@ -49,8 +49,7 @@
       <property name="expand" type="bool" value="true"/>
       <property name="style" type="uint" value="0"/>
     </property>
-    <property name="plugin-5" type="string" value="power-manager-plugin"/>
-    <property name="plugin-6" type="string" value="systray">
+    <property name="plugin-5" type="string" value="systray">
       <property name="known-legacy-items" type="array">
       </property>
       <property name="known-items" type="array">
@@ -63,9 +62,10 @@
       <property name="hidden-legacy-items" type="array">
       </property>
     </property>
-    <property name="plugin-7" type="string" value="pulseaudio">
+    <property name="plugin-6" type="string" value="pulseaudio">
       <property name="enable-keyboard-shortcuts" type="bool" value="true"/>
     </property>
+    <property name="plugin-7" type="string" value="power-manager-plugin"/>
     <property name="plugin-8" type="string" value="notification-plugin"/>
     <property name="plugin-9" type="string" value="clock">
       <property name="digital-date-font" type="string" value="Noto Sans Semi-Bold 9"/>
