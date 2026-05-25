@@ -170,14 +170,11 @@
 
 #xfce4-power-manager-plugin {
     color: #ffffff;
-    padding: 0;
+    padding: 0 4px;
     margin: 0;
     border: 1px solid rgba(0,0,0,0);
+    min-width: 40px;
     transition: 500ms;
-}
-
-#xfce4-power-manager-plugin image {
-    margin: 0 -4px;
 }
 
 #xfce4-power-manager-plugin:hover {
