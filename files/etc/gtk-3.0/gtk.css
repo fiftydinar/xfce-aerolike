@@ -141,10 +141,11 @@
 
 #clock-button {
     color: #ffffff;
-    margin-right: -16px;
+    margin-right: -20px;
     padding: 0 2px;
     border: 1px solid rgba(0,0,0,0);
     padding: 0 4px;
+    min-width: 36px;
     transition: 500ms;
 }
 
@@ -173,7 +174,7 @@
     padding: 0 4px;
     margin: 0;
     border: 1px solid rgba(0,0,0,0);
-    min-width: 40px;
+    min-width: 36px;
     transition: 500ms;
 }
 
@@ -201,6 +202,8 @@
 #notification-plugin,
 #notification-plugin-8,
 #xfce4-notification-plugin {
+    padding: 0 4px;
+    min-width: 36px;
     border: 1px solid rgba(0,0,0,0);
     transition: 500ms;
 }
@@ -260,8 +263,9 @@
 }
 
 #xfce4-clipman-plugin {
-    padding: 0;
+    padding: 0 4px;
     margin: 0;
+    min-width: 36px;
     border: 1px solid rgba(0,0,0,0);
     transition: 500ms;
 }
@@ -290,8 +294,9 @@
 }
 
 #pulseaudio-button {
-    padding: 0;
+    padding: 0 2px;
     margin: 0;
+    min-width: 36px;
     border: 1px solid rgba(0,0,0,0);
     transition: 500ms;
 }
@@ -316,8 +321,9 @@
 }
 
 #sn-button {
-    padding: 0;
+    padding: 0 4px;
     margin: 0;
+    min-width: 36px;
     border: 1px solid rgba(0,0,0,0);
     transition: 500ms;
 }
