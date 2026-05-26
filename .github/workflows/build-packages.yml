@@ -22,14 +22,24 @@ jobs:
         pkg:
           - name: linux-lts
             repo: https://gitlab.archlinux.org/archlinux/packaging/packages/linux-lts.git
-
-          - name: xfdesktop
-            repo: https://gitlab.archlinux.org/archlinux/packaging/packages/xfdesktop.git
-            prepare: |
-              sed -i 's|--prefix=/usr|--prefix=/usr --with-default-backdrop-filename=/usr/share/backgrounds/frosted-glass.webp|g' ./PKGBUILD
+            skippgpcheck: true
+            patch: |
+              SRCDIR=$(find /build/src -maxdepth 1 -type d -name 'linux-*' | head -1)
+              [ -n "$SRCDIR" ] || { echo "ERROR: source dir not found"; exit 1; }
+              cd "$SRCDIR"
+              sed -i "s|# CONFIG_CMDLINE_BOOL is not set|CONFIG_CMDLINE_BOOL=y|" .config
+              echo "CONFIG_CMDLINE=\"$KERNEL_CMDLINE\"" >> .config
+              cd /build
 
           - name: xfce4-screensaver
             repo: https://gitlab.archlinux.org/archlinux/packaging/packages/xfce4-screensaver.git
+            patch: |
+              SRCDIR=$(find /build/src -maxdepth 1 -type d -name 'xfce4-screensaver*' | head -1)
+              [ -n "$SRCDIR" ] || { echo "ERROR: source dir not found"; exit 1; }
+              curl -sLO https://raw.githubusercontent.com/fiftydinar/xfce-aerolike/refs/heads/main/patches/xfce4-screensaver/0001-set-default-wallpaper.patch
+              cd "$SRCDIR"
+              patch -p1 < /build/0001-set-default-wallpaper.patch
+              cd /build
 
           - name: corefreq
             repo: https://aur.archlinux.org/corefreq.git
@@ -72,7 +82,7 @@ jobs:
           echo "KERNEL_CMDLINE=${{ github.event.inputs.kernel-cmdline }}" >> $GITHUB_ENV
 
       - name: Apply patches
-        if: ${{ matrix.pkg.prepare && matrix.pkg.name != 'linux-lts' }}
+        if: ${{ matrix.pkg.prepare }}
         run: |
           cd /build && ${{ matrix.pkg.prepare }}
 
@@ -83,35 +93,31 @@ jobs:
           pacman -Sy --noconfirm --needed base-devel ${depends[@]} ${makedepends[@]} 2>/dev/null || true
 
       - name: Build package
+        if: ${{ matrix.pkg.patch }}
         run: |
           cd /build
           echo "::group::Building ${{ matrix.pkg.name }}"
           chown -R builder:builder /build
-          if [ "${{ matrix.pkg.name }}" = "linux-lts" ]; then
-            echo "Patching kernel cmdline..."
-            sudo -u builder makepkg --noconfirm --syncdeps --nocheck --skippgpcheck --nobuild
-            SRCDIR=$(find /build/src -maxdepth 1 -type d -name 'linux-*' | head -1)
-            [ -n "$SRCDIR" ] || { echo "ERROR: source dir not found"; exit 1; }
-            cd "$SRCDIR"
-            sed -i "s|# CONFIG_CMDLINE_BOOL is not set|CONFIG_CMDLINE_BOOL=y|" .config
-            echo "CONFIG_CMDLINE=\"$KERNEL_CMDLINE\"" >> .config
-            cd /build
-            chown -R builder:builder /build
-            sudo -u builder makepkg --noconfirm --syncdeps --nocheck --skippgpcheck --noextract
-          elif [ "${{ matrix.pkg.name }}" = "xfce4-screensaver" ]; then
-            echo "Applying wallpaper patch..."
-            sudo -u builder makepkg --noconfirm --syncdeps --nocheck --nobuild
-            SRCDIR=$(find /build/src -maxdepth 1 -type d -name 'xfce4-screensaver*' | head -1)
-            [ -n "$SRCDIR" ] || { echo "ERROR: source dir not found"; exit 1; }
-            curl -sLO https://raw.githubusercontent.com/fiftydinar/xfce-aerolike/refs/heads/main/patches/xfce4-screensaver/0001-set-default-wallpaper.patch
-            cd "$SRCDIR"
-            patch -p1 < /build/0001-set-default-wallpaper.patch
-            cd /build
-            echo "Building patched package..."
-            sudo -u builder makepkg --noconfirm --syncdeps --nocheck --noextract
-          else
-            sudo -u builder makepkg --noconfirm --syncdeps --nocheck
-          fi
+          PGP=""
+          [ "${{ matrix.pkg.skippgpcheck }}" = "true" ] && PGP="--skippgpcheck"
+          echo "Extracting sources..."
+          sudo -u builder makepkg --noconfirm --syncdeps --nocheck $PGP --nobuild
+          echo "Applying patch..."
+          ${{ matrix.pkg.patch }}
+          echo "Building patched package..."
+          chown -R builder:builder /build
+          sudo -u builder makepkg --noconfirm --syncdeps --nocheck $PGP --noextract
+          echo "::endgroup::"
+
+      - name: Build package
+        if: ${{ !matrix.pkg.patch }}
+        run: |
+          cd /build
+          echo "::group::Building ${{ matrix.pkg.name }}"
+          chown -R builder:builder /build
+          PGP=""
+          [ "${{ matrix.pkg.skippgpcheck }}" = "true" ] && PGP="--skippgpcheck"
+          sudo -u builder makepkg --noconfirm --syncdeps --nocheck $PGP
           echo "::endgroup::"
 
       - name: Upload package
@@ -257,7 +263,7 @@ jobs:
           i=1
           for pkgdir in */; do
             pkgname=${pkgdir%/}
-            pkgfile=$(ls "$pkgdir/"*.pkg.tar.zst 2>/dev/null | head -1)
+            pkgfile=$(ls "$pkgdir"*.pkg.tar.zst 2>/dev/null | head -1)
             if [ -n "$pkgfile" ]; then
               size=$(du -h "$pkgfile" | cut -f1)
               cp "$pkgfile" packages/
