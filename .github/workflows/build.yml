@@ -38,3 +38,41 @@ jobs:
           registry_token: ${{ github.token }}
           pr_event_number: ${{ github.event.number }}
           maximize_build_space: false
+
+  generate-disk-image:
+    name: Generate disk image (qcow2)
+    runs-on: ubuntu-latest
+    needs: bluebuild
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build disk-ready container
+        run: |
+          sudo podman build \
+            -t xfce-aerolike-disk \
+            -f Containerfile.disk \
+            .
+
+      - name: Convert to qcow2 via bootc-image-builder
+        run: |
+          mkdir -p output
+          sudo podman run --rm --privileged \
+            -v ./output:/output \
+            -v /var/lib/containers/storage:/var/lib/containers/storage \
+            quay.io/centos-bootc/bootc-image-builder:latest \
+            --type qcow2 \
+            --rootfs ext4 \
+            localhost/xfce-aerolike-disk
+
+      - name: Compress disk image
+        run: |
+          zstd -T0 -19 output/qcow2/disk.qcow2 -o xfce-aerolike.qcow2.zst
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: xfce-aerolike-disk
+          path: xfce-aerolike.qcow2.zst
+          compression-level: 0
