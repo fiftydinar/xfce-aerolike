@@ -272,6 +272,7 @@ jobs:
             xfce-aerolike-packages.tar.gz
             packages/*.pkg.tar.zst
       - name: Trigger bluebuild
+        if: github.event_name == 'schedule'
         run: gh workflow run build.yml --ref main
         env:
           GITHUB_TOKEN: ${{ github.token }}
