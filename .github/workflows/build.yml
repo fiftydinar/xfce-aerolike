@@ -7,13 +7,14 @@ on:
   push:
     paths-ignore:
       - "**.md"
-      - .github/workflows/build-packages.yml
+      - ".github/workflows/build-packages.yml"
   workflow_dispatch:
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref || github.run_id }}
   cancel-in-progress: true
 jobs:
   bluebuild:
+    if: ${{ !cancelled() && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success') }}
     name: Build Custom Image
     runs-on: ubuntu-latest
     permissions:
