@@ -21,37 +21,34 @@ jobs:
       matrix:
         pkg:
           - name: linux-lts
-            pkgbuild: https://gitlab.archlinux.org/archlinux/packaging/packages/linux-lts/-/raw/main/PKGBUILD
+            repo: https://gitlab.archlinux.org/archlinux/packaging/packages/linux-lts.git
 
           - name: xfdesktop
-            pkgbuild: https://gitlab.archlinux.org/archlinux/packaging/packages/xfdesktop/-/raw/main/PKGBUILD
+            repo: https://gitlab.archlinux.org/archlinux/packaging/packages/xfdesktop.git
             prepare: |
               sed -i 's|--prefix=/usr|--prefix=/usr --with-default-backdrop-filename=/usr/share/backgrounds/frosted-glass.webp|g' ./PKGBUILD
 
           - name: xfce4-screensaver
-            pkgbuild: https://gitlab.archlinux.org/archlinux/packaging/packages/xfce4-screensaver/-/raw/main/PKGBUILD
+            repo: https://gitlab.archlinux.org/archlinux/packaging/packages/xfce4-screensaver.git
 
           - name: corefreq
-            pkgbuild: https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h=corefreq
+            repo: https://aur.archlinux.org/corefreq.git
             prepare: |
               sed -i 's|make |make DELAY_TSC=1 |g' ./PKGBUILD
 
           - name: gtk2
-            pkgbuild: https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h=gtk2
-
-          - name: libwnck
-            pkgbuild: https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h=libwnck
+            repo: https://aur.archlinux.org/gtk2.git
 
           - name: gtk-nocsd-git
-            pkgbuild: https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h=gtk-nocsd-git
+            repo: https://aur.archlinux.org/gtk-nocsd-git.git
             prepare: |
               sed -i 's|LIBDIR="/usr/lib"|LIBDIR="/usr/lib" NOOPT=1|' ./PKGBUILD
 
           - name: networkmanager-dispatcher-chrony
-            pkgbuild: https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h=networkmanager-dispatcher-chrony
+            repo: https://aur.archlinux.org/networkmanager-dispatcher-chrony.git
 
           - name: dwarfs-bin
-            pkgbuild: https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h=dwarfs-bin
+            repo: https://aur.archlinux.org/dwarfs-bin.git
 
     container:
       image: docker.io/archlinux:latest
@@ -63,11 +60,11 @@ jobs:
           pacman -Sy --noconfirm base-devel git sudo pacman-contrib
           useradd -m builder && echo 'builder ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
 
-      - name: Download PKGBUILD
+      - name: Clone package repo
         run: |
-          mkdir -p /build
-          curl -sfL "${{ matrix.pkg.pkgbuild }}" -o /build/PKGBUILD
-          ls -la /build/PKGBUILD
+          rm -rf /build
+          git clone --depth 1 "${{ matrix.pkg.repo }}" /build
+          ls -la /build/
 
       - name: Override kernel cmdline
         if: ${{ matrix.pkg.name == 'linux-lts' && github.event.inputs.kernel-cmdline != '' }}
@@ -92,24 +89,25 @@ jobs:
           chown -R builder:builder /build
           if [ "${{ matrix.pkg.name }}" = "linux-lts" ]; then
             echo "Patching kernel cmdline..."
-            python3 -c '
-            import os
-            c = os.environ["KERNEL_CMDLINE"]
-            with open("PKGBUILD") as f:
-              s = f.read()
-            old = "  cp ../config .config"
-            new = "  CMDLINE=\"" + c + "\"\n  sed -i \"s|# CONFIG_CMDLINE_BOOL is not set|CONFIG_CMDLINE_BOOL=y\\nCONFIG_CMDLINE=\\"" + c + "\\"|g\" ../config\n  cp ../config .config"
-            s = s.replace(old, new, 1)
-            with open("PKGBUILD", "w") as f:
-              f.write(s)
-            '
+            cat > /tmp/patch-kernel.py << 'PYEOF'
+import os
+c = os.environ["KERNEL_CMDLINE"]
+with open("PKGBUILD") as f:
+    s = f.read()
+old = "  cp ../config .config"
+new = '  CMDLINE="' + c + '"\n  sed -i "s|# CONFIG_CMDLINE_BOOL is not set|CONFIG_CMDLINE_BOOL=y\\nCONFIG_CMDLINE=\\"' + c + '\\"|g" ../config\n  cp ../config .config'
+s = s.replace(old, new, 1)
+with open("PKGBUILD", "w") as f:
+    f.write(s)
+PYEOF
+            python3 /tmp/patch-kernel.py
             updpkgsums PKGBUILD
             chown -R builder:builder /build
             sudo -u builder makepkg --noconfirm --syncdeps --nocheck
           elif [ "${{ matrix.pkg.name }}" = "xfce4-screensaver" ]; then
             echo "Applying wallpaper patch..."
             sudo -u builder makepkg --noconfirm --syncdeps --nocheck --nobuild
-            SRCDIR=$(ls -d /build/src/xfce4-screensaver-* | head -1)
+            SRCDIR=$(find /build/src -maxdepth 1 -type d -name 'xfce4-screensaver*' | head -1)
             [ -n "$SRCDIR" ] || { echo "ERROR: source dir not found"; exit 1; }
             wget -q https://raw.githubusercontent.com/fiftydinar/xfce-aerolike/refs/heads/main/patches/xfce4-screensaver/0001-set-default-wallpaper.patch
             cd "$SRCDIR"
@@ -129,20 +127,68 @@ jobs:
           path: /build/*.pkg.tar.zst
           compression-level: 0
 
+  build-libwnck:
+    name: libwnck
+    runs-on: ubuntu-latest
+    needs: build-base
+    container:
+      image: docker.io/archlinux:latest
+      options: --cap-add=SYS_ADMIN
+
+    steps:
+      - name: Setup build environment
+        run: |
+          pacman -Sy --noconfirm base-devel git sudo pacman-contrib
+          useradd -m builder && echo 'builder ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
+
+      - name: Download gtk2
+        uses: actions/download-artifact@v4
+        with:
+          name: gtk2
+          path: /deps
+
+      - name: Install gtk2
+        run: pacman -U --noconfirm /deps/*.pkg.tar.zst
+
+      - name: Clone repo
+        run: |
+          rm -rf /build
+          git clone --depth 1 https://aur.archlinux.org/libwnck.git /build
+          ls -la /build/
+
+      - name: Install dependencies
+        run: |
+          cd /build
+          . ./PKGBUILD
+          pacman -Sy --noconfirm --needed base-devel ${depends[@]} ${makedepends[@]} 2>/dev/null || true
+
+      - name: Build package
+        run: |
+          cd /build
+          chown -R builder:builder /build
+          sudo -u builder makepkg --noconfirm --syncdeps --nocheck
+
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: libwnck
+          path: /build/*.pkg.tar.zst
+          compression-level: 0
+
   build-dependent:
     name: ${{ matrix.pkg.name }}
     runs-on: ubuntu-latest
-    needs: build-base
+    needs: [build-base, build-libwnck]
     strategy:
       fail-fast: false
       matrix:
         pkg:
           - name: compiz
-            pkgbuild: https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h=compiz
+            repo: https://aur.archlinux.org/compiz.git
             deps: gtk2 libwnck
 
           - name: emerald
-            pkgbuild: https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h=emerald
+            repo: https://aur.archlinux.org/emerald.git
             deps: gtk2 libwnck
 
     container:
@@ -170,11 +216,11 @@ jobs:
         run: |
           pacman -U --noconfirm /deps/*.pkg.tar.zst
 
-      - name: Download PKGBUILD
+      - name: Clone repo
         run: |
-          mkdir -p /build
-          curl -sfL "${{ matrix.pkg.pkgbuild }}" -o /build/PKGBUILD
-          ls -la /build/PKGBUILD
+          rm -rf /build
+          git clone --depth 1 "${{ matrix.pkg.repo }}" /build
+          ls -la /build/
 
       - name: Install dependencies
         run: |
@@ -190,9 +236,16 @@ jobs:
           sudo -u builder makepkg --noconfirm --syncdeps --nocheck
           echo "::endgroup::"
 
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.pkg.name }}
+          path: /build/*.pkg.tar.zst
+          compression-level: 0
+
   publish:
     name: Publish release
-    needs: [build-base, build-dependent]
+    needs: [build-base, build-libwnck, build-dependent]
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
