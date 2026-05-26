@@ -91,16 +91,16 @@ jobs:
           if [ "${{ matrix.pkg.name }}" = "linux-lts" ]; then
             echo "Patching kernel cmdline..."
             python3 -c '
-import os
-c = os.environ["KERNEL_CMDLINE"]
-with open("PKGBUILD") as f:
-  s = f.read()
-old = "  cp ../config .config"
-new = "  CMDLINE=\"" + c + "\"\n  sed -i \"s|# CONFIG_CMDLINE_BOOL is not set|CONFIG_CMDLINE_BOOL=y\\nCONFIG_CMDLINE=\\"" + c + "\\"|g\" ../config\n  cp ../config .config"
-s = s.replace(old, new, 1)
-with open("PKGBUILD", "w") as f:
-  f.write(s)
-'
+            import os
+            c = os.environ["KERNEL_CMDLINE"]
+            with open("PKGBUILD") as f:
+              s = f.read()
+            old = "  cp ../config .config"
+            new = "  CMDLINE=\"" + c + "\"\n  sed -i \"s|# CONFIG_CMDLINE_BOOL is not set|CONFIG_CMDLINE_BOOL=y\\nCONFIG_CMDLINE=\\"" + c + "\\"|g\" ../config\n  cp ../config .config"
+            s = s.replace(old, new, 1)
+            with open("PKGBUILD", "w") as f:
+              f.write(s)
+            '
             updpkgsums PKGBUILD
             chown -R builder:builder /build
             sudo -u builder makepkg --noconfirm --syncdeps --nocheck
