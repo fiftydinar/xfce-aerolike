@@ -244,6 +244,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: write
     steps:
       - uses: actions/download-artifact@v4
       - name: Create release archive
@@ -270,3 +271,7 @@ jobs:
           files: |
             xfce-aerolike-packages.tar.gz
             packages/*.pkg.tar.zst
+      - name: Trigger bluebuild
+        run: gh workflow run build.yml --ref main
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
