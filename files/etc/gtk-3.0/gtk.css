@@ -349,13 +349,19 @@
 
 /* Give glass styling to the system tray buttons. */
 
-#systray-6 button {
+#systray-5 button,
+#systray-5 .button,
+#systray-6 button,
+#systray-6 .button {
     color: #ffffff;
     border: 1px solid rgba(0,0,0,0);
     transition: 500ms;
 }
 
-#systray-6 button:hover {
+#systray-5 button:hover,
+#systray-5 .button:hover,
+#systray-6 button:hover,
+#systray-6 .button:hover {
     background-color: transparent;
     background-image: linear-gradient(to bottom,
                                       rgba(255,255,255,0.5),
@@ -365,7 +371,10 @@
     box-shadow: 0 0 0 1px rgba(255,255,255,0.375) inset;
 }
 
-#systray-6 button:checked, #systray-6 button:active {
+#systray-5 button:checked, #systray-5 button:active,
+#systray-5 .button:checked, #systray-5 .button:active,
+#systray-6 button:checked, #systray-6 button:active,
+#systray-6 .button:checked, #systray-6 .button:active {
     background-color: transparent;
     background-image: linear-gradient(to bottom,
                                       rgba(255,255,255,0.625),
