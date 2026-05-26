@@ -22,9 +22,6 @@ jobs:
         pkg:
           - name: linux-lts
             pkgbuild: https://gitlab.archlinux.org/archlinux/packaging/packages/linux-lts/-/raw/main/PKGBUILD
-            prepare: |
-              CMDLINE="${KERNEL_CMDLINE}"
-              sed -i 's|# CONFIG_CMDLINE_BOOL is not set|CONFIG_CMDLINE_BOOL=y\nCONFIG_CMDLINE="'"$CMDLINE"'"|g' ./config
 
           - name: xfdesktop
             pkgbuild: https://gitlab.archlinux.org/archlinux/packaging/packages/xfdesktop/-/raw/main/PKGBUILD
@@ -76,15 +73,9 @@ jobs:
           echo "KERNEL_CMDLINE=${{ github.event.inputs.kernel-cmdline }}" >> $GITHUB_ENV
 
       - name: Apply patches
-        if: ${{ matrix.pkg.prepare }}
+        if: ${{ matrix.pkg.prepare && matrix.pkg.name != 'linux-lts' }}
         working-directory: /build
         run: ${{ matrix.pkg.prepare }}
-
-      - name: Update checksums
-        if: ${{ matrix.pkg.name == 'linux-lts' }}
-        working-directory: /build
-        run: |
-          updpkgsums PKGBUILD
 
       - name: Install dependencies
         working-directory: /build
@@ -97,13 +88,28 @@ jobs:
         run: |
           echo "::group::Building ${{ matrix.pkg.name }}"
           chown -R builder:builder /build
-          if [ "${{ matrix.pkg.name }}" = "xfce4-screensaver" ]; then
+          if [ "${{ matrix.pkg.name }}" = "linux-lts" ]; then
+            echo "Patching kernel cmdline..."
+            python3 << 'PYEOF'
+import os
+c = os.environ['KERNEL_CMDLINE']
+with open('PKGBUILD') as f:
+  s = f.read()
+old = '  cp ../config .config'
+new = '  CMDLINE="' + c + '"\n  sed -i "s|# CONFIG_CMDLINE_BOOL is not set|CONFIG_CMDLINE_BOOL=y\\nCONFIG_CMDLINE=\\"' + c + '\\"|g" ../config\n  cp ../config .config'
+s = s.replace(old, new, 1)
+with open('PKGBUILD', 'w') as f:
+  f.write(s)
+PYEOF
+            updpkgsums PKGBUILD
+            chown -R builder:builder /build
+            sudo -u builder makepkg --noconfirm --syncdeps --nocheck
+          elif [ "${{ matrix.pkg.name }}" = "xfce4-screensaver" ]; then
             echo "Applying wallpaper patch..."
             sudo -u builder makepkg --noconfirm --syncdeps --nocheck --nobuild
-            echo "Downloading patch..."
-            wget -q https://raw.githubusercontent.com/fiftydinar/xfce-aerolike/refs/heads/main/patches/xfce4-screensaver/0001-set-default-wallpaper.patch
             SRCDIR=$(ls -d /build/src/xfce4-screensaver-* | head -1)
             [ -n "$SRCDIR" ] || { echo "ERROR: source dir not found"; exit 1; }
+            wget -q https://raw.githubusercontent.com/fiftydinar/xfce-aerolike/refs/heads/main/patches/xfce4-screensaver/0001-set-default-wallpaper.patch
             cd "$SRCDIR"
             patch -p1 < /build/0001-set-default-wallpaper.patch
             cd /build
