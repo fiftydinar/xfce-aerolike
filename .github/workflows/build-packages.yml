@@ -67,9 +67,8 @@ jobs:
           useradd -m builder && echo 'builder ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
 
       - name: Download PKGBUILD
-        working-directory: /build
         run: |
-          mkdir -p /build && curl -sL "${{ matrix.pkg.pkgbuild }}" -o PKGBUILD
+          mkdir -p /build && cd /build && curl -sL "${{ matrix.pkg.pkgbuild }}" -o PKGBUILD
 
       - name: Override kernel cmdline
         if: ${{ matrix.pkg.name == 'linux-lts' && github.event.inputs.kernel-cmdline != '' }}
@@ -164,9 +163,8 @@ jobs:
           pacman -U --noconfirm /deps/*.pkg.tar.zst
 
       - name: Download PKGBUILD
-        working-directory: /build
         run: |
-          curl -sL "${{ matrix.pkg.pkgbuild }}" -o PKGBUILD
+          mkdir -p /build && cd /build && curl -sL "${{ matrix.pkg.pkgbuild }}" -o PKGBUILD
 
       - name: Install dependencies
         working-directory: /build
