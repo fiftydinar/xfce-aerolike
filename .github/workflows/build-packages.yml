@@ -82,6 +82,8 @@ jobs:
       - name: Install dependencies
         working-directory: /build
         run: |
+          pwd
+          ls -la
           . PKGBUILD
           pacman -Sy --noconfirm --needed base-devel ${depends[@]} ${makedepends[@]} 2>/dev/null || true
 
@@ -179,6 +181,8 @@ jobs:
       - name: Install dependencies
         working-directory: /build
         run: |
+          pwd
+          ls -la
           . PKGBUILD
           pacman -Sy --noconfirm --needed base-devel ${depends[@]} ${makedepends[@]} 2>/dev/null || true
 
