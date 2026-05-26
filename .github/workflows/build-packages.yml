@@ -1,0 +1,206 @@
+name: Build packages
+on:
+  schedule:
+    - cron: "00 04 * * *"
+  workflow_dispatch:
+    inputs:
+      kernel-cmdline:
+        description: 'Kernel cmdline args, use commas between each arg'
+        required: false
+        default: ''
+
+env:
+  KERNEL_CMDLINE: "nmi_watchdog=0,modprobe.blacklist=i5500_temp,coretemp,intel_idle,intel_cstate,intel_uncore,acpi_cpufreq,pcc_cpufreq,intel_powerclamp,i7core_edac,intel_rapl_msr,intel_rapl_common,intel_pmc_bxt,k10temp,rapl,sp5100_tco,wmi,eeepc_wmi,asus_wmi,amd_pstate=disable,idle=halt,intel_pstate=disable,intel_idle.max_cstate=0,tsc=unstable,nowatchdog"
+
+jobs:
+  build-base:
+    name: ${{ matrix.pkg.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        pkg:
+          - name: linux-lts
+            pkgbuild: https://gitlab.archlinux.org/archlinux/packaging/packages/linux-lts/-/raw/main/PKGBUILD
+            prepare: |
+              CMDLINE="${KERNEL_CMDLINE}"
+              sed -i 's|# CONFIG_CMDLINE_BOOL is not set|CONFIG_CMDLINE_BOOL=y\nCONFIG_CMDLINE="'"$CMDLINE"'"|g' ./config
+
+          - name: xfdesktop
+            pkgbuild: https://gitlab.archlinux.org/archlinux/packaging/packages/xfdesktop/-/raw/main/PKGBUILD
+            prepare: |
+              sed -i 's|--prefix=/usr|--prefix=/usr --with-default-backdrop-filename=/usr/share/backgrounds/frosted-glass.webp|g' ./PKGBUILD
+
+          - name: xfce4-screensaver
+            pkgbuild: https://gitlab.archlinux.org/archlinux/packaging/packages/xfce4-screensaver/-/raw/main/PKGBUILD
+
+          - name: corefreq
+            pkgbuild: https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h=corefreq
+            prepare: |
+              sed -i 's|make |make DELAY_TSC=1 |g' ./PKGBUILD
+
+          - name: gtk2
+            pkgbuild: https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h=gtk2
+
+          - name: libwnck
+            pkgbuild: https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h=libwnck
+
+          - name: gtk-nocsd-git
+            pkgbuild: https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h=gtk-nocsd-git
+            prepare: |
+              sed -i 's|LIBDIR="/usr/lib"|LIBDIR="/usr/lib" NOOPT=1|' ./PKGBUILD
+
+          - name: networkmanager-dispatcher-chrony
+            pkgbuild: https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h=networkmanager-dispatcher-chrony
+
+          - name: dwarfs-bin
+            pkgbuild: https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h=dwarfs-bin
+
+    container:
+      image: docker.io/archlinux:latest
+      options: --cap-add=SYS_ADMIN
+
+    steps:
+      - name: Setup build environment
+        run: |
+          pacman -Sy --noconfirm base-devel git sudo pacman-contrib
+          useradd -m builder && echo 'builder ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
+
+      - name: Download PKGBUILD
+        working-directory: /build
+        run: |
+          mkdir -p /build && curl -sL "${{ matrix.pkg.pkgbuild }}" -o PKGBUILD
+
+      - name: Override kernel cmdline
+        if: ${{ matrix.pkg.name == 'linux-lts' && github.event.inputs.kernel-cmdline != '' }}
+        run: |
+          echo "KERNEL_CMDLINE=${{ github.event.inputs.kernel-cmdline }}" >> $GITHUB_ENV
+
+      - name: Apply patches
+        if: ${{ matrix.pkg.prepare }}
+        working-directory: /build
+        run: ${{ matrix.pkg.prepare }}
+
+      - name: Update checksums
+        if: ${{ matrix.pkg.name == 'linux-lts' }}
+        working-directory: /build
+        run: |
+          updpkgsums PKGBUILD
+
+      - name: Install dependencies
+        working-directory: /build
+        run: |
+          source PKGBUILD
+          pacman -Sy --noconfirm --needed base-devel ${depends[@]} ${makedepends[@]} 2>/dev/null || true
+
+      - name: Build package
+        working-directory: /build
+        run: |
+          chown -R builder:builder /build
+          if [ "${{ matrix.pkg.name }}" = "xfce4-screensaver" ]; then
+            sudo -u builder makepkg --noconfirm --syncdeps --nocheck --nobuild
+            wget -q https://raw.githubusercontent.com/fiftydinar/xfce-aerolike/refs/heads/main/patches/xfce4-screensaver/0001-set-default-wallpaper.patch
+            SRCDIR=$(ls -d /build/src/xfce4-screensaver-* | head -1)
+            [ -n "$SRCDIR" ] || { echo "ERROR: source dir not found"; exit 1; }
+            cd "$SRCDIR"
+            patch -p1 < /build/0001-set-default-wallpaper.patch
+            cd /build
+            sudo -u builder makepkg --noconfirm --syncdeps --nocheck --noextract
+          else
+            sudo -u builder makepkg --noconfirm --syncdeps --nocheck
+          fi
+
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.pkg.name }}
+          path: /build/*.pkg.tar.zst
+          compression-level: 0
+
+  build-dependent:
+    name: ${{ matrix.pkg.name }}
+    runs-on: ubuntu-latest
+    needs: build-base
+    strategy:
+      fail-fast: false
+      matrix:
+        pkg:
+          - name: compiz
+            pkgbuild: https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h=compiz
+            deps: gtk2 libwnck
+
+          - name: emerald
+            pkgbuild: https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h=emerald
+            deps: gtk2 libwnck
+
+    container:
+      image: docker.io/archlinux:latest
+      options: --cap-add=SYS_ADMIN
+
+    steps:
+      - name: Setup build environment
+        run: |
+          pacman -Sy --noconfirm base-devel git sudo pacman-contrib
+          useradd -m builder && echo 'builder ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
+
+      - name: Download AUR dependencies
+        uses: actions/download-artifact@v4
+        with:
+          name: gtk2
+          path: /deps
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: libwnck
+          path: /deps
+
+      - name: Install AUR dependencies
+        run: |
+          pacman -U --noconfirm /deps/*.pkg.tar.zst
+
+      - name: Download PKGBUILD
+        working-directory: /build
+        run: |
+          curl -sL "${{ matrix.pkg.pkgbuild }}" -o PKGBUILD
+
+      - name: Install dependencies
+        working-directory: /build
+        run: |
+          source PKGBUILD
+          pacman -Sy --noconfirm --needed base-devel ${depends[@]} ${makedepends[@]} 2>/dev/null || true
+
+      - name: Build package
+        working-directory: /build
+        run: |
+          chown -R builder:builder /build
+          sudo -u builder makepkg --noconfirm --syncdeps --nocheck
+
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.pkg.name }}
+          path: /build/*.pkg.tar.zst
+          compression-level: 0
+
+  publish:
+    name: Publish release
+    needs: [build-base, build-dependent]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+      - name: Create release archive
+        run: |
+          mkdir packages
+          for dir in */; do
+            cp "$dir"*.pkg.tar.zst packages/ 2>/dev/null || true
+          done
+          tar -czf xfce-aerolike-packages.tar.gz packages/
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: packages-${{ github.run_id }}
+          files: |
+            xfce-aerolike-packages.tar.gz
+            packages/*.pkg.tar.zst
