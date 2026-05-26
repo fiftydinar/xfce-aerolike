@@ -255,8 +255,9 @@ jobs:
           echo "| # | Package | Size |" >> $GITHUB_STEP_SUMMARY
           echo "|---|---|---|" >> $GITHUB_STEP_SUMMARY
           i=1
-          for pkgname in linux-lts xfdesktop xfce4-screensaver corefreq gtk2 libwnck gtk-nocsd-git networkmanager-dispatcher-chrony dwarfs-bin compiz emerald; do
-            pkgfile=$(ls "$pkgname/"*.pkg.tar.zst 2>/dev/null | head -1)
+          for pkgdir in */; do
+            pkgname=${pkgdir%/}
+            pkgfile=$(ls "$pkgdir/"*.pkg.tar.zst 2>/dev/null | head -1)
             if [ -n "$pkgfile" ]; then
               size=$(du -h "$pkgfile" | cut -f1)
               cp "$pkgfile" packages/
