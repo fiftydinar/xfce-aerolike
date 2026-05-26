@@ -4,6 +4,7 @@ on:
     paths-ignore:
       - "**.md"
       - ".github/workflows/build-packages.yml"
+      - ".github/workflows/build-qcow2-only.yml"
   workflow_dispatch:
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref || github.run_id }}
