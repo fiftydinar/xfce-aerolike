@@ -1,9 +1,5 @@
 name: bluebuild
 on:
-  workflow_run:
-    workflows: ["Build packages"]
-    types: [completed]
-    branches: [main]
   push:
     paths-ignore:
       - "**.md"
@@ -14,7 +10,6 @@ concurrency:
   cancel-in-progress: true
 jobs:
   bluebuild:
-    if: ${{ !cancelled() && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success') }}
     name: Build Custom Image
     runs-on: ubuntu-latest
     permissions:
