@@ -96,19 +96,24 @@ jobs:
       - name: Build package
         working-directory: /build
         run: |
+          echo "::group::Building ${{ matrix.pkg.name }}"
           chown -R builder:builder /build
           if [ "${{ matrix.pkg.name }}" = "xfce4-screensaver" ]; then
+            echo "Applying wallpaper patch..."
             sudo -u builder makepkg --noconfirm --syncdeps --nocheck --nobuild
+            echo "Downloading patch..."
             wget -q https://raw.githubusercontent.com/fiftydinar/xfce-aerolike/refs/heads/main/patches/xfce4-screensaver/0001-set-default-wallpaper.patch
             SRCDIR=$(ls -d /build/src/xfce4-screensaver-* | head -1)
             [ -n "$SRCDIR" ] || { echo "ERROR: source dir not found"; exit 1; }
             cd "$SRCDIR"
             patch -p1 < /build/0001-set-default-wallpaper.patch
             cd /build
+            echo "Building patched package..."
             sudo -u builder makepkg --noconfirm --syncdeps --nocheck --noextract
           else
             sudo -u builder makepkg --noconfirm --syncdeps --nocheck
           fi
+          echo "::endgroup::"
 
       - name: Upload package
         uses: actions/upload-artifact@v4
@@ -172,8 +177,10 @@ jobs:
       - name: Build package
         working-directory: /build
         run: |
+          echo "::group::Building ${{ matrix.pkg.name }}"
           chown -R builder:builder /build
           sudo -u builder makepkg --noconfirm --syncdeps --nocheck
+          echo "::endgroup::"
 
       - name: Upload package
         uses: actions/upload-artifact@v4
@@ -194,8 +201,19 @@ jobs:
       - name: Create release archive
         run: |
           mkdir packages
-          for dir in */; do
-            cp "$dir"*.pkg.tar.zst packages/ 2>/dev/null || true
+          echo "## Built packages" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| # | Package | Size |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|---|" >> $GITHUB_STEP_SUMMARY
+          i=1
+          for pkgname in linux-lts xfdesktop xfce4-screensaver corefreq gtk2 libwnck gtk-nocsd-git networkmanager-dispatcher-chrony dwarfs-bin compiz emerald; do
+            pkgfile=$(ls "$pkgname/"*.pkg.tar.zst 2>/dev/null | head -1)
+            if [ -n "$pkgfile" ]; then
+              size=$(du -h "$pkgfile" | cut -f1)
+              cp "$pkgfile" packages/
+              echo "| $i | $pkgname | $size |" >> $GITHUB_STEP_SUMMARY
+              i=$((i + 1))
+            fi
           done
           tar -czf xfce-aerolike-packages.tar.gz packages/
       - uses: softprops/action-gh-release@v2
