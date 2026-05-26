@@ -80,7 +80,7 @@ jobs:
       - name: Install dependencies
         working-directory: /build
         run: |
-          source PKGBUILD
+          . PKGBUILD
           pacman -Sy --noconfirm --needed base-devel ${depends[@]} ${makedepends[@]} 2>/dev/null || true
 
       - name: Build package
@@ -175,7 +175,7 @@ jobs:
       - name: Install dependencies
         working-directory: /build
         run: |
-          source PKGBUILD
+          . PKGBUILD
           pacman -Sy --noconfirm --needed base-devel ${depends[@]} ${makedepends[@]} 2>/dev/null || true
 
       - name: Build package
