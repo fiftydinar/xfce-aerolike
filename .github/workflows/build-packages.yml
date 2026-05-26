@@ -76,20 +76,18 @@ jobs:
 
       - name: Apply patches
         if: ${{ matrix.pkg.prepare && matrix.pkg.name != 'linux-lts' }}
-        working-directory: /build
-        run: ${{ matrix.pkg.prepare }}
+        run: |
+          cd /build && ${{ matrix.pkg.prepare }}
 
       - name: Install dependencies
-        working-directory: /build
         run: |
-          pwd
-          ls -la
-          . PKGBUILD
+          cd /build
+          . ./PKGBUILD
           pacman -Sy --noconfirm --needed base-devel ${depends[@]} ${makedepends[@]} 2>/dev/null || true
 
       - name: Build package
-        working-directory: /build
         run: |
+          cd /build
           echo "::group::Building ${{ matrix.pkg.name }}"
           chown -R builder:builder /build
           if [ "${{ matrix.pkg.name }}" = "linux-lts" ]; then
@@ -179,27 +177,18 @@ jobs:
           ls -la /build/PKGBUILD
 
       - name: Install dependencies
-        working-directory: /build
         run: |
-          pwd
-          ls -la
-          . PKGBUILD
+          cd /build
+          . ./PKGBUILD
           pacman -Sy --noconfirm --needed base-devel ${depends[@]} ${makedepends[@]} 2>/dev/null || true
 
       - name: Build package
-        working-directory: /build
         run: |
+          cd /build
           echo "::group::Building ${{ matrix.pkg.name }}"
           chown -R builder:builder /build
           sudo -u builder makepkg --noconfirm --syncdeps --nocheck
           echo "::endgroup::"
-
-      - name: Upload package
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.pkg.name }}
-          path: /build/*.pkg.tar.zst
-          compression-level: 0
 
   publish:
     name: Publish release
