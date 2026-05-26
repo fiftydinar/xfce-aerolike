@@ -1,5 +1,10 @@
 FROM ghcr.io/fiftydinar/xfce-aerolike:latest
 
+# bootc-image-builder's osbuild pipeline runs an SELinux relabeling stage
+# that requires this file to exist. An empty file_contexts means no labels
+# are applied — no SELinux dependency on the resulting system.
+RUN mkdir -p /etc/selinux/targeted/contexts/files && touch /etc/selinux/targeted/contexts/files/file_contexts
+
 # bootc-image-builder requires PLATFORM_ID for non-Fedora containers
 RUN grep -q PLATFORM_ID /etc/os-release || echo 'PLATFORM_ID="platform:rolling"' >> /etc/os-release
 
