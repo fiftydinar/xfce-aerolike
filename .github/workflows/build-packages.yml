@@ -89,21 +89,15 @@ jobs:
           chown -R builder:builder /build
           if [ "${{ matrix.pkg.name }}" = "linux-lts" ]; then
             echo "Patching kernel cmdline..."
-            cat > /tmp/patch-kernel.py << 'PYEOF'
-import os
-c = os.environ["KERNEL_CMDLINE"]
-with open("PKGBUILD") as f:
-    s = f.read()
-old = "  cp ../config .config"
-new = '  CMDLINE="' + c + '"\n  sed -i "s|# CONFIG_CMDLINE_BOOL is not set|CONFIG_CMDLINE_BOOL=y\\nCONFIG_CMDLINE=\\"' + c + '\\"|g" ../config\n  cp ../config .config'
-s = s.replace(old, new, 1)
-with open("PKGBUILD", "w") as f:
-    f.write(s)
-PYEOF
-            python3 /tmp/patch-kernel.py
-            updpkgsums PKGBUILD
+            sudo -u builder makepkg --noconfirm --syncdeps --nocheck --nobuild
+            SRCDIR=$(find /build/src -maxdepth 1 -type d -name 'linux-*' | head -1)
+            [ -n "$SRCDIR" ] || { echo "ERROR: source dir not found"; exit 1; }
+            cd "$SRCDIR"
+            sed -i "s|# CONFIG_CMDLINE_BOOL is not set|CONFIG_CMDLINE_BOOL=y|" .config
+            echo "CONFIG_CMDLINE=\"$KERNEL_CMDLINE\"" >> .config
+            cd /build
             chown -R builder:builder /build
-            sudo -u builder makepkg --noconfirm --syncdeps --nocheck
+            sudo -u builder makepkg --noconfirm --syncdeps --nocheck --noextract
           elif [ "${{ matrix.pkg.name }}" = "xfce4-screensaver" ]; then
             echo "Applying wallpaper patch..."
             sudo -u builder makepkg --noconfirm --syncdeps --nocheck --nobuild
