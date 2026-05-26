@@ -97,8 +97,22 @@ modules:
     snippets:
       # Install all optional dependencies for xarchiver
       - "pacman -Syu --needed --noconfirm --asdeps $(expac -Ss '%o' xarchiver)"
-      # Symlink dash to sh
+      # Symlink dash to sh with pacman hook to persist across bash updates
       - "ln -sfT /usr/bin/dash /usr/bin/sh"
+      - |
+        cat > /usr/share/libalpm/hooks/dashbinsh.hook << 'HOOK'
+        [Trigger]
+        Type = Package
+        Operation = Install
+        Operation = Upgrade
+        Target = bash
+
+        [Action]
+        Description = Re-pointing /bin/sh symlink to dash...
+        When = PostTransaction
+        Exec = /usr/bin/ln -sfT dash /usr/bin/sh
+        Depends = dash
+        HOOK
       # Fix dracut's lib hang on finding root device due to dash's hex escape
       - |
         sed -i 's/echo "\$hook"/printf '\''%s\\n'\'' "$hook"/g' /usr/lib/dracut/modules.d/80base/dracut-lib.sh
