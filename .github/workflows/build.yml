@@ -7,7 +7,6 @@ on:
   push:
     paths-ignore:
       - "**.md"
-      - .github/workflows/build-packages.yml
   workflow_dispatch:
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref || github.run_id }}
