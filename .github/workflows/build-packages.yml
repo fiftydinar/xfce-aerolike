@@ -89,7 +89,7 @@ jobs:
           chown -R builder:builder /build
           if [ "${{ matrix.pkg.name }}" = "linux-lts" ]; then
             echo "Patching kernel cmdline..."
-            sudo -u builder makepkg --noconfirm --syncdeps --nocheck --nobuild
+            sudo -u builder makepkg --noconfirm --syncdeps --nocheck --skippgpcheck --nobuild
             SRCDIR=$(find /build/src -maxdepth 1 -type d -name 'linux-*' | head -1)
             [ -n "$SRCDIR" ] || { echo "ERROR: source dir not found"; exit 1; }
             cd "$SRCDIR"
@@ -97,13 +97,13 @@ jobs:
             echo "CONFIG_CMDLINE=\"$KERNEL_CMDLINE\"" >> .config
             cd /build
             chown -R builder:builder /build
-            sudo -u builder makepkg --noconfirm --syncdeps --nocheck --noextract
+            sudo -u builder makepkg --noconfirm --syncdeps --nocheck --skippgpcheck --noextract
           elif [ "${{ matrix.pkg.name }}" = "xfce4-screensaver" ]; then
             echo "Applying wallpaper patch..."
             sudo -u builder makepkg --noconfirm --syncdeps --nocheck --nobuild
             SRCDIR=$(find /build/src -maxdepth 1 -type d -name 'xfce4-screensaver*' | head -1)
             [ -n "$SRCDIR" ] || { echo "ERROR: source dir not found"; exit 1; }
-            wget -q https://raw.githubusercontent.com/fiftydinar/xfce-aerolike/refs/heads/main/patches/xfce4-screensaver/0001-set-default-wallpaper.patch
+            curl -sLO https://raw.githubusercontent.com/fiftydinar/xfce-aerolike/refs/heads/main/patches/xfce4-screensaver/0001-set-default-wallpaper.patch
             cd "$SRCDIR"
             patch -p1 < /build/0001-set-default-wallpaper.patch
             cd /build
