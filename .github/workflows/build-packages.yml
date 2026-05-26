@@ -65,7 +65,9 @@ jobs:
 
       - name: Download PKGBUILD
         run: |
-          mkdir -p /build && cd /build && curl -sL "${{ matrix.pkg.pkgbuild }}" -o PKGBUILD
+          mkdir -p /build
+          curl -sfL "${{ matrix.pkg.pkgbuild }}" -o /build/PKGBUILD
+          ls -la /build/PKGBUILD
 
       - name: Override kernel cmdline
         if: ${{ matrix.pkg.name == 'linux-lts' && github.event.inputs.kernel-cmdline != '' }}
@@ -170,7 +172,9 @@ jobs:
 
       - name: Download PKGBUILD
         run: |
-          mkdir -p /build && cd /build && curl -sL "${{ matrix.pkg.pkgbuild }}" -o PKGBUILD
+          mkdir -p /build
+          curl -sfL "${{ matrix.pkg.pkgbuild }}" -o /build/PKGBUILD
+          ls -la /build/PKGBUILD
 
       - name: Install dependencies
         working-directory: /build
