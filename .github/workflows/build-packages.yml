@@ -24,7 +24,7 @@ jobs:
             repo: https://gitlab.archlinux.org/archlinux/packaging/packages/linux-lts.git
             skippgpcheck: true
             patch: |
-              SRCDIR=$(find /build/src -maxdepth 1 -type d -name 'linux-*' | head -1)
+              SRCDIR=$(find "$BUILDDIR" -maxdepth 1 -type d -name 'linux-*' | head -1)
               [ -n "$SRCDIR" ] || { echo "ERROR: source dir not found"; exit 1; }
               cd "$SRCDIR"
               sed -i "s|# CONFIG_CMDLINE_BOOL is not set|CONFIG_CMDLINE_BOOL=y|" .config
@@ -34,7 +34,7 @@ jobs:
           - name: xfce4-screensaver
             repo: https://gitlab.archlinux.org/archlinux/packaging/packages/xfce4-screensaver.git
             patch: |
-              SRCDIR=$(find /build/src -maxdepth 1 -type d -name 'xfce4-screensaver*' | head -1)
+              SRCDIR=$(find "$BUILDDIR" -maxdepth 1 -type d -name 'xfce4-screensaver*' | head -1)
               [ -n "$SRCDIR" ] || { echo "ERROR: source dir not found"; exit 1; }
               curl -sLO https://raw.githubusercontent.com/fiftydinar/xfce-aerolike/refs/heads/main/patches/xfce4-screensaver/0001-set-default-wallpaper.patch
               cd "$SRCDIR"
@@ -71,11 +71,13 @@ jobs:
           useradd -m builder && echo 'builder ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
           echo 'Defaults env_keep += "MAKEFLAGS BUILDDIR PATH CCACHE_DIR CCACHE_COMPRESS"' > /etc/sudoers.d/keep-environment
           sed -i '/^OPTIONS=(/ { s/ !debug//g; s/ debug/ !debug/; }' /etc/makepkg.conf
+          mkdir -p /mnt/build
+          mount -t tmpfs -o size=6G,exec tmpfs /mnt/build
 
       - name: Set build optimization variables
         run: |
           echo "MAKEFLAGS=-j$(nproc)" >> $GITHUB_ENV
-          echo "BUILDDIR=/dev/shm" >> $GITHUB_ENV
+          echo "BUILDDIR=/mnt/build" >> $GITHUB_ENV
           echo "PATH=/usr/lib/ccache/bin:$PATH" >> $GITHUB_ENV
           echo "CCACHE_DIR=/ccache" >> $GITHUB_ENV
           echo "CCACHE_COMPRESS=1" >> $GITHUB_ENV
@@ -122,6 +124,8 @@ jobs:
           sudo -u builder makepkg --noconfirm --syncdeps --nocheck $PGP --nobuild
           echo "Applying patch..."
           ${{ matrix.pkg.patch }}
+          echo "Fixing ownership after patch..."
+          chown -R builder:builder "$BUILDDIR"
           echo "Building patched package..."
           chown -R builder:builder /build
           sudo -u builder makepkg --noconfirm --syncdeps --nocheck $PGP --noextract
@@ -160,11 +164,13 @@ jobs:
           useradd -m builder && echo 'builder ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
           echo 'Defaults env_keep += "MAKEFLAGS BUILDDIR PATH CCACHE_DIR CCACHE_COMPRESS"' > /etc/sudoers.d/keep-environment
           sed -i '/^OPTIONS=(/ { s/ !debug//g; s/ debug/ !debug/; }' /etc/makepkg.conf
+          mkdir -p /mnt/build
+          mount -t tmpfs -o size=6G,exec tmpfs /mnt/build
 
       - name: Set build optimization variables
         run: |
           echo "MAKEFLAGS=-j$(nproc)" >> $GITHUB_ENV
-          echo "BUILDDIR=/dev/shm" >> $GITHUB_ENV
+          echo "BUILDDIR=/mnt/build" >> $GITHUB_ENV
           echo "PATH=/usr/lib/ccache/bin:$PATH" >> $GITHUB_ENV
           echo "CCACHE_DIR=/ccache" >> $GITHUB_ENV
           echo "CCACHE_COMPRESS=1" >> $GITHUB_ENV
@@ -238,11 +244,13 @@ jobs:
           useradd -m builder && echo 'builder ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
           echo 'Defaults env_keep += "MAKEFLAGS BUILDDIR PATH CCACHE_DIR CCACHE_COMPRESS"' > /etc/sudoers.d/keep-environment
           sed -i '/^OPTIONS=(/ { s/ !debug//g; s/ debug/ !debug/; }' /etc/makepkg.conf
+          mkdir -p /mnt/build
+          mount -t tmpfs -o size=6G,exec tmpfs /mnt/build
 
       - name: Set build optimization variables
         run: |
           echo "MAKEFLAGS=-j$(nproc)" >> $GITHUB_ENV
-          echo "BUILDDIR=/dev/shm" >> $GITHUB_ENV
+          echo "BUILDDIR=/mnt/build" >> $GITHUB_ENV
           echo "PATH=/usr/lib/ccache/bin:$PATH" >> $GITHUB_ENV
           echo "CCACHE_DIR=/ccache" >> $GITHUB_ENV
           echo "CCACHE_COMPRESS=1" >> $GITHUB_ENV
