@@ -1,7 +1,7 @@
 name: Build packages
 on:
   schedule:
-    - cron: "0 4 * * *"
+    - cron: "32 5 * * *"
   workflow_dispatch:
     inputs:
       kernel-cmdline:
