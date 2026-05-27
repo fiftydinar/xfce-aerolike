@@ -62,7 +62,7 @@ jobs:
 
     container:
       image: docker.io/archlinux:latest
-      options: --cap-add=SYS_ADMIN --tmpfs /build:size=12G,exec
+      options: --cap-add=SYS_ADMIN --tmpfs /build:size=14G,exec
 
     steps:
       - name: Setup build environment
@@ -152,7 +152,7 @@ jobs:
     needs: build-base
     container:
       image: docker.io/archlinux:latest
-      options: --cap-add=SYS_ADMIN --tmpfs /build:size=12G,exec
+      options: --cap-add=SYS_ADMIN --tmpfs /build:size=14G,exec
 
     steps:
       - name: Setup build environment
@@ -231,7 +231,7 @@ jobs:
 
     container:
       image: docker.io/archlinux:latest
-      options: --cap-add=SYS_ADMIN --tmpfs /build:size=12G,exec
+      options: --cap-add=SYS_ADMIN --tmpfs /build:size=14G,exec
 
     steps:
       - name: Setup build environment
