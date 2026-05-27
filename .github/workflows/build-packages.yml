@@ -62,7 +62,7 @@ jobs:
 
     container:
       image: docker.io/archlinux:latest
-      options: --cap-add=SYS_ADMIN --shm-size=8G
+      options: --cap-add=SYS_ADMIN --shm-size=8G --tmpfs /mnt/build:size=6G,exec
 
     steps:
       - name: Setup build environment
@@ -72,8 +72,6 @@ jobs:
           echo 'Defaults env_keep += "MAKEFLAGS BUILDDIR PATH CCACHE_DIR CCACHE_COMPRESS"' > /etc/sudoers.d/keep-environment
           sed -i '/^OPTIONS=(/ { s/ !debug//g; s/ debug/ !debug/; }' /etc/makepkg.conf
           mkdir -p /mnt/build
-          mount -t tmpfs -o size=6G,exec tmpfs /mnt/build
-
       - name: Set build optimization variables
         run: |
           echo "MAKEFLAGS=-j$(nproc)" >> $GITHUB_ENV
@@ -155,7 +153,7 @@ jobs:
     needs: build-base
     container:
       image: docker.io/archlinux:latest
-      options: --cap-add=SYS_ADMIN --shm-size=8G
+      options: --cap-add=SYS_ADMIN --shm-size=8G --tmpfs /mnt/build:size=6G,exec
 
     steps:
       - name: Setup build environment
@@ -165,8 +163,6 @@ jobs:
           echo 'Defaults env_keep += "MAKEFLAGS BUILDDIR PATH CCACHE_DIR CCACHE_COMPRESS"' > /etc/sudoers.d/keep-environment
           sed -i '/^OPTIONS=(/ { s/ !debug//g; s/ debug/ !debug/; }' /etc/makepkg.conf
           mkdir -p /mnt/build
-          mount -t tmpfs -o size=6G,exec tmpfs /mnt/build
-
       - name: Set build optimization variables
         run: |
           echo "MAKEFLAGS=-j$(nproc)" >> $GITHUB_ENV
@@ -235,7 +231,7 @@ jobs:
 
     container:
       image: docker.io/archlinux:latest
-      options: --cap-add=SYS_ADMIN --shm-size=8G
+      options: --cap-add=SYS_ADMIN --shm-size=8G --tmpfs /mnt/build:size=6G,exec
 
     steps:
       - name: Setup build environment
@@ -245,8 +241,6 @@ jobs:
           echo 'Defaults env_keep += "MAKEFLAGS BUILDDIR PATH CCACHE_DIR CCACHE_COMPRESS"' > /etc/sudoers.d/keep-environment
           sed -i '/^OPTIONS=(/ { s/ !debug//g; s/ debug/ !debug/; }' /etc/makepkg.conf
           mkdir -p /mnt/build
-          mount -t tmpfs -o size=6G,exec tmpfs /mnt/build
-
       - name: Set build optimization variables
         run: |
           echo "MAKEFLAGS=-j$(nproc)" >> $GITHUB_ENV
