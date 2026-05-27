@@ -69,6 +69,9 @@ jobs:
         run: |
           pacman -Sy --noconfirm base-devel git sudo pacman-contrib
           useradd -m builder && echo 'builder ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
+      
+      - name: Optimize build speed
+        run: echo "MAKEFLAGS=-j$(nproc)" >> $GITHUB_ENV
 
       - name: Clone package repo
         run: |
