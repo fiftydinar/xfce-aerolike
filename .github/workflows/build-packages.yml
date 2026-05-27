@@ -309,6 +309,13 @@ jobs:
       contents: write
       actions: write
     steps:
+      - name: Cleanup old releases
+        run: |
+          gh release list --limit 100 --json tagName,createdAt \
+            --jq '.[].tagName' | sort |
+            head -n -30 | xargs -r -I{} gh release delete {} --yes --cleanup-tag
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
       - uses: actions/download-artifact@v4
       - name: Create release archive
         run: |
