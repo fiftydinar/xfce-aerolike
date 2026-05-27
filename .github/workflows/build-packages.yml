@@ -68,7 +68,7 @@ jobs:
       - name: Setup build environment
         run: |
           pacman -Sy --noconfirm base-devel git sudo pacman-contrib ccache
-          useradd -m builder && echo 'builder ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
+          useradd -m builder && echo 'builder ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers && echo 'Defaults !env_reset' > /etc/sudoers.d/keep-environment
           mkdir -p /ccache && chown builder:builder /ccache
           sed -i 's/!ccache/ccache/' /etc/makepkg.conf
           sed -i '/^OPTIONS=(/ { s/ !debug//g; s/ debug/ !debug/; }' /etc/makepkg.conf
@@ -159,7 +159,7 @@ jobs:
       - name: Setup build environment
         run: |
           pacman -Sy --noconfirm base-devel git sudo pacman-contrib ccache
-          useradd -m builder && echo 'builder ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
+          useradd -m builder && echo 'builder ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers && echo 'Defaults !env_reset' > /etc/sudoers.d/keep-environment
           mkdir -p /ccache && chown builder:builder /ccache
           sed -i 's/!ccache/ccache/' /etc/makepkg.conf
           sed -i '/^OPTIONS=(/ { s/ !debug//g; s/ debug/ !debug/; }' /etc/makepkg.conf
@@ -239,7 +239,7 @@ jobs:
       - name: Setup build environment
         run: |
           pacman -Sy --noconfirm base-devel git sudo pacman-contrib ccache
-          useradd -m builder && echo 'builder ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
+          useradd -m builder && echo 'builder ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers && echo 'Defaults !env_reset' > /etc/sudoers.d/keep-environment
           mkdir -p /ccache && chown builder:builder /ccache
           sed -i 's/!ccache/ccache/' /etc/makepkg.conf
           sed -i '/^OPTIONS=(/ { s/ !debug//g; s/ debug/ !debug/; }' /etc/makepkg.conf
