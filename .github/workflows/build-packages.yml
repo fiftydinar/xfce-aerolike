@@ -62,13 +62,13 @@ jobs:
 
     container:
       image: docker.io/archlinux:latest
-      options: --cap-add=SYS_ADMIN --tmpfs /buildtmp:size=2G,exec
+      options: --cap-add=SYS_ADMIN --tmpfs /build:size=4G,exec
 
     steps:
       - name: Setup build environment
         run: |
           pacman -Sy --noconfirm base-devel git sudo pacman-contrib ccache
-          useradd -m builder && echo 'builder ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers && echo 'Defaults !env_reset' > /etc/sudoers.d/keep-environment
+          useradd -m builder && echo 'builder ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
           mkdir -p /ccache && chown builder:builder /ccache
           sed -i 's/!ccache/ccache/' /etc/makepkg.conf
           sed -i '/^OPTIONS=(/ { s/ !debug//g; s/ debug/ !debug/; }' /etc/makepkg.conf
@@ -80,7 +80,7 @@ jobs:
           echo "CCACHE_COMPRESS=1" >> $GITHUB_ENV
           echo "CFLAGS=-pipe" >> $GITHUB_ENV
           echo "CXXFLAGS=-pipe" >> $GITHUB_ENV
-          echo "BUILDDIR=/buildtmp" >> $GITHUB_ENV
+          echo "BUILDDIR=/build" >> $GITHUB_ENV
 
       - name: Cache ccache
         uses: actions/cache@v4
@@ -92,7 +92,6 @@ jobs:
 
       - name: Clone package repo
         run: |
-          rm -rf /build
           git clone --depth 1 "${{ matrix.pkg.repo }}" /build
           ls -la /build/
 
@@ -153,13 +152,13 @@ jobs:
     needs: build-base
     container:
       image: docker.io/archlinux:latest
-      options: --cap-add=SYS_ADMIN --tmpfs /buildtmp:size=2G,exec
+      options: --cap-add=SYS_ADMIN --tmpfs /build:size=4G,exec
 
     steps:
       - name: Setup build environment
         run: |
           pacman -Sy --noconfirm base-devel git sudo pacman-contrib ccache
-          useradd -m builder && echo 'builder ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers && echo 'Defaults !env_reset' > /etc/sudoers.d/keep-environment
+          useradd -m builder && echo 'builder ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
           mkdir -p /ccache && chown builder:builder /ccache
           sed -i 's/!ccache/ccache/' /etc/makepkg.conf
           sed -i '/^OPTIONS=(/ { s/ !debug//g; s/ debug/ !debug/; }' /etc/makepkg.conf
@@ -171,7 +170,7 @@ jobs:
           echo "CCACHE_COMPRESS=1" >> $GITHUB_ENV
           echo "CFLAGS=-pipe" >> $GITHUB_ENV
           echo "CXXFLAGS=-pipe" >> $GITHUB_ENV
-          echo "BUILDDIR=/buildtmp" >> $GITHUB_ENV
+          echo "BUILDDIR=/build" >> $GITHUB_ENV
 
       - name: Cache ccache
         uses: actions/cache@v4
@@ -192,7 +191,6 @@ jobs:
 
       - name: Clone repo
         run: |
-          rm -rf /build
           git clone --depth 1 https://aur.archlinux.org/libwnck.git /build
           ls -la /build/
 
@@ -233,13 +231,13 @@ jobs:
 
     container:
       image: docker.io/archlinux:latest
-      options: --cap-add=SYS_ADMIN --tmpfs /buildtmp:size=2G,exec
+      options: --cap-add=SYS_ADMIN --tmpfs /build:size=4G,exec
 
     steps:
       - name: Setup build environment
         run: |
           pacman -Sy --noconfirm base-devel git sudo pacman-contrib ccache
-          useradd -m builder && echo 'builder ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers && echo 'Defaults !env_reset' > /etc/sudoers.d/keep-environment
+          useradd -m builder && echo 'builder ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
           mkdir -p /ccache && chown builder:builder /ccache
           sed -i 's/!ccache/ccache/' /etc/makepkg.conf
           sed -i '/^OPTIONS=(/ { s/ !debug//g; s/ debug/ !debug/; }' /etc/makepkg.conf
@@ -251,7 +249,7 @@ jobs:
           echo "CCACHE_COMPRESS=1" >> $GITHUB_ENV
           echo "CFLAGS=-pipe" >> $GITHUB_ENV
           echo "CXXFLAGS=-pipe" >> $GITHUB_ENV
-          echo "BUILDDIR=/buildtmp" >> $GITHUB_ENV
+          echo "BUILDDIR=/build" >> $GITHUB_ENV
 
       - name: Cache ccache
         uses: actions/cache@v4
@@ -278,7 +276,6 @@ jobs:
 
       - name: Clone repo
         run: |
-          rm -rf /build
           git clone --depth 1 "${{ matrix.pkg.repo }}" /build
           ls -la /build/
 
