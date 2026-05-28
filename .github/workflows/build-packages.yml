@@ -221,6 +221,7 @@ jobs:
     needs: [build-base, build-libwnck]
     strategy:
       fail-fast: false
+      max-parallel: 1
       matrix:
         pkg:
           - name: compiz
@@ -229,7 +230,7 @@ jobs:
 
           - name: emerald
             repo: https://aur.archlinux.org/emerald.git
-            deps: gtk2 libwnck
+            deps: gtk2 libwnck compiz
 
     container:
       image: docker.io/archlinux:latest
@@ -262,15 +263,13 @@ jobs:
             ccache-${{ matrix.pkg.name }}-
 
       - name: Download AUR dependencies
-        uses: actions/download-artifact@v4
-        with:
-          name: gtk2
-          path: /deps
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: libwnck
-          path: /deps
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p /deps
+          for dep in ${{ matrix.pkg.deps }}; do
+            gh run download "${{ github.run_id }}" --name "$dep" --dir /deps
+          done
 
       - name: Install AUR dependencies
         run: |
