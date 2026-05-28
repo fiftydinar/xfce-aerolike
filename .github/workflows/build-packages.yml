@@ -148,82 +148,19 @@ jobs:
           path: /build/*.pkg.tar.zst
           compression-level: 0
 
-  build-libwnck:
-    name: libwnck
-    runs-on: ubuntu-latest
-    needs: build-base
-    container:
-      image: docker.io/archlinux:latest
-      options: --cap-add=SYS_ADMIN --tmpfs /build:size=14G,exec
-
-    steps:
-      - name: Setup build environment
-        run: |
-          pacman -Sy --noconfirm base-devel git sudo pacman-contrib ccache
-          useradd -m builder && echo 'builder ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
-          mkdir -p /ccache && chown builder:builder /ccache
-          sed -i 's/!ccache/ccache/' /etc/makepkg.conf
-          sed -i '/^OPTIONS=(/ { s/ !debug//g; s/ debug/ !debug/; }' /etc/makepkg.conf
-
-      - name: Set build optimization variables
-        run: |
-          echo "MAKEFLAGS=-j$(nproc)" >> $GITHUB_ENV
-          echo "CCACHE_DIR=/ccache" >> $GITHUB_ENV
-          echo "CCACHE_COMPRESS=1" >> $GITHUB_ENV
-          echo "CFLAGS=-pipe" >> $GITHUB_ENV
-          echo "CXXFLAGS=-pipe" >> $GITHUB_ENV
-          echo "BUILDDIR=/build" >> $GITHUB_ENV
-
-      - name: Cache ccache
-        uses: actions/cache@v4
-        with:
-          path: /ccache
-          key: ccache-libwnck-${{ github.run_id }}
-          restore-keys: |
-            ccache-libwnck-
-
-      - name: Download gtk2
-        uses: actions/download-artifact@v4
-        with:
-          name: gtk2
-          path: /deps
-
-      - name: Install gtk2
-        run: pacman -U --noconfirm /deps/*.pkg.tar.zst
-
-      - name: Clone repo
-        run: |
-          git clone --depth 1 https://aur.archlinux.org/libwnck.git /build
-          ls -la /build/
-
-      - name: Install dependencies
-        run: |
-          cd /build
-          . ./PKGBUILD
-          pacman -Sy --noconfirm --needed base-devel ${depends[@]} ${makedepends[@]} 2>/dev/null || true
-
-      - name: Build package
-        run: |
-          cd /build
-          chown -R builder:builder /build
-          sudo -E -u builder makepkg --noconfirm --syncdeps --nocheck
-
-      - name: Upload package
-        uses: actions/upload-artifact@v4
-        with:
-          name: libwnck
-          path: /build/*.pkg.tar.zst
-          compression-level: 0
-
   build-dependent:
     name: ${{ matrix.pkg.name }}
     runs-on: ubuntu-latest
-    needs: [build-base, build-libwnck]
+    needs: build-base
     strategy:
       fail-fast: false
       max-parallel: 1
       matrix:
         pkg:
+          - name: libwnck
+            repo: https://aur.archlinux.org/libwnck.git
+            deps: gtk2
+
           - name: compiz
             repo: https://aur.archlinux.org/compiz.git
             deps: gtk2 libwnck
@@ -303,7 +240,7 @@ jobs:
 
   publish:
     name: Publish release
-    needs: [build-base, build-libwnck, build-dependent]
+    needs: [build-base, build-dependent]
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
