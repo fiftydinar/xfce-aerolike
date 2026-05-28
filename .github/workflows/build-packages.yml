@@ -271,6 +271,7 @@ jobs:
           echo "|---|---|---|" >> $GITHUB_STEP_SUMMARY
           i=1
           for pkgdir in */; do
+            [ "$pkgdir" = "packages/" ] && continue
             pkgname=${pkgdir%/}
             pkgfile=$(ls "$pkgdir"*.pkg.tar.zst 2>/dev/null | head -1)
             if [ -n "$pkgfile" ]; then
