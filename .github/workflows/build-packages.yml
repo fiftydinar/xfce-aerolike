@@ -1,7 +1,7 @@
 name: Build packages
 on:
   schedule:
-    - cron: "00 03 * * *"
+    - cron: "00 01 * * *"
   workflow_dispatch:
     inputs:
       kernel-cmdline:
@@ -163,7 +163,6 @@ jobs:
 
           - name: compiz
             repo: https://aur.archlinux.org/compiz.git
-            deps: gtk2 libwnck
 
           - name: emerald
             repo: https://aur.archlinux.org/emerald.git
@@ -203,8 +202,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          deps="${{ matrix.pkg.deps }}"
+          [ -z "$deps" ] && exit 0
           mkdir -p /deps
-          for dep in ${{ matrix.pkg.deps }}; do
+          for dep in $deps; do
             gh run download "${{ github.run_id }}" --name "$dep" --dir /deps
           done
 
