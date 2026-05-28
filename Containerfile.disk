@@ -16,5 +16,8 @@ RUN pacman -Syu --noconfirm bootupd && \
     mkdir -p /usr/lib/bootc/install && \
     printf 'bootloader = "grub"\n' > /usr/lib/bootc/install/00-arch-bootloader.toml
 
+# Disable automatic bootc updates — disk images are static snapshots
+RUN systemctl --system disable bootc-fetch-apply-updates.timer || true
+
 # Create a default user so the disk image boots to a usable login
 RUN useradd -m -G wheel liveuser && echo 'liveuser:liveuser' | chpasswd && mkdir -p /etc/sudoers.d && echo 'liveuser ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/liveuser
