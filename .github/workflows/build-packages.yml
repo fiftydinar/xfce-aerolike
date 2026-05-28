@@ -91,13 +91,10 @@ jobs:
           restore-keys: |
             ccache-${{ matrix.pkg.name }}-
 
-      #- name: Unmount tmpfs if linux-lts without ccache
-        #if: ${{ matrix.pkg.name == 'linux-lts' }}
-        #run: |
-          #if [ -z "$(ls -A /ccache 2>/dev/null)" ]; then
-            #umount /build && mkdir -p /build
-            #echo "ccache empty, tmpfs removed for linux-lts"
-          #fi
+      - name: Unmount tmpfs for linux-lts
+        if: ${{ matrix.pkg.name == 'linux-lts' }}
+        run: |
+          umount /build && mkdir -p /build
 
       - name: Clone ${{ matrix.pkg.name }}
         run: |
