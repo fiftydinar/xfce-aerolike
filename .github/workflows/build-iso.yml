@@ -23,7 +23,7 @@ jobs:
       - name: Install ISO build dependencies
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq xorriso grub-pc grub-efi grub-efi-amd64-bin dosfstools mtools
+          sudo apt-get install -y -qq xorriso grub-common grub-pc-bin grub-efi-amd64-bin dosfstools mtools
 
       - name: Pull container image
         run: sudo podman pull ${{ env.IMAGE_TAG }}
