@@ -69,7 +69,7 @@ jobs:
     steps:
       - name: Prepare build container
         run: |
-          pacman -Sy --noconfirm base-devel git sudo pacman-contrib ccache
+          pacman -Sy --noconfirm base-devel git sudo pacman-contrib ccache github-cli
           useradd -m builder && echo 'builder ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
           mkdir -p /ccache && chown builder:builder /ccache
           sed -i 's/!ccache/ccache/' /etc/makepkg.conf
