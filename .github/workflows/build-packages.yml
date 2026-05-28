@@ -49,6 +49,9 @@ jobs:
           - name: gtk2
             repo: https://aur.archlinux.org/gtk2.git
 
+          - name: compiz
+            repo: https://aur.archlinux.org/compiz.git
+          
           - name: gtk-nocsd-git
             repo: https://aur.archlinux.org/gtk-nocsd-git.git
             prepare: |
@@ -165,9 +168,6 @@ jobs:
             repo: https://aur.archlinux.org/libwnck.git
             deps: gtk2
 
-          - name: compiz
-            repo: https://aur.archlinux.org/compiz.git
-
           - name: emerald
             repo: https://aur.archlinux.org/emerald.git
             deps: gtk2 libwnck compiz
@@ -214,6 +214,7 @@ jobs:
           done
 
       - name: Install pre-built AUR deps
+        if: ${{ matrix.pkg.deps }}
         run: |
           pacman -U --noconfirm /deps/*.pkg.tar.zst
 
