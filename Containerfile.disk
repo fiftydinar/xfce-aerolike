@@ -11,13 +11,11 @@ RUN grep -q PLATFORM_ID /etc/os-release || echo 'PLATFORM_ID="platform:rolling"'
 # bootc-image-builder doesn't like 2 dots in VERSION_ID (e.g. 20250528.1.2 → 20250528.1-2)
 RUN sed -E -i "s/^(VERSION_ID=)(['\"]?)([0-9]{8}\.[0-9]+)\.([0-9]+)(['\"]?)/\1\"\3-\4\"/" /etc/os-release
 
-# bootupd is only needed for disk image (qcow2), not for the bootc image itself
-# Telling bootc to use GRUB (via install config) bypasses the "bootupd required
-# for ostree-based installs" error. bootc runs bootupctl from the deployment
-# via chroot — no socket/service files needed, no bubblewrap needed.
-RUN pacman -Syu --noconfirm bootupd && \
-    mkdir -p /usr/lib/bootc/install && \
-    printf '[install]\nbootloader = "grub"\n' > /usr/lib/bootc/install/00-arch-bootloader.toml
+# For disk images, bootc's auto-detect falls back to systemd-boot when
+# bootupd has no update payload (no GRUB EFI binary). systemd-boot on UEFI
+# works with both UKI and traditional kernels via BLS entries.
+# We still install bootupd for its grub config/dropins support.
+RUN pacman -Syu --noconfirm bootupd
 
 # Disable automatic bootc updates — disk images are static snapshots
 RUN systemctl disable bootc-fetch-apply-updates.timer
