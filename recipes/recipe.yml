@@ -147,7 +147,7 @@ modules:
         sed -i 's/^# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' /etc/sudoers || echo "%wheel ALL=(ALL:ALL) ALL" >> /etc/sudoers
       # Set default language to English and generate locale
       - |
-        sed -i 's/^#\s*\(en_US.UTF-8 UTF-8\)/\1/' /etc/locale.gen
+        sed -i 's/^# *\([a-z]\+\_[A-Z]\+.*\)/\1/' /etc/locale.gen
       - "locale-gen"
       - "echo 'LANG=en_US.UTF-8' > /etc/locale.conf"
       # Set nano as the default editor
