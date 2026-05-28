@@ -72,9 +72,8 @@ jobs:
           grub-mkimage -O x86_64-efi -o isoroot/EFI/BOOT/BOOTx64.efi \
             -p /EFI/BOOT \
             fat iso9660 part_gpt part_msdos normal boot linux \
-            configfile loopback efi_gop efi_uga gfxterm \
-            loadenv search search_fs_file search_fs_uuid \
-            search_label ext2
+            configfile loopback efi_gop efi_uga \
+            loadenv search search_label ext2
 
           dd if=/dev/zero of=efiboot.img bs=1M count=10
           mkfs.vfat efiboot.img
@@ -83,8 +82,7 @@ jobs:
           grub-mkimage -O i386-pc-eltorito -o isoroot/boot/eltorito.img \
             -p /boot/grub \
             iso9660 biosdisk normal boot linux configfile loopback \
-            search search_label search_fs_file search_fs_uuid \
-            ext2 fat part_gpt part_msdos gfxterm
+            search search_label ext2 fat part_gpt part_msdos
 
           xorriso -as mkisofs \
             -R -J \
