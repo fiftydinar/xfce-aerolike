@@ -41,6 +41,11 @@ jobs:
               patch -p1 < /build/0001-set-default-wallpaper.patch
               cd /build
 
+          - name: xfdesktop
+            repo: https://gitlab.archlinux.org/archlinux/packaging/packages/xfdesktop.git
+            prepare: |
+              sed -i 's|--prefix=/usr|--prefix=/usr --with-default-backdrop-filename=/usr/share/backgrounds/frosted-glass.webp|g' ./PKGBUILD
+
           - name: corefreq
             repo: https://aur.archlinux.org/corefreq.git
             prepare: |
