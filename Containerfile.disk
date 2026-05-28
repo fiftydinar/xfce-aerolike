@@ -8,5 +8,8 @@ RUN mkdir -p /etc/selinux/targeted/contexts/files && touch /etc/selinux/targeted
 # bootc-image-builder requires PLATFORM_ID for non-Fedora containers
 RUN grep -q PLATFORM_ID /etc/os-release || echo 'PLATFORM_ID="platform:rolling"' >> /etc/os-release
 
+# bootupd is only needed for disk image (qcow2), not for the bootc image itself
+RUN pacman -Syu --noconfirm bootupd
+
 # Create a default user so the disk image boots to a usable login
-RUN useradd -m -G wheel liveuser && echo 'liveuser:liveuser' | chpasswd && echo 'liveuser ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers.d/liveuser
+RUN useradd -m -G wheel liveuser && echo 'liveuser:liveuser' | chpasswd && mkdir -p /etc/sudoers.d && echo 'liveuser ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/liveuser
