@@ -99,10 +99,8 @@ jobs:
           if [ "${{ matrix.pkg.name }}" = "linux-lts" ] && [ -z "$(ls -A /ccache 2>/dev/null)" ]; then
             echo "ccache empty, skipping tmpfs for linux-lts"
           else
-            if ! mountpoint -q /build; then
-              mount -t tmpfs -o size=14G,exec tmpfs /build
-            fi
-            mountpoint -q /build && echo "tmpfs mounted at /build" || echo "no tmpfs at /build"
+            grep -qF '/build ' /proc/mounts || mount -t tmpfs -o size=14G,exec tmpfs /build
+            grep -F '/build ' /proc/mounts || echo "no tmpfs at /build"
           fi
 
       - name: Clone ${{ matrix.pkg.name }}
