@@ -5,6 +5,7 @@ on:
     paths-ignore:
       - "**.md"
       - ".github/workflows/build-packages.yml"
+      - ".github/workflows/build.yml"
 
 env:
   IMAGE_TAG: ghcr.io/fiftydinar/xfce-aerolike:latest
