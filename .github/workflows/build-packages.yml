@@ -95,8 +95,15 @@ jobs:
         run: mkdir -p /build
 
       - name: Mount tmpfs for build
-        if: ${{ matrix.pkg.name != 'linux-lts' || steps.ccache.outputs.cache-hit == 'true' }}
-        run: mount -t tmpfs -o size=14G,exec tmpfs /build
+        run: |
+          if [ "${{ matrix.pkg.name }}" = "linux-lts" ] && [ -z "$(ls -A /ccache 2>/dev/null)" ]; then
+            echo "ccache empty, skipping tmpfs for linux-lts"
+          else
+            if ! mountpoint -q /build; then
+              mount -t tmpfs -o size=14G,exec tmpfs /build
+            fi
+            mountpoint -q /build && echo "tmpfs mounted at /build" || echo "no tmpfs at /build"
+          fi
 
       - name: Clone ${{ matrix.pkg.name }}
         run: |
