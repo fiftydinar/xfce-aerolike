@@ -1,0 +1,155 @@
+name: build-iso
+on:
+  workflow_dispatch:
+  push:
+    paths-ignore:
+      - "**.md"
+      - ".github/workflows/build-packages.yml"
+
+env:
+  IMAGE_TAG: ghcr.io/fiftydinar/xfce-aerolike:latest
+  ISO_NAME: xfce-aerolike
+
+jobs:
+  build-iso:
+    name: Build Live ISO
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install ISO build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xorriso grub-pc grub-efi grub-efi-amd64-bin dosfstools mtools
+
+      - name: Pull container image
+        run: sudo podman pull ${{ env.IMAGE_TAG }}
+
+      - name: Extract rootfs
+        run: |
+          mkdir -p rootfs work
+          CTR=$(sudo podman create ${{ env.IMAGE_TAG }})
+          sudo podman export $CTR | sudo tar --xattrs-include='*' -pxf - -C rootfs
+          sudo podman rm $CTR
+          sudo rm -rf rootfs/var/tmp
+          sudo ln -s /tmp rootfs/var/tmp
+
+      - name: Generate initramfs with dmsquash-live
+        run: |
+          cat > work/chroot.sh << 'CHROOT'
+          set -xeuo pipefail
+
+          useradd -m -G wheel liveuser
+          echo "liveuser:liveuser" | chpasswd
+          echo "liveuser ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+          mkdir -p /etc/lightdm/lightdm.conf.d
+          cat > /etc/lightdm/lightdm.conf.d/50-live-autologin.conf << 'LIGHTDM'
+          [Seat:*]
+          autologin-user=liveuser
+          autologin-user-timeout=0
+          LIGHTDM
+
+          pacman -Sy --noconfirm --needed dracut
+
+          KVER=$(basename "$(find /usr/lib/modules -maxdepth 1 -type d | grep -v "\.img$" | tail -n1)")
+          dracut --force --no-hostonly --reproducible --zstd \
+            --kver "$KVER" \
+            --add "dmsquash-live dmsquash-live-autooverlay" \
+            /app/initramfs.img
+
+          pacman -Scc --noconfirm
+CHROOT
+          sudo podman run --rm --privileged \
+            --tmpfs /tmp:rw --tmpfs /run:rw \
+            --volume $PWD/work:/app \
+            --rootfs $PWD/rootfs \
+            /usr/bin/bash /app/chroot.sh
+
+      - name: Create squashfs
+        run: |
+          sudo mksquashfs rootfs work/squashfs.img -all-root -noappend -comp zstd -Xcompression-level 19
+
+      - name: Organize ISO root
+        run: |
+          mkdir -p isoroot/boot/grub isoroot/LiveOS
+          KVER=$(basename "$(find rootfs/usr/lib/modules -maxdepth 1 -type d | grep -v "\.img$" | tail -n1)")
+          sudo cp rootfs/usr/lib/modules/$KVER/vmlinuz isoroot/boot/vmlinuz
+          sudo mv work/initramfs.img isoroot/boot/initramfs.img
+          sudo mv work/squashfs.img isoroot/LiveOS/squashfs.img
+          sudo chown -R $USER:$USER isoroot
+
+      - name: Create GRUB config
+        run: |
+          cat > isoroot/boot/grub/grub.cfg << 'GRUB'
+          set default="0"
+          set timeout=10
+
+          menuentry "Start xfce-aerolike Live" {
+            linux /boot/vmlinuz root=live:LABEL=xfce-aerolike ro rd.live.image quiet
+            initrd /boot/initramfs.img
+          }
+
+          menuentry "Start xfce-aerolike Live (nomodeset)" {
+            linux /boot/vmlinuz root=live:LABEL=xfce-aerolike ro rd.live.image nomodeset quiet
+            initrd /boot/initramfs.img
+          }
+GRUB
+
+      - name: Build ISO
+        run: |
+          mkdir -p isoroot/EFI/BOOT
+          cp isoroot/boot/grub/grub.cfg isoroot/EFI/BOOT/BOOT.conf
+          cp isoroot/boot/grub/grub.cfg isoroot/EFI/BOOT/grub.cfg
+
+          grub-mkimage -O x86_64-efi -o isoroot/EFI/BOOT/BOOTx64.efi \
+            -p /EFI/BOOT \
+            fat iso9660 part_gpt part_msdos normal boot linux configfile \
+            loopback efi_gop efi_uga file help gfxterm \
+            loadenv search search_fs_file search_fs_uuid search_label \
+            ls cat echo true false read sleep reboot halt \
+            ext2 ext4 btrfs xfs squash4 lvm diskfilter
+
+          dd if=/dev/zero of=efiboot.img bs=1M count=10
+          mkfs.vfat efiboot.img
+          mcopy -i efiboot.img -s isoroot/EFI ::
+
+          grub-mkimage -O i386-pc-eltorito -o isoroot/boot/eltorito.img \
+            -p /boot/grub iso9660 biosdisk
+
+          xorriso -as mkisofs \
+            -R -J \
+            -V "xfce-aerolike" \
+            -partition_cyl_align all \
+            -partition_offset 16 \
+            -appended_part_as_gpt \
+            -append_partition 2 C12A7328-F81F-11D2-BA4B-00A0C93EC93B efiboot.img \
+            -iso_mbr_part_type EBD0A0A2-B9E5-4433-87C0-68B6B72699C7 \
+            -c boot.catalog \
+            -b boot/eltorito.img \
+            -no-emul-boot \
+            -boot-load-size 4 \
+            -boot-info-table \
+            --grub2-boot-info \
+            -eltorito-alt-boot \
+            -e --interval:appended_partition_2:all:: \
+            -no-emul-boot \
+            -iso-level 3 \
+            -o xfce-aerolike.iso \
+            isoroot
+
+      - name: Verify ISO
+        run: |
+          ls -lh xfce-aerolike.iso
+          file xfce-aerolike.iso
+
+      - name: Upload ISO
+        uses: actions/upload-artifact@v4
+        with:
+          name: xfce-aerolike-live-iso
+          path: xfce-aerolike.iso
+          compression-level: 0
+          if-no-files-found: error
