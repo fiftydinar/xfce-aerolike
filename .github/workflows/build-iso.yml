@@ -60,21 +60,7 @@ jobs:
           sudo chown -R $USER:$USER isoroot
 
       - name: Create GRUB config
-        run: |
-          cat > isoroot/boot/grub/grub.cfg << 'GRUB'
-          set default="0"
-          set timeout=10
-
-          menuentry "Start xfce-aerolike Live" {
-            linux /boot/vmlinuz root=live:LABEL=xfce-aerolike ro rd.live.image quiet
-            initrd /boot/initramfs.img
-          }
-
-          menuentry "Start xfce-aerolike Live (nomodeset)" {
-            linux /boot/vmlinuz root=live:LABEL=xfce-aerolike ro rd.live.image nomodeset quiet
-            initrd /boot/initramfs.img
-          }
-GRUB
+        run: cp scripts/live-grub.cfg isoroot/boot/grub/grub.cfg
 
       - name: Build ISO
         run: |

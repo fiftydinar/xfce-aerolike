@@ -14,14 +14,9 @@ autologin-user=liveuser
 autologin-user-timeout=0
 LIGHTDM
 
-# Disable services inappropriate for a live environment
+# Disable auto-updates in live environment
 systemctl disable bootc-fetch-apply-updates.timer
 systemctl disable bootc-fetch-apply-updates.service
-systemctl disable memory-tweaks-aerolike.service
-systemctl disable dirty-centisecs-aerolike.service
-
-# Install dracut for live initramfs
-pacman -Sy --noconfirm --needed dracut
 
 # Regenerate initramfs with dmsquash-live modules
 KVER=$(basename "$(find /usr/lib/modules -maxdepth 1 -type d | grep -v "\.img$" | tail -n1)")
@@ -29,6 +24,3 @@ dracut --force --no-hostonly --reproducible --zstd \
   --kver "$KVER" \
   --add "dmsquash-live dmsquash-live-autooverlay" \
   /app/initramfs.img
-
-# Clean up
-pacman -Scc --noconfirm
