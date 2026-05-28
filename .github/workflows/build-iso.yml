@@ -81,7 +81,10 @@ jobs:
           mcopy -i efiboot.img -s isoroot/EFI ::
 
           grub-mkimage -O i386-pc-eltorito -o isoroot/boot/eltorito.img \
-            -p /boot/grub iso9660 biosdisk
+            -p /boot/grub \
+            iso9660 biosdisk normal boot linux configfile loopback \
+            search search_label search_fs_file search_fs_uuid \
+            ext2 fat part_gpt part_msdos gfxterm
 
           xorriso -as mkisofs \
             -R -J \
