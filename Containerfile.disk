@@ -9,8 +9,12 @@ RUN mkdir -p /etc/selinux/targeted/contexts/files && touch /etc/selinux/targeted
 RUN grep -q PLATFORM_ID /etc/os-release || echo 'PLATFORM_ID="platform:rolling"' >> /etc/os-release
 
 # bootupd is only needed for disk image (qcow2), not for the bootc image itself
-RUN pacman -Syu --noconfirm bootupd && \
-    bootupctl backend generate-update-metadata
+# The Arch package doesn't ship bootupd.socket/service (upstream Makefile doesn't install them),
+# so we create them here — bootc's install check looks for these files.
+RUN pacman -Syu --noconfirm bootupd bubblewrap && \
+    mkdir -p /usr/lib/systemd/system && \
+    printf '[Unit]\nDescription=Bootloader Update Daemon\nRequires=bootupd.socket\n\n[Service]\nExecStart=/usr/libexec/bootupd\n' > /usr/lib/systemd/system/bootupd.service && \
+    printf '[Unit]\nDescription=Bootloader Update Socket\n\n[Socket]\nListenStream=/run/bootupd.sock\n\n[Install]\nWantedBy=sockets.target\n' > /usr/lib/systemd/system/bootupd.socket
 
 # Create a default user so the disk image boots to a usable login
 RUN useradd -m -G wheel liveuser && echo 'liveuser:liveuser' | chpasswd && mkdir -p /etc/sudoers.d && echo 'liveuser ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/liveuser
