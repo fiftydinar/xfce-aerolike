@@ -62,9 +62,7 @@ jobs:
 
     container:
       image: docker.io/archlinux:latest
-      options: >-
-        --cap-add=SYS_ADMIN
-        ${{ matrix.pkg.name != 'linux-lts' && '--tmpfs /build:size=14G,exec' || '' }}
+      options: --cap-add=SYS_ADMIN
 
     steps:
       - name: Prepare build container
@@ -85,12 +83,20 @@ jobs:
           echo "BUILDDIR=/build" >> $GITHUB_ENV
 
       - name: Cache ccache
+        id: ccache
         uses: actions/cache@v4
         with:
           path: /ccache
           key: ccache-${{ matrix.pkg.name }}-${{ github.run_id }}
           restore-keys: |
             ccache-${{ matrix.pkg.name }}-
+
+      - name: Create build directory
+        run: mkdir -p /build
+
+      - name: Mount tmpfs for build
+        if: ${{ matrix.pkg.name != 'linux-lts' || steps.ccache.outputs.cache-hit == 'true' }}
+        run: mount -t tmpfs -o size=14G,exec tmpfs /build
 
       - name: Clone ${{ matrix.pkg.name }}
         run: |
@@ -175,7 +181,7 @@ jobs:
     steps:
       - name: Prepare build container
         run: |
-          pacman -Sy --noconfirm base-devel git sudo pacman-contrib ccache
+          pacman -Sy --noconfirm base-devel git sudo pacman-contrib ccache github-cli
           useradd -m builder && echo 'builder ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
           mkdir -p /ccache && chown builder:builder /ccache
           sed -i 's/!ccache/ccache/' /etc/makepkg.conf
