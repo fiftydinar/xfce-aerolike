@@ -37,32 +37,9 @@ jobs:
           sudo rm -rf rootfs/var/tmp
           sudo ln -s /tmp rootfs/var/tmp
 
-      - name: Generate initramfs with dmsquash-live
+      - name: Run chroot script (live user, dmsquash-live initramfs)
         run: |
-          cat > work/chroot.sh << 'CHROOT'
-          set -xeuo pipefail
-
-          useradd -m -G wheel liveuser
-          echo "liveuser:liveuser" | chpasswd
-          echo "liveuser ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
-
-          mkdir -p /etc/lightdm/lightdm.conf.d
-          cat > /etc/lightdm/lightdm.conf.d/50-live-autologin.conf << 'LIGHTDM'
-          [Seat:*]
-          autologin-user=liveuser
-          autologin-user-timeout=0
-          LIGHTDM
-
-          pacman -Sy --noconfirm --needed dracut
-
-          KVER=$(basename "$(find /usr/lib/modules -maxdepth 1 -type d | grep -v "\.img$" | tail -n1)")
-          dracut --force --no-hostonly --reproducible --zstd \
-            --kver "$KVER" \
-            --add "dmsquash-live dmsquash-live-autooverlay" \
-            /app/initramfs.img
-
-          pacman -Scc --noconfirm
-CHROOT
+          cp scripts/build-iso-chroot.sh work/chroot.sh
           sudo podman run --rm --privileged \
             --tmpfs /tmp:rw --tmpfs /run:rw \
             --volume $PWD/work:/app \
@@ -71,7 +48,7 @@ CHROOT
 
       - name: Create squashfs
         run: |
-          sudo mksquashfs rootfs work/squashfs.img -all-root -noappend -comp zstd -Xcompression-level 19
+          sudo mksquashfs rootfs work/squashfs.img -all-root -noappend -comp zstd
 
       - name: Organize ISO root
         run: |
