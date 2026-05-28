@@ -272,14 +272,14 @@ jobs:
           i=1
           for pkgdir in */; do
             [ "$pkgdir" = "packages/" ] && continue
-            pkgname=${pkgdir%/}
-            pkgfile=$(ls "$pkgdir"*.pkg.tar.zst 2>/dev/null | head -1)
-            if [ -n "$pkgfile" ]; then
+            for pkgfile in "$pkgdir"*.pkg.tar.zst; do
+              [ -f "$pkgfile" ] || continue
+              pkgname=$(basename "$pkgfile" .pkg.tar.zst)
               size=$(du -h "$pkgfile" | cut -f1)
               cp "$pkgfile" packages/
               echo "| $i | $pkgname | $size |" >> $GITHUB_STEP_SUMMARY
               i=$((i + 1))
-            fi
+            done
           done
           tar -czf xfce-aerolike-packages.tar.gz packages/
       - name: Create GitHub release
