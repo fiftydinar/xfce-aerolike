@@ -22,5 +22,10 @@ RUN pacman -Syu --noconfirm bootupd && \
 # Disable automatic bootc updates — disk images are static snapshots
 RUN systemctl --system disable bootc-fetch-apply-updates.timer || true
 
+# bootupd is installed only for bootloader install during disk creation.
+# At runtime it's unused: no socket/service units are shipped by the Arch package,
+# and bootloader-update.service is not enabled. Mask it anyway for safety.
+RUN systemctl --system mask bootloader-update.service || true
+
 # Create a default user so the disk image boots to a usable login
 RUN useradd -m -G wheel liveuser && echo 'liveuser:liveuser' | chpasswd && mkdir -p /etc/sudoers.d && echo 'liveuser ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/liveuser
