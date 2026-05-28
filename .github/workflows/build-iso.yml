@@ -71,9 +71,8 @@ jobs:
           grub-mkimage -O x86_64-efi -o isoroot/EFI/BOOT/BOOTx64.efi \
             -p /EFI/BOOT \
             fat iso9660 part_gpt part_msdos normal boot linux configfile \
-            loopback efi_gop efi_uga file help gfxterm \
+            loopback efi_gop efi_uga gfxterm \
             loadenv search search_fs_file search_fs_uuid search_label \
-            ls cat echo true false read sleep reboot halt \
             ext2 ext4 btrfs xfs squash4 lvm diskfilter
 
           dd if=/dev/zero of=efiboot.img bs=1M count=10
