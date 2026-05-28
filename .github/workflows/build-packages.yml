@@ -62,7 +62,7 @@ jobs:
 
     container:
       image: docker.io/archlinux:latest
-      options: --cap-add=SYS_ADMIN
+      options: --cap-add=SYS_ADMIN --tmpfs /build:size=14G,exec
 
     steps:
       - name: Prepare build container
@@ -91,16 +91,12 @@ jobs:
           restore-keys: |
             ccache-${{ matrix.pkg.name }}-
 
-      - name: Create build directory
-        run: mkdir -p /build
-
-      - name: Mount tmpfs for build
+      - name: Unmount tmpfs if linux-lts without ccache
+        if: ${{ matrix.pkg.name == 'linux-lts' }}
         run: |
-          if [ "${{ matrix.pkg.name }}" = "linux-lts" ] && [ -z "$(ls -A /ccache 2>/dev/null)" ]; then
-            echo "ccache empty, skipping tmpfs for linux-lts"
-          else
-            grep -qF '/build ' /proc/mounts || mount -t tmpfs -o size=14G,exec tmpfs /build
-            grep -F '/build ' /proc/mounts || echo "no tmpfs at /build"
+          if [ -z "$(ls -A /ccache 2>/dev/null)" ]; then
+            umount /build && mkdir -p /build
+            echo "ccache empty, tmpfs removed for linux-lts"
           fi
 
       - name: Clone ${{ matrix.pkg.name }}
