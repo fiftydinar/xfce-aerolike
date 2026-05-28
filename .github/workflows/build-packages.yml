@@ -210,7 +210,7 @@ jobs:
           [ -z "$deps" ] && exit 0
           mkdir -p /deps
           for dep in $deps; do
-            gh run download "${{ github.run_id }}" --name "$dep" --dir /deps
+            gh run download "${{ github.run_id }}" --repo "${{ github.repository }}" --name "$dep" --dir /deps
           done
 
       - name: Install pre-built AUR deps
