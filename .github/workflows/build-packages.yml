@@ -91,13 +91,13 @@ jobs:
           restore-keys: |
             ccache-${{ matrix.pkg.name }}-
 
-      - name: Unmount tmpfs if linux-lts without ccache
-        if: ${{ matrix.pkg.name == 'linux-lts' }}
-        run: |
-          if [ -z "$(ls -A /ccache 2>/dev/null)" ]; then
-            umount /build && mkdir -p /build
-            echo "ccache empty, tmpfs removed for linux-lts"
-          fi
+      #- name: Unmount tmpfs if linux-lts without ccache
+        #if: ${{ matrix.pkg.name == 'linux-lts' }}
+        #run: |
+          #if [ -z "$(ls -A /ccache 2>/dev/null)" ]; then
+            #umount /build && mkdir -p /build
+            #echo "ccache empty, tmpfs removed for linux-lts"
+          #fi
 
       - name: Clone ${{ matrix.pkg.name }}
         run: |
@@ -124,29 +124,29 @@ jobs:
         if: ${{ matrix.pkg.patch }}
         run: |
           cd /build
-          echo "::group::Building ${{ matrix.pkg.name }}"
+          echo "─────────────── Building ${{ matrix.pkg.name }} ───────────────"
           chown -R builder:builder /build
           PGP=""
           [ "${{ matrix.pkg.skippgpcheck }}" = "true" ] && PGP="--skippgpcheck"
-          echo "Extracting sources..."
+          echo "──────────────────── Extracting sources ────────────────────"
           sudo -E -u builder makepkg --noconfirm --syncdeps --nocheck $PGP --nobuild
-          echo "Applying patch..."
+          echo "────────────────────── Applying patch ──────────────────────"
           ${{ matrix.pkg.patch }}
-          echo "Building patched package..."
+          echo "───────────────── Building patched package ─────────────────"
           chown -R builder:builder /build
           sudo -E -u builder makepkg --noconfirm --syncdeps --nocheck $PGP --noextract
-          echo "::endgroup::"
+          echo "────────── Building ${{ matrix.pkg.name }} finished ──────────"
 
       - name: Build package
         if: ${{ !matrix.pkg.patch }}
         run: |
           cd /build
-          echo "::group::Building ${{ matrix.pkg.name }}"
+          echo "─────────────── Building ${{ matrix.pkg.name }} ───────────────"
           chown -R builder:builder /build
           PGP=""
           [ "${{ matrix.pkg.skippgpcheck }}" = "true" ] && PGP="--skippgpcheck"
           sudo -E -u builder makepkg --noconfirm --syncdeps --nocheck $PGP
-          echo "::endgroup::"
+          echo "────────── Building ${{ matrix.pkg.name }} finished ──────────"
 
       - name: Upload package
         uses: actions/upload-artifact@v4
@@ -234,10 +234,10 @@ jobs:
       - name: Build ${{ matrix.pkg.name }}
         run: |
           cd /build
-          echo "::group::Building ${{ matrix.pkg.name }}"
+          echo "─────────────── Building ${{ matrix.pkg.name }} ───────────────"
           chown -R builder:builder /build
           sudo -E -u builder makepkg --noconfirm --syncdeps --nocheck
-          echo "::endgroup::"
+          echo "────────── Building ${{ matrix.pkg.name }} finished ──────────"
 
       - name: Upload package
         uses: actions/upload-artifact@v4
