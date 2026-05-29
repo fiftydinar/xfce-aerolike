@@ -46,9 +46,6 @@ jobs:
             prepare: |
               sed -i 's|--prefix=/usr|--prefix=/usr --with-default-backdrop-filename=/usr/share/backgrounds/frosted-glass.webp|g' ./PKGBUILD
 
-          - name: xfce-aero-lang-changer
-            repo: https://github.com/fiftydinar/xfce-aero-lang-changer.git
-
           - name: corefreq
             repo: https://aur.archlinux.org/corefreq.git
             prepare: |
@@ -69,6 +66,9 @@ jobs:
             repo: https://aur.archlinux.org/networkmanager-dispatcher-chrony.git
 
           - name: dwarfs-bin
+            repo: https://aur.archlinux.org/dwarfs-bin.git
+
+          - name: fltk-bin
             repo: https://aur.archlinux.org/dwarfs-bin.git
 
     container:
@@ -173,6 +173,10 @@ jobs:
       max-parallel: 1
       matrix:
         pkg:
+          - name: xfce-aero-lang-changer
+            repo: https://github.com/fiftydinar/xfce-aero-lang-changer.git
+            deps: fltk-git
+        
           - name: libwnck
             repo: https://aur.archlinux.org/libwnck.git
             deps: gtk2
