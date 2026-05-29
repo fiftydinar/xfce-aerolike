@@ -71,7 +71,11 @@ jobs:
           - name: fltk-git
             repo: https://aur.archlinux.org/fltk-git.git
             prepare: |
-              pacman -Syu --noconfirm libgl
+              pacman -Syu --noconfirm libgl glu && \
+              VER=$(curl -sL https://raw.githubusercontent.com/fiftydinar/xfce-aero-lang-changer/master/Cargo.lock | grep -A2 'name = "fltk-sys"' | grep version | sed 's/.*"\(.*\)".*/\1/') && \
+              sed -i "s/pkgver=.*/pkgver=$VER/" PKGBUILD && \
+              sed -i "s|source=('fltk::git+https://github.com/fltk/fltk.git')|source=(\"https://github.com/fltk/fltk/archive/refs/tags/release-$VER.tar.gz\")|" PKGBUILD && \
+              sed -i '/^pkgver()/,/^}/c\pkgver() { echo '"$VER"'; }' PKGBUILD
 
     container:
       image: docker.io/archlinux:latest
