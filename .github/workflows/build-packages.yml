@@ -46,6 +46,9 @@ jobs:
             prepare: |
               sed -i 's|--prefix=/usr|--prefix=/usr --with-default-backdrop-filename=/usr/share/backgrounds/frosted-glass.webp|g' ./PKGBUILD
 
+          - name: xfce-lang-changer
+            repo: https://github.com/fiftydinar/xfce-lang-changer.git
+          
           - name: corefreq
             repo: https://aur.archlinux.org/corefreq.git
             prepare: |
