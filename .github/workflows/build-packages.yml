@@ -68,8 +68,8 @@ jobs:
           - name: dwarfs-bin
             repo: https://aur.archlinux.org/dwarfs-bin.git
 
-          - name: fltk-bin
-            repo: https://aur.archlinux.org/dwarfs-bin.git
+          - name: fltk-git
+            repo: https://aur.archlinux.org/fltk-git.git
 
     container:
       image: docker.io/archlinux:latest
