@@ -48,8 +48,6 @@ jobs:
 
           - name: xfce-aero-lang-changer
             repo: https://github.com/fiftydinar/xfce-aero-lang-changer.git
-            prepare: |
-              sed -i 's|make |make LINK=static |g' ./PKGBUILD
 
           - name: corefreq
             repo: https://aur.archlinux.org/corefreq.git
