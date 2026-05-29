@@ -46,6 +46,11 @@ jobs:
             prepare: |
               sed -i 's|--prefix=/usr|--prefix=/usr --with-default-backdrop-filename=/usr/share/backgrounds/frosted-glass.webp|g' ./PKGBUILD
 
+          - name: xfce-aero-lang-changer
+            repo: https://github.com/fiftydinar/xfce-aero-lang-changer.git
+            prepare: |
+              sed -i 's|make |make LINK=static |g' ./PKGBUILD
+
           - name: corefreq
             repo: https://aur.archlinux.org/corefreq.git
             prepare: |
@@ -67,16 +72,6 @@ jobs:
 
           - name: dwarfs-bin
             repo: https://aur.archlinux.org/dwarfs-bin.git
-
-          - name: fltk-git
-            repo: https://aur.archlinux.org/fltk-git.git
-            prepare: |
-              pacman -Syu --noconfirm libgl glu && \
-              TAG=$(curl -sL "https://api.github.com/repos/fiftydinar/xfce-aero-lang-changer/releases/latest" | grep '"tag_name"' | sed 's/.*"\(.*\)".*/\1/') && \
-              VER=$(curl -sL "https://raw.githubusercontent.com/fiftydinar/xfce-aero-lang-changer/$TAG/Cargo.lock" | grep -A2 'name = "fltk-sys"' | grep version | sed 's/.*"\(.*\)".*/\1/') && \
-              sed -i "s/pkgver=.*/pkgver=$VER/" PKGBUILD && \
-              sed -i "s|source=('fltk::git+https://github.com/fltk/fltk.git')|source=(\"https://github.com/fltk/fltk/archive/refs/tags/$VER.tar.gz\")|" PKGBUILD && \
-              sed -i '/^pkgver()/,/^}/c\pkgver() { echo '"$VER"'; }' PKGBUILD
 
     container:
       image: docker.io/archlinux:latest
@@ -180,10 +175,6 @@ jobs:
       max-parallel: 1
       matrix:
         pkg:
-          - name: xfce-aero-lang-changer
-            repo: https://github.com/fiftydinar/xfce-aero-lang-changer.git
-            deps: fltk-git
-        
           - name: libwnck
             repo: https://aur.archlinux.org/libwnck.git
             deps: gtk2
