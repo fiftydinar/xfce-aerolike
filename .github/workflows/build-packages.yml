@@ -92,6 +92,7 @@ jobs:
           echo "CFLAGS=-pipe" >> $GITHUB_ENV
           echo "CXXFLAGS=-pipe" >> $GITHUB_ENV
           echo "BUILDDIR=/build" >> $GITHUB_ENV
+          echo "CARGO_HOME=/home/builder/.cargo" >> $GITHUB_ENV
 
       - name: Cache ccache
         id: ccache
@@ -201,6 +202,7 @@ jobs:
           echo "CFLAGS=-pipe" >> $GITHUB_ENV
           echo "CXXFLAGS=-pipe" >> $GITHUB_ENV
           echo "BUILDDIR=/build" >> $GITHUB_ENV
+          echo "CARGO_HOME=/home/builder/.cargo" >> $GITHUB_ENV
 
       - name: Cache ccache
         uses: actions/cache@v4
