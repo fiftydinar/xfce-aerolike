@@ -267,9 +267,9 @@ jobs:
     steps:
       - name: Prune old releases
         run: |
-          gh release list --limit 100 --json tagName,createdAt \
-            --jq '.[].tagName' | sort |
-            head -n -30 | xargs -r -I{} gh release delete {} --yes --cleanup-tag
+          gh release list --repo ${{ github.repository }} --limit 100 --json tagName,createdAt \
+              --jq '.[].tagName' | sort | \
+              head -n -30 | xargs -r -I{} gh release delete {} --repo ${{ github.repository }} --yes --cleanup-tag
         env:
           GITHUB_TOKEN: ${{ github.token }}
       - name: Download all build artifacts
@@ -303,6 +303,6 @@ jobs:
             packages/*.pkg.tar.zst
       - name: Trigger bluebuild
         if: github.event_name == 'schedule'
-        run: gh workflow run build.yml --ref main
+        run: gh workflow run build.yml --ref main --repo "${{ github.repository }}"
         env:
           GITHUB_TOKEN: ${{ github.token }}
