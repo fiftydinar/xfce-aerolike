@@ -59,6 +59,9 @@ jobs:
 
           - name: compiz
             repo: https://aur.archlinux.org/compiz.git
+
+          - name: glycin-ng
+            repo: https://aur.archlinux.org/glycin-ng.git
           
           - name: gtk-nocsd-git
             repo: https://aur.archlinux.org/gtk-nocsd-git.git
