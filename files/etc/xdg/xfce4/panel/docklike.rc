@@ -10,3 +10,4 @@ indicatorColorFromTheme=false
 indicatorColor=rgb(64,184,191)
 inactiveColor=rgb(24,135,124)
 indicatorOrientation=1
+showPreviews=true
