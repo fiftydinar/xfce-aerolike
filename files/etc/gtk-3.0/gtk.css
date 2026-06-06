@@ -69,6 +69,53 @@
     box-shadow: 0 0 0 1px rgba(255,255,255,0.5) inset;
 }
 
+/* Docklike window preview thumbnail popup. */
+.xfce-docklike-window .menu {
+    background-color: rgba(0,0,0,0.35);
+    background-image: linear-gradient(to bottom,
+                                      rgba(255,255,255,0.5),
+                                      rgba(255,255,255,0.1) 3%,
+                                      rgba(255,255,255,0.05) 50%,
+                                      rgba(0,0,0,0.1));
+    border: 1px solid rgba(0,0,0,0.3);
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.25) inset;
+    color: #ffffff;
+}
+
+.xfce-docklike-window .menu_item grid {
+    margin: 0px;
+    padding: 4px;
+    border-radius: 3px;
+    border: 1px solid transparent;
+    transition: 250ms;
+}
+
+.xfce-docklike-window .menu_item:hover grid {
+    background-image: linear-gradient(to bottom,
+                                      rgba(255,255,255,0.5),
+                                      rgba(135,165,202,0));
+    border: 1px solid rgba(0,0,0,0.5);
+    border-radius: 3px;
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.375) inset;
+    color: #1e4d5c;
+}
+
+.xfce-docklike-window .menu_item:active grid {
+    background-image: linear-gradient(to bottom,
+                                      rgba(255,255,255,0.625),
+                                      rgba(255,255,255,0.165));
+    border: 1px solid rgba(0,0,0,0.5);
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.5) inset;
+    color: #000000;
+}
+
+.xfce-docklike-window .menu_item .preview {
+    margin: 2px 0px;
+    border: 1px solid rgba(0,0,0,0.4);
+    border-radius: 2px;
+    box-shadow: 0 0 3px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.2) inset;
+}
+
 /* Applications menu and whisker menu with an orb, based on PNG. */
 
 #applicationmenu-button {
