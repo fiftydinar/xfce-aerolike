@@ -62,8 +62,6 @@ jobs:
 
           - name: glycin-ng
             repo: https://aur.archlinux.org/glycin-ng.git
-            prepare: |
-              sed -i 's|https://github.com/QaidVoid/glycin-ng.git#tag=$pkgver|https://github.com/QaidVoid/glycin-ng.git#branch=fix-svg-premultiplied-alpha|g' ./PKGBUILD
 
           - name: gtk-nocsd-git
             repo: https://aur.archlinux.org/gtk-nocsd-git.git
