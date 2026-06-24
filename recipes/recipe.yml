@@ -153,7 +153,7 @@ modules:
       # Set nano as the default editor
       - "echo 'VISUAL=nano\nEDITOR=nano' >> /etc/environment"
       # Download and install aerothemeplasma Kvantum theme
-      - "wget --retry-connrefused --tries=30 https://gitgud.io/aeroshell/atp/aerothemeplasma/-/raw/Plasma/HEAD/misc/kvantum/Windows7Aero/Windows7Aero.kvconfig -P /usr/share/Kvantum/Windows7Aero && wget --retry-connrefused --tries=30 https://gitgud.io/aeroshell/atp/aerothemeplasma/-/raw/Plasma/HEAD/misc/kvantum/Windows7Aero/Windows7Aero.svg -P /usr/share/Kvantum/Windows7Aero"
+      - "wget --retry-connrefused --tries=30 https://gitgud.io/aeroshell/atp/aerothemeplasma/-/raw/HEAD/misc/kvantum/Windows7Aero/Windows7Aero.kvconfig -P /usr/share/Kvantum/Windows7Aero && wget --retry-connrefused --tries=30 https://gitgud.io/aeroshell/atp/aerothemeplasma/-/raw/HEAD/misc/kvantum/Windows7Aero/Windows7Aero.svg -P /usr/share/Kvantum/Windows7Aero"
       # Set gtk-nocsd by default
       - "echo 'LD_PRELOAD=/usr/lib/libgtk-nocsd.so' >> /etc/environment"
       - "echo 'SHARUN_ALLOW_LD_PRELOAD=1' >> /etc/environment"
