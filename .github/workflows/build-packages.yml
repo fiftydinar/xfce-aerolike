@@ -99,7 +99,7 @@ jobs:
 
       - name: Cache ccache
         id: ccache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: /ccache
           key: ccache-${{ matrix.pkg.name }}-${{ github.run_id }}
@@ -208,7 +208,7 @@ jobs:
           echo "CARGO_HOME=/home/builder/.cargo" >> $GITHUB_ENV
 
       - name: Cache ccache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: /ccache
           key: ccache-${{ matrix.pkg.name }}-${{ github.run_id }}
