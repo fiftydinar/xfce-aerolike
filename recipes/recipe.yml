@@ -94,6 +94,8 @@ modules:
         - unbound
         - avahi
         - nss-mdns
+        # OOM prevention
+        - jsoncpp
         # Other
         - expac
         - dash
@@ -202,6 +204,7 @@ modules:
       disabled:
         - systemd-timesyncd.service
         - systemd-resolved.service
+        - systemd-oomd.service
       enabled:
         - NetworkManager.service
         - unbound.service
@@ -209,6 +212,7 @@ modules:
         - avahi-daemon.service
         - bluetooth.service
         - lightdm.service
+        - oomd.service
   - type: files
     files:
       - source: usr

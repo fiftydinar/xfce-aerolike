@@ -71,6 +71,9 @@ jobs:
           - name: networkmanager-dispatcher-chrony
             repo: https://aur.archlinux.org/networkmanager-dispatcher-chrony.git
 
+          - name: oomd
+            repo: https://aur.archlinux.org/oomd.git
+
           - name: dwarfs-bin
             repo: https://aur.archlinux.org/dwarfs-bin.git
 
