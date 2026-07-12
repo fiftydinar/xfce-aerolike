@@ -50,6 +50,8 @@ case "$ACTION" in
         rm -f "$DOMAIN_FILE"
         ;;
     down)
+        CONN_TYPE=$(nmcli -g connection.type con show "$CONNECTION_UUID" 2>/dev/null)
+        [ "$CONN_TYPE" != "wireguard" ] && exit 0
         DOMAIN_FILE="$DOMAIN_DIR/$CONNECTION_UUID"
         [ -f "$DOMAIN_FILE" ] || exit 0
         while read -r domain; do
