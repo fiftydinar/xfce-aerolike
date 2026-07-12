@@ -187,8 +187,16 @@ modules:
         sed -i 's/^hosts:.*/hosts: files mymachines myhostname mdns_minimal [NOTFOUND=return] dns/' /etc/nsswitch.conf
       # Generate unbound-control TLS certificates for VPN split-DNS dispatcher
       - "unbound-control-setup"
-      # Remove stale systemd-resolved resolv.conf symlink
-      - "rm -f /etc/resolv.conf"
+      # Overwrite container runtime bind-mounted resolv.conf with static file
+      - |
+        cat > /etc/resolv.conf << 'EOF'
+        nameserver 127.0.0.1
+        nameserver ::1
+        options trust-ad
+        # Fallback when unbound is not running
+        nameserver 9.9.9.9
+        nameserver 149.112.112.112
+        EOF
   - type: systemd
     system:
       disabled:
