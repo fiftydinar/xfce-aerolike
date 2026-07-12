@@ -128,18 +128,6 @@ modules:
         wget --retry-connrefused --tries=10 "$PKGS_URL" -O /tmp/pkgs.tar.gz && tar -xzf /tmp/pkgs.tar.gz -C /tmp/
         pacman -U --noconfirm --ask 4 /tmp/packages/*.pkg.tar.zst
         rm -rf /tmp/packages/ /tmp/pkgs.tar.gz
-      # Build yserver from source if not in pre-built packages (needed for testing non-main branches)
-      - |
-        if ! command -v yserver &>/dev/null; then
-          pacman -S --noconfirm --needed --assume-installed xorg-server rust just shaderc pkgconf git seatd libxkbcommon libinput systemd-libs fontconfig libxshmfence freetype2
-          git clone --depth 1 https://github.com/joske/yserver.git /tmp/yserver-src
-          cd /tmp/yserver-src
-          cargo build --release
-          install -Dm755 target/release/yserver /usr/bin/yserver
-          cd /
-          rm -rf /tmp/yserver-src /root/.cargo /root/.rustup /root/.cache
-          pacman -Rns --noconfirm rust just git || true
-        fi
       # Set compiz to use emerald decorator
       - |
         sed -i 's|USE_EMERALD="no"|USE_EMERALD="yes"|g' /usr/bin/compiz-decorator
