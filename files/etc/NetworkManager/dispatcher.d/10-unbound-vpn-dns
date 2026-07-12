@@ -2,7 +2,7 @@
 # Update unbound forward zones on VPN connect/disconnect for split-DNS
 
 ACTION="$2"
-DOMAIN_FILE="/run/unbound-vpn-domains"
+DOMAIN_DIR="/run/unbound-vpn-domains"
 
 case "$ACTION" in
     vpn-up)
@@ -13,15 +13,44 @@ case "$ACTION" in
         [ -z "$DNS_DOMAINS" ] && DNS_DOMAINS=$(nmcli -g ipv6.dns-search con show "$CONNECTION_UUID" 2>/dev/null)
         [ -z "$DNS_DOMAINS" ] && exit 0
 
-        rm -f "$DOMAIN_FILE"
+        mkdir -p "$DOMAIN_DIR"
         for domain in $DNS_DOMAINS; do
-            echo "$domain" >> "$DOMAIN_FILE"
+            echo "$domain" >> "$DOMAIN_DIR/$CONNECTION_UUID"
+            for server in $DNS_SERVERS; do
+                unbound-control forward_add +i "$domain" "$server"
+            done
+        done
+        ;;
+    up)
+        CONN_TYPE=$(nmcli -g connection.type con show "$CONNECTION_UUID" 2>/dev/null)
+        [ "$CONN_TYPE" != "wireguard" ] && exit 0
+
+        DNS_SERVERS=$(nmcli -g ipv4.dns con show "$CONNECTION_UUID" 2>/dev/null)
+        [ -z "$DNS_SERVERS" ] && DNS_SERVERS=$(nmcli -g ipv6.dns con show "$CONNECTION_UUID" 2>/dev/null)
+        [ -z "$DNS_SERVERS" ] && exit 0
+
+        DNS_DOMAINS=$(nmcli -g ipv4.dns-search con show "$CONNECTION_UUID" 2>/dev/null)
+        [ -z "$DNS_DOMAINS" ] && DNS_DOMAINS=$(nmcli -g ipv6.dns-search con show "$CONNECTION_UUID" 2>/dev/null)
+        [ -z "$DNS_DOMAINS" ] && exit 0
+
+        mkdir -p "$DOMAIN_DIR"
+        for domain in $DNS_DOMAINS; do
+            echo "$domain" >> "$DOMAIN_DIR/$CONNECTION_UUID"
             for server in $DNS_SERVERS; do
                 unbound-control forward_add +i "$domain" "$server"
             done
         done
         ;;
     vpn-down)
+        DOMAIN_FILE="$DOMAIN_DIR/$CONNECTION_UUID"
+        [ -f "$DOMAIN_FILE" ] || exit 0
+        while read -r domain; do
+            unbound-control forward_remove "$domain" 2>/dev/null
+        done < "$DOMAIN_FILE"
+        rm -f "$DOMAIN_FILE"
+        ;;
+    down)
+        DOMAIN_FILE="$DOMAIN_DIR/$CONNECTION_UUID"
         [ -f "$DOMAIN_FILE" ] || exit 0
         while read -r domain; do
             unbound-control forward_remove "$domain" 2>/dev/null
