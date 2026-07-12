@@ -6,40 +6,26 @@ DOMAIN_FILE="/run/unbound-vpn-domains"
 
 case "$ACTION" in
     vpn-up)
-        sleep 1
-        VPN_UUID=$(nmcli -t -f TYPE,UUID con show --active 2>/dev/null | grep '^vpn:' | head -1 | cut -d: -f2)
-        [ -z "$VPN_UUID" ] && exit 0
-
-        DNS_SERVERS=$(nmcli -t -f ipv4.dns con show "$VPN_UUID" 2>/dev/null | cut -d: -f2-)
-        [ -z "$DNS_SERVERS" ] && DNS_SERVERS=$(nmcli -t -f ipv6.dns con show "$VPN_UUID" 2>/dev/null | cut -d: -f2-)
-        DNS_DOMAINS=$(nmcli -t -f ipv4.dns-search con show "$VPN_UUID" 2>/dev/null | cut -d: -f2-)
-        [ -z "$DNS_DOMAINS" ] && DNS_DOMAINS=$(nmcli -t -f ipv6.dns-search con show "$VPN_UUID" 2>/dev/null | cut -d: -f2-)
-
+        DNS_SERVERS="${VPN_IP4_NAMESERVERS:-$VPN_IP6_NAMESERVERS}"
         [ -z "$DNS_SERVERS" ] && exit 0
+
+        DNS_DOMAINS=$(nmcli -g ipv4.dns-search con show "$CONNECTION_UUID" 2>/dev/null)
+        [ -z "$DNS_DOMAINS" ] && DNS_DOMAINS=$(nmcli -g ipv6.dns-search con show "$CONNECTION_UUID" 2>/dev/null)
         [ -z "$DNS_DOMAINS" ] && exit 0
 
         rm -f "$DOMAIN_FILE"
-        IFS=',' read -ra DOMAINS <<< "$DNS_DOMAINS"
-        IFS=',' read -ra SERVERS <<< "$DNS_SERVERS"
-        for domain in "${DOMAINS[@]}"; do
-            domain="${domain## }"
-            domain="${domain%% }"
-            [ -z "$domain" ] && continue
+        for domain in $DNS_DOMAINS; do
             echo "$domain" >> "$DOMAIN_FILE"
-            for server in "${SERVERS[@]}"; do
-                server="${server## }"
-                server="${server%% }"
-                [ -z "$server" ] && continue
-                /usr/sbin/unbound-control forward_add +i "$domain" "$server"
+            for server in $DNS_SERVERS; do
+                unbound-control forward_add +i "$domain" "$server"
             done
         done
         ;;
     vpn-down)
-        if [ -f "$DOMAIN_FILE" ]; then
-            while read -r domain; do
-                /usr/sbin/unbound-control forward_remove "$domain" 2>/dev/null
-            done < "$DOMAIN_FILE"
-            rm -f "$DOMAIN_FILE"
-        fi
+        [ -f "$DOMAIN_FILE" ] || exit 0
+        while read -r domain; do
+            unbound-control forward_remove "$domain" 2>/dev/null
+        done < "$DOMAIN_FILE"
+        rm -f "$DOMAIN_FILE"
         ;;
 esac
