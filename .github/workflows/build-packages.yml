@@ -20,8 +20,8 @@ jobs:
       fail-fast: false
       matrix:
         pkg:
-          - name: linux-lts
-            repo: https://gitlab.archlinux.org/archlinux/packaging/packages/linux-lts.git
+          - name: linux
+            repo: https://gitlab.archlinux.org/archlinux/packaging/packages/linux.git
             skippgpcheck: true
             patch: |
               SRCDIR=$(find "${BUILDDIR:-/build}/src" -maxdepth 1 -type d -name 'linux-*' | head -1)
@@ -48,11 +48,6 @@ jobs:
 
           - name: xfce-aero-lang-changer
             repo: https://github.com/fiftydinar/xfce-aero-lang-changer.git
-
-          - name: corefreq
-            repo: https://aur.archlinux.org/corefreq.git
-            prepare: |
-              sed -i 's|make |make DELAY_TSC=1 |g' ./PKGBUILD
 
           - name: gtk2
             repo: https://aur.archlinux.org/gtk2.git
@@ -109,8 +104,8 @@ jobs:
           restore-keys: |
             ccache-${{ matrix.pkg.name }}-
 
-      - name: Unmount tmpfs for linux-lts
-        if: ${{ matrix.pkg.name == 'linux-lts' }}
+      - name: Unmount tmpfs for linux
+        if: ${{ matrix.pkg.name == 'linux' }}
         run: |
           umount /build && mkdir -p /build
 
@@ -120,7 +115,7 @@ jobs:
           ls -la /build/
 
       - name: Override kernel cmdline
-        if: ${{ matrix.pkg.name == 'linux-lts' && github.event.inputs.kernel-cmdline != '' }}
+        if: ${{ matrix.pkg.name == 'linux' && github.event.inputs.kernel-cmdline != '' }}
         run: |
           echo "KERNEL_CMDLINE=${{ github.event.inputs.kernel-cmdline }}" >> $GITHUB_ENV
 

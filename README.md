@@ -36,9 +36,10 @@ For the default icon set, I credit:
 Now that we know what's the theming base and other defaults, I'll highlight what I added on top of it.
 
 - Image setup in shortly is explained like this:
-  - arch-base + dracut + bootc (with composefs) + SystemD + Xorg + LightDM + NetworkManager + chronyd + bluez + systemd-resolved + Pipewire + mesa (OpenGL) + vulkan + compiz + emerald + XFCE4 base + XFCE4 goodies like screenshotter and its applet plugins + theming
-- Uses `linux-lts` kernel
-- Uses [`corefreq`](https://github.com/cyring/CoreFreq) as CPU frequency scaling, idle and source clock (TSC) driver instead of AMD's or Intel's equivalent (offers more control, potentially better CPU efficiency and performance)
+  - arch-base + dracut + bootc (with composefs) + SystemD + Xorg + LightDM + NetworkManager + chronyd + bluez + unbound + avahi + Pipewire + mesa (OpenGL) + vulkan + compiz + emerald + XFCE4 base + XFCE4 goodies like screenshotter and its applet plugins + theming
+- Uses `linux` kernel instead of `linux-lts`
+- Uses `unbound` as the DNS resolver (recursive, DNSSEC-validating) instead of `systemd-resolved`, paired with `avahi` for mDNS and `NetworkManager` for connection management. Split-DNS for VPNs is handled via a NetworkManager dispatcher script.
+- Uses [facebook's `oomd`](https://github.com/facebookincubator/oomd) for proactive OOM prevention (PSI-based, per-cgroup, kills by memory size/growth) instead of `systemd-oomd`.
 - Has automatic seamless system updates enabled (runs atomic `bootc upgrade` once per day).
 - Uses `compiz` as the compositing window manager and `emerald` as the window decorator.
 - Additional `compiz` defaults that enables blur, snap and grid plugins + blurs taskbar and start menu. Also modified grid plugin to use colors matching the default background.

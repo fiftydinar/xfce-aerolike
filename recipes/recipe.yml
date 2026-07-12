@@ -128,17 +128,18 @@ modules:
         wget --retry-connrefused --tries=10 "$PKGS_URL" -O /tmp/pkgs.tar.gz && tar -xzf /tmp/pkgs.tar.gz -C /tmp/
         pacman -U --noconfirm --ask 4 /tmp/packages/*.pkg.tar.zst
         rm -rf /tmp/packages/ /tmp/pkgs.tar.gz
-      # CoreFreq: install kernel module via DKMS
+      # Build yserver from source if not in pre-built packages (needed for testing non-main branches)
       - |
-        _CF_VER=$(ls /usr/src/ | grep -oP '(?<=corefreq-)\S+' | head -1)
-        _KVER=$(basename $(find /usr/lib/modules -maxdepth 1 -type d | grep -v "\.img$" | tail -n 1))
-        dkms install corefreq/"$_CF_VER" -k "$_KVER"
-      # CoreFreq: kernel module params and autoload
-      - "echo 'options corefreqk Register_ClockSource=1 Register_Governor=1 Register_CPU_Freq=1 Register_CPU_Idle=1 Idle_Route=1 RDPMC_Enable=1' > /usr/lib/modprobe.d/corefreqk.conf"
-      - "echo 'corefreqk' > /usr/lib/modules-load.d/corefreq.conf"
-      - "echo 'w /sys/devices/system/clocksource/clocksource0/current_clocksource - - - - corefreq' > /usr/lib/tmpfiles.d/corefreq-clock.conf"
-      - "echo 'w /sys/devices/cpu/rdpmc - - - - 2' > /usr/lib/tmpfiles.d/corefreq-rdpmc.conf"
-      - "systemctl --system enable corefreqd"
+        if ! command -v yserver &>/dev/null; then
+          pacman -S --noconfirm --needed --assume-installed xorg-server rust just shaderc pkgconf git seatd libxkbcommon libinput systemd-libs fontconfig libxshmfence freetype2
+          git clone --depth 1 https://github.com/joske/yserver.git /tmp/yserver-src
+          cd /tmp/yserver-src
+          cargo build --release
+          install -Dm755 target/release/yserver /usr/bin/yserver
+          cd /
+          rm -rf /tmp/yserver-src /root/.cargo /root/.rustup /root/.cache
+          pacman -Rns --noconfirm rust just git || true
+        fi
       # Set compiz to use emerald decorator
       - |
         sed -i 's|USE_EMERALD="no"|USE_EMERALD="yes"|g' /usr/bin/compiz-decorator
