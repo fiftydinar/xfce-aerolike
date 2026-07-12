@@ -90,6 +90,10 @@ modules:
         - vulkan-tools
         - clinfo
         - xdotool
+        # DNS resolver (replaces systemd-resolved)
+        - unbound
+        - avahi
+        - nss-mdns
         # Other
         - expac
         - dash
@@ -178,14 +182,23 @@ modules:
         sed -i 's|<property name="MonospaceFontName" type="string" value=".*"/>|<property name="MonospaceFontName" type="string" value="Noto Sans Mono 9"/>|' /etc/xdg/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml
       # Modify LightDM defaults
       - "echo '\n\ntheme-name=Aerolike\nicon-theme-name=Obsidian-Teal\ncursor-theme-name=aero-drop\nfont-name=Noto Sans\nbackground=/usr/share/backgrounds/frosted-glass.webp' >> /etc/lightdm/lightdm-gtk-greeter.conf"
+      # Configure nsswitch for mDNS (replace systemd-resolved nss with avahi)
+      - |
+        sed -i 's/^hosts:.*/hosts: files mymachines myhostname mdns_minimal [NOTFOUND=return] dns/' /etc/nsswitch.conf
+      # Generate unbound-control TLS certificates for VPN split-DNS dispatcher
+      - "unbound-control-setup"
+      # Remove stale systemd-resolved resolv.conf symlink
+      - "rm -f /etc/resolv.conf"
   - type: systemd
     system:
       disabled:
         - systemd-timesyncd.service
+        - systemd-resolved.service
       enabled:
         - NetworkManager.service
-        - systemd-resolved.service
+        - unbound.service
         - chronyd.service
+        - avahi-daemon.service
         - bluetooth.service
         - lightdm.service
   - type: files
