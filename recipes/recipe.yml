@@ -50,8 +50,6 @@ modules:
         - noto-fonts-emoji
         - noto-fonts-extra
         # Desktop environment
-        - xorg
-        - xorg-drivers
         - xfce4
         - xfce4-screenshooter
         - obsidian-icon-theme
@@ -59,8 +57,7 @@ modules:
         - kvantum
         - qt5ct
         - qt6ct
-        - lightdm
-        - lightdm-gtk-greeter
+        # lightdm installed in script section (needs --assume-installed xorg-server)
         - pavucontrol
         - network-manager-applet
         - blueman
@@ -101,6 +98,8 @@ modules:
         - dash
   - type: script
     snippets:
+      # Install lightdm without xorg-server dependency
+      - "pacman -S --noconfirm --needed --assume-installed xorg-server lightdm lightdm-gtk-greeter"
       # Install all optional dependencies for xarchiver
       - "pacman -Syu --needed --noconfirm --asdeps $(expac -Ss '%o' xarchiver)"
       # Symlink dash to sh with pacman hook to persist across bash updates
@@ -128,6 +127,18 @@ modules:
         wget --retry-connrefused --tries=10 "$PKGS_URL" -O /tmp/pkgs.tar.gz && tar -xzf /tmp/pkgs.tar.gz -C /tmp/
         pacman -U --noconfirm --ask 4 /tmp/packages/*.pkg.tar.zst
         rm -rf /tmp/packages/ /tmp/pkgs.tar.gz
+      # Build yserver from source if not in pre-built packages (needed for testing non-main branches)
+      - |
+        if ! command -v yserver &>/dev/null; then
+          pacman -S --noconfirm --needed --assume-installed xorg-server rust just shaderc pkgconf git seatd libxkbcommon libinput systemd-libs fontconfig libxshmfence freetype2
+          git clone --depth 1 https://github.com/joske/yserver.git /tmp/yserver-src
+          cd /tmp/yserver-src
+          cargo build --release
+          install -Dm755 target/release/yserver /usr/bin/yserver
+          cd /
+          rm -rf /tmp/yserver-src /root/.cargo /root/.rustup /root/.cache
+          pacman -Rns --noconfirm rust just git || true
+        fi
       # Set compiz to use emerald decorator
       - |
         sed -i 's|USE_EMERALD="no"|USE_EMERALD="yes"|g' /usr/bin/compiz-decorator
@@ -178,16 +189,8 @@ modules:
         sed -i 's/^hosts:.*/hosts: files mymachines myhostname mdns_minimal [NOTFOUND=return] dns/' /etc/nsswitch.conf
       # Generate unbound-control TLS certificates for VPN split-DNS dispatcher
       - "unbound-control-setup"
-      # Overwrite container runtime bind-mounted resolv.conf with static file
-      - |
-        cat > /etc/resolv.conf << 'EOF'
-        nameserver 127.0.0.1
-        nameserver ::1
-        options trust-ad
-        # Fallback when unbound is not running
-        nameserver 9.9.9.9
-        nameserver 149.112.112.112
-        EOF
+      # Remove any symlinks (e.g. from Fedora's systemd-resolved) before files module overlays resolv.conf
+      - "rm -f /etc/resolv.conf"
   - type: systemd
     system:
       disabled:
