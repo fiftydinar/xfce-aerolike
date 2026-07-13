@@ -20,17 +20,16 @@ jobs:
       fail-fast: false
       matrix:
         pkg:
-          - name: linux
-            enabled: false
-            repo: https://gitlab.archlinux.org/archlinux/packaging/packages/linux.git
-            skippgpcheck: true
-            patch: |
-              SRCDIR=$(find "${BUILDDIR:-/build}/src" -maxdepth 1 -type d -name 'linux-*' | head -1)
-              [ -n "$SRCDIR" ] || { echo "ERROR: source dir not found at ${BUILDDIR:-/build}/src"; exit 1; }
-              cd "$SRCDIR"
-              sed -i "s|# CONFIG_CMDLINE_BOOL is not set|CONFIG_CMDLINE_BOOL=y|" .config
-              echo "CONFIG_CMDLINE=\"$KERNEL_CMDLINE\"" >> .config
-              cd /build
+          # - name: linux  # TODO: kernel build disabled, uncomment to re-enable
+          #   repo: https://gitlab.archlinux.org/archlinux/packaging/packages/linux.git
+          #   skippgpcheck: true
+          #   patch: |
+          #     SRCDIR=$(find "${BUILDDIR:-/build}/src" -maxdepth 1 -type d -name 'linux-*' | head -1)
+          #     [ -n "$SRCDIR" ] || { echo "ERROR: source dir not found at ${BUILDDIR:-/build}/src"; exit 1; }
+          #     cd "$SRCDIR"
+          #     sed -i "s|# CONFIG_CMDLINE_BOOL is not set|CONFIG_CMDLINE_BOOL=y|" .config
+          #     echo "CONFIG_CMDLINE=\"$KERNEL_CMDLINE\"" >> .config
+          #     cd /build
 
           - name: xfce4-screensaver
             repo: https://gitlab.archlinux.org/archlinux/packaging/packages/xfce4-screensaver.git
@@ -73,6 +72,9 @@ jobs:
           - name: dwarfs-bin
             repo: https://aur.archlinux.org/dwarfs-bin.git
 
+          - name: yserver-git
+            repo: https://aur.archlinux.org/yserver-git.git
+
     container:
       image: docker.io/archlinux:latest
       options: --cap-add=SYS_ADMIN --tmpfs /build:size=14G,exec
@@ -105,36 +107,24 @@ jobs:
           restore-keys: |
             ccache-${{ matrix.pkg.name }}-
 
-      - name: Unmount tmpfs for linux
-        if: ${{ matrix.pkg.name == 'linux' && matrix.pkg.enabled != false }}
-        run: |
-          umount /build && mkdir -p /build
-
       - name: Clone ${{ matrix.pkg.name }}
-        if: ${{ matrix.pkg.enabled != false }}
         run: |
           git clone --depth 1 "${{ matrix.pkg.repo }}" /build
           ls -la /build/
 
-      - name: Override kernel cmdline
-        if: ${{ matrix.pkg.name == 'linux' && github.event.inputs.kernel-cmdline != '' && matrix.pkg.enabled != false }}
-        run: |
-          echo "KERNEL_CMDLINE=${{ github.event.inputs.kernel-cmdline }}" >> $GITHUB_ENV
-
       - name: Apply patches
-        if: ${{ matrix.pkg.prepare && matrix.pkg.enabled != false }}
+        if: ${{ matrix.pkg.prepare }}
         run: |
           cd /build && ${{ matrix.pkg.prepare }}
 
       - name: Install official dependencies
-        if: ${{ matrix.pkg.enabled != false }}
         run: |
           cd /build
           . ./PKGBUILD
           pacman -Sy --noconfirm --needed base-devel ${depends[@]} ${makedepends[@]} 2>/dev/null || true
 
       - name: Build patched package
-        if: ${{ matrix.pkg.patch && matrix.pkg.enabled != false }}
+        if: ${{ matrix.pkg.patch }}
         run: |
           cd /build
           echo "─────────────── Building ${{ matrix.pkg.name }} ───────────────"
@@ -151,7 +141,7 @@ jobs:
           echo "────────── Building ${{ matrix.pkg.name }} finished ──────────"
 
       - name: Build package
-        if: ${{ !matrix.pkg.patch && matrix.pkg.enabled != false }}
+        if: ${{ !matrix.pkg.patch }}
         run: |
           cd /build
           echo "─────────────── Building ${{ matrix.pkg.name }} ───────────────"
@@ -162,7 +152,6 @@ jobs:
           echo "────────── Building ${{ matrix.pkg.name }} finished ──────────"
 
       - name: Upload package
-        if: ${{ matrix.pkg.enabled != false }}
         uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.pkg.name }}
