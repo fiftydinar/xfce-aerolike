@@ -1,6 +1,7 @@
 [Unit]
 Description=Ensure resolv.conf exists for unbound
 After=local-fs.target
+Before=unbound.service
 
 [Service]
 Type=oneshot
