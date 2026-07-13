@@ -187,6 +187,8 @@ modules:
       # Configure nsswitch for mDNS (replace systemd-resolved nss with avahi)
       - |
         sed -i 's/^hosts:.*/hosts: files mymachines myhostname mdns_minimal [NOTFOUND=return] dns/' /etc/nsswitch.conf
+      # Initialize DNSSEC trust anchor for unbound
+      - "unbound-anchor -a /etc/unbound/root.key"
       # Generate unbound-control TLS certificates for VPN split-DNS dispatcher
       - "unbound-control-setup"
       # Remove D-Bus activation for systemd-resolved (masked units can still be D-Bus activated)
