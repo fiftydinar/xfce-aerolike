@@ -191,9 +191,10 @@ modules:
       - "unbound-control-setup"
   - type: systemd
     system:
-      disabled:
+      masked:
         - systemd-timesyncd.service
         - systemd-resolved.service
+        - systemd-resolved.socket
         - systemd-oomd.service
       enabled:
         - NetworkManager.service
