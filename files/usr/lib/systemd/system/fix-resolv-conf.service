@@ -1,0 +1,12 @@
+[Unit]
+Description=Ensure resolv.conf exists for unbound
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecCondition=/bin/sh -c '[ ! -e /etc/resolv.conf ] || [ -L /etc/resolv.conf ]'
+ExecStart=/usr/bin/cp --remove-destination /usr/share/xfce-aerolike/resolv.conf /etc/resolv.conf
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

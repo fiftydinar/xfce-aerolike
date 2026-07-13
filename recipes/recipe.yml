@@ -189,16 +189,6 @@ modules:
         sed -i 's/^hosts:.*/hosts: files mymachines myhostname mdns_minimal [NOTFOUND=return] dns/' /etc/nsswitch.conf
       # Generate unbound-control TLS certificates for VPN split-DNS dispatcher
       - "unbound-control-setup"
-      # Write static resolv.conf for unbound (overwrites host bind-mount)
-      - |
-        umount /etc/resolv.conf
-        cat > /etc/resolv.conf << 'EOF'
-        nameserver 127.0.0.1
-        nameserver ::1
-        options trust-ad
-        nameserver 9.9.9.9
-        nameserver 149.112.112.112
-        EOF
   - type: systemd
     system:
       disabled:
@@ -225,6 +215,7 @@ modules:
         - bootc-fetch-apply-updates.timer
         - memory-tweaks-aerolike.service
         - dirty-centisecs-aerolike.service
+        - fix-resolv-conf.service
   - type: signing
   - type: script
     snippets:
