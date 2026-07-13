@@ -197,6 +197,8 @@ modules:
         - systemd-timesyncd.service
         - systemd-resolved.service
         - systemd-resolved.socket
+        - systemd-resolved-varlink.socket
+        - systemd-resolved-monitor.socket
         - systemd-oomd.service
       enabled:
         - NetworkManager.service
