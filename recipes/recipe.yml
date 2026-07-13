@@ -189,8 +189,16 @@ modules:
         sed -i 's/^hosts:.*/hosts: files mymachines myhostname mdns_minimal [NOTFOUND=return] dns/' /etc/nsswitch.conf
       # Generate unbound-control TLS certificates for VPN split-DNS dispatcher
       - "unbound-control-setup"
-      # Remove any symlinks (e.g. from Fedora's systemd-resolved) before files module overlays resolv.conf
-      - "rm -f /etc/resolv.conf"
+      # Unbind host resolv.conf, then write static one for unbound
+      - |
+        umount /etc/resolv.conf 2>/dev/null || true
+        cat > /etc/resolv.conf << 'EOF'
+        nameserver 127.0.0.1
+        nameserver ::1
+        options trust-ad
+        nameserver 9.9.9.9
+        nameserver 149.112.112.112
+        EOF
   - type: systemd
     system:
       disabled:
