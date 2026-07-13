@@ -189,6 +189,8 @@ modules:
         sed -i 's/^hosts:.*/hosts: files mymachines myhostname mdns_minimal [NOTFOUND=return] dns/' /etc/nsswitch.conf
       # Generate unbound-control TLS certificates for VPN split-DNS dispatcher
       - "unbound-control-setup"
+      # Remove D-Bus activation for systemd-resolved (masked units can still be D-Bus activated)
+      - "rm -f /usr/share/dbus-1/system-services/org.freedesktop.resolve1.service"
   - type: systemd
     system:
       masked:
