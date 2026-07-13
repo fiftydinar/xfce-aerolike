@@ -21,6 +21,7 @@ jobs:
       matrix:
         pkg:
           - name: linux
+            enabled: false
             repo: https://gitlab.archlinux.org/archlinux/packaging/packages/linux.git
             skippgpcheck: true
             patch: |
@@ -105,33 +106,35 @@ jobs:
             ccache-${{ matrix.pkg.name }}-
 
       - name: Unmount tmpfs for linux
-        if: ${{ matrix.pkg.name == 'linux' }}
+        if: ${{ matrix.pkg.name == 'linux' && matrix.pkg.enabled != false }}
         run: |
           umount /build && mkdir -p /build
 
       - name: Clone ${{ matrix.pkg.name }}
+        if: ${{ matrix.pkg.enabled != false }}
         run: |
           git clone --depth 1 "${{ matrix.pkg.repo }}" /build
           ls -la /build/
 
       - name: Override kernel cmdline
-        if: ${{ matrix.pkg.name == 'linux' && github.event.inputs.kernel-cmdline != '' }}
+        if: ${{ matrix.pkg.name == 'linux' && github.event.inputs.kernel-cmdline != '' && matrix.pkg.enabled != false }}
         run: |
           echo "KERNEL_CMDLINE=${{ github.event.inputs.kernel-cmdline }}" >> $GITHUB_ENV
 
       - name: Apply patches
-        if: ${{ matrix.pkg.prepare }}
+        if: ${{ matrix.pkg.prepare && matrix.pkg.enabled != false }}
         run: |
           cd /build && ${{ matrix.pkg.prepare }}
 
       - name: Install official dependencies
+        if: ${{ matrix.pkg.enabled != false }}
         run: |
           cd /build
           . ./PKGBUILD
           pacman -Sy --noconfirm --needed base-devel ${depends[@]} ${makedepends[@]} 2>/dev/null || true
 
       - name: Build patched package
-        if: ${{ matrix.pkg.patch }}
+        if: ${{ matrix.pkg.patch && matrix.pkg.enabled != false }}
         run: |
           cd /build
           echo "─────────────── Building ${{ matrix.pkg.name }} ───────────────"
@@ -148,7 +151,7 @@ jobs:
           echo "────────── Building ${{ matrix.pkg.name }} finished ──────────"
 
       - name: Build package
-        if: ${{ !matrix.pkg.patch }}
+        if: ${{ !matrix.pkg.patch && matrix.pkg.enabled != false }}
         run: |
           cd /build
           echo "─────────────── Building ${{ matrix.pkg.name }} ───────────────"
@@ -159,6 +162,7 @@ jobs:
           echo "────────── Building ${{ matrix.pkg.name }} finished ──────────"
 
       - name: Upload package
+        if: ${{ matrix.pkg.enabled != false }}
         uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.pkg.name }}
