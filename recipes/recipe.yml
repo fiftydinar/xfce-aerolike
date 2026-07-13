@@ -59,7 +59,8 @@ modules:
         - qt6ct
         - xorg
         - xorg-drivers
-        # lightdm installed in script section (needs --assume-installed xorg-server)
+        - lightdm
+        - lightdm-gtk-greeter
         - pavucontrol
         - network-manager-applet
         - blueman
@@ -100,8 +101,6 @@ modules:
         - dash
   - type: script
     snippets:
-      # Install lightdm without xorg-server dependency
-      - "pacman -S --noconfirm --needed lightdm lightdm-gtk-greeter"
       # Install all optional dependencies for xarchiver
       - "pacman -Syu --needed --noconfirm --asdeps $(expac -Ss '%o' xarchiver)"
       # Symlink dash to sh with pacman hook to persist across bash updates
