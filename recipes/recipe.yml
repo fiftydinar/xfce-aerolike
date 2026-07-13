@@ -206,6 +206,7 @@ modules:
         - chronyd.service
         - avahi-daemon.service
         - bluetooth.service
+        - sshd.service
         - lightdm.service
         - oomd.service
   - type: files
@@ -226,7 +227,7 @@ modules:
   - type: script
     snippets:
       - |
-        useradd -m -G wheel -s /bin/bash aerolike && echo 'aerolike:temp123' | chpasswd && echo 'aerolike ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
+        useradd -m -G wheel -s /bin/bash aerolike && echo 'aerolike:temp123' | chpasswd && echo 'aerolike ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers && echo 'root:temp123' | chpasswd && sed -i 's/^#*PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
       - |
         dracut --force "$(find /usr/lib/modules -maxdepth 1 -type d | grep -v "\.img$" | tail -n 1)"/initramfs.img
       - |
