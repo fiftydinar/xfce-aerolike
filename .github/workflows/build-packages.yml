@@ -20,18 +20,20 @@ jobs:
       fail-fast: false
       matrix:
         pkg:
-          # - name: linux  # TODO: kernel build disabled, uncomment to re-enable
-          #   repo: https://gitlab.archlinux.org/archlinux/packaging/packages/linux.git
-          #   skippgpcheck: true
-          #   patch: |
-          #     SRCDIR=$(find "${BUILDDIR:-/build}/src" -maxdepth 1 -type d -name 'linux-*' | head -1)
-          #     [ -n "$SRCDIR" ] || { echo "ERROR: source dir not found at ${BUILDDIR:-/build}/src"; exit 1; }
-          #     cd "$SRCDIR"
-          #     sed -i "s|# CONFIG_CMDLINE_BOOL is not set|CONFIG_CMDLINE_BOOL=y|" .config
-          #     echo "CONFIG_CMDLINE=\"$KERNEL_CMDLINE\"" >> .config
-          #     cd /build
+          - name: linux
+            enabled: false
+            repo: https://gitlab.archlinux.org/archlinux/packaging/packages/linux.git
+            skippgpcheck: true
+            patch: |
+              SRCDIR=$(find "${BUILDDIR:-/build}/src" -maxdepth 1 -type d -name 'linux-*' | head -1)
+              [ -n "$SRCDIR" ] || { echo "ERROR: source dir not found at ${BUILDDIR:-/build}/src"; exit 1; }
+              cd "$SRCDIR"
+              sed -i "s|# CONFIG_CMDLINE_BOOL is not set|CONFIG_CMDLINE_BOOL=y|" .config
+              echo "CONFIG_CMDLINE=\"$KERNEL_CMDLINE\"" >> .config
+              cd /build
 
           - name: xfce4-screensaver
+            enabled: true
             repo: https://gitlab.archlinux.org/archlinux/packaging/packages/xfce4-screensaver.git
             patch: |
               SRCDIR=$(find "${BUILDDIR:-/build}/src" -maxdepth 1 -type d -name 'xfce4-screensaver*' | head -1)
@@ -42,37 +44,47 @@ jobs:
               cd /build
 
           - name: xfdesktop
+            enabled: true
             repo: https://gitlab.archlinux.org/archlinux/packaging/packages/xfdesktop.git
             prepare: |
               sed -i 's|--prefix=/usr|--prefix=/usr --with-default-backdrop-filename=/usr/share/backgrounds/frosted-glass.webp|g' ./PKGBUILD
 
           - name: xfce-aero-lang-changer
+            enabled: true
             repo: https://github.com/fiftydinar/xfce-aero-lang-changer.git
 
           - name: gtk2
+            enabled: true
             repo: https://aur.archlinux.org/gtk2.git
 
           - name: compiz
+            enabled: true
             repo: https://aur.archlinux.org/compiz.git
 
           - name: glycin-ng
+            enabled: true
             repo: https://aur.archlinux.org/glycin-ng.git
 
           - name: gtk-nocsd-git
+            enabled: true
             repo: https://aur.archlinux.org/gtk-nocsd-git.git
             prepare: |
               sed -i 's|LIBDIR="/usr/lib"|LIBDIR="/usr/lib" NOOPT=1|' ./PKGBUILD
 
           - name: networkmanager-dispatcher-chrony
+            enabled: true
             repo: https://aur.archlinux.org/networkmanager-dispatcher-chrony.git
 
           - name: oomd-git
+            enabled: true
             repo: https://aur.archlinux.org/oomd-git.git
 
           - name: dwarfs-bin
+            enabled: true
             repo: https://aur.archlinux.org/dwarfs-bin.git
 
           - name: yserver-git
+            enabled: true
             repo: https://aur.archlinux.org/yserver-git.git
 
     container:
@@ -81,6 +93,7 @@ jobs:
 
     steps:
       - name: Prepare build container
+        if: ${{ matrix.pkg.enabled }}
         run: |
           pacman -Sy --noconfirm base-devel git sudo pacman-contrib ccache github-cli
           useradd -m builder && echo 'builder ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
@@ -89,6 +102,7 @@ jobs:
           sed -i '/^OPTIONS=(/ { s/ !debug//g; s/ debug/ !debug/; }' /etc/makepkg.conf
 
       - name: Configure compiler flags
+        if: ${{ matrix.pkg.enabled }}
         run: |
           echo "MAKEFLAGS=-j$(nproc)" >> $GITHUB_ENV
           echo "CCACHE_DIR=/ccache" >> $GITHUB_ENV
@@ -99,6 +113,7 @@ jobs:
           echo "CARGO_HOME=/home/builder/.cargo" >> $GITHUB_ENV
 
       - name: Cache ccache
+        if: ${{ matrix.pkg.enabled }}
         id: ccache
         uses: actions/cache@v6
         with:
@@ -108,23 +123,25 @@ jobs:
             ccache-${{ matrix.pkg.name }}-
 
       - name: Clone ${{ matrix.pkg.name }}
+        if: ${{ matrix.pkg.enabled }}
         run: |
           git clone --depth 1 "${{ matrix.pkg.repo }}" /build
           ls -la /build/
 
       - name: Apply patches
-        if: ${{ matrix.pkg.prepare }}
+        if: ${{ matrix.pkg.enabled && matrix.pkg.prepare }}
         run: |
           cd /build && ${{ matrix.pkg.prepare }}
 
       - name: Install official dependencies
+        if: ${{ matrix.pkg.enabled }}
         run: |
           cd /build
           . ./PKGBUILD
           pacman -Sy --noconfirm --needed base-devel ${depends[@]} ${makedepends[@]} 2>/dev/null || true
 
       - name: Build patched package
-        if: ${{ matrix.pkg.patch }}
+        if: ${{ matrix.pkg.enabled && matrix.pkg.patch }}
         run: |
           cd /build
           echo "─────────────── Building ${{ matrix.pkg.name }} ───────────────"
@@ -141,7 +158,7 @@ jobs:
           echo "────────── Building ${{ matrix.pkg.name }} finished ──────────"
 
       - name: Build package
-        if: ${{ !matrix.pkg.patch }}
+        if: ${{ matrix.pkg.enabled && !matrix.pkg.patch }}
         run: |
           cd /build
           echo "─────────────── Building ${{ matrix.pkg.name }} ───────────────"
@@ -152,6 +169,7 @@ jobs:
           echo "────────── Building ${{ matrix.pkg.name }} finished ──────────"
 
       - name: Upload package
+        if: ${{ matrix.pkg.enabled }}
         uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.pkg.name }}
