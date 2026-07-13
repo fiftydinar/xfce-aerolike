@@ -1,0 +1,13 @@
+[Unit]
+Description=Update unbound DNSSEC trust anchor
+After=network-online.target
+Before=unbound.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/unbound-anchor -a /etc/unbound/root.key
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -221,6 +221,7 @@ modules:
         - memory-tweaks-aerolike.service
         - dirty-centisecs-aerolike.service
         - fix-resolv-conf.service
+        - unbound-anchor.service
   - type: signing
   - type: script
     snippets:
