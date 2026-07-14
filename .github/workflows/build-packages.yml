@@ -84,7 +84,7 @@ jobs:
             repo: https://gitlab.archlinux.org/archlinux/packaging/packages/systemd.git
             skippgpcheck: true
             prepare: |
-              sed -i 's|rm "\$pkgdir"/usr/{bin/resolvconf,share/man/man1/resolvconf.1}|rm -f "$pkgdir"/usr/{bin/resolvconf,share/man/man1/resolvconf.1}|' ./PKGBUILD
+              sed -i 's|^  rm "|  rm -f "|' ./PKGBUILD
               echo "MESON_EXTRA_CONFIGURE_OPTIONS=-Dapparmor=disabled -Dbootloader=disabled -Dsysupdated=disabled -Dsysupdate=disabled -Dnss-mymachines=disabled -Dnss-resolve=disabled -Dresolve=false -Dtimesyncd=false -Doomd=false -Dcoredump=false -Dnetworkd=false -Dhomed=disabled -Dportabled=false -Dmachined=false -Dsysext=false -Dnsresourced=false -Dmountfsd=false -Dimportd=disabled -Dvmspawn=disabled -Dstoragetm=false -Dquotacheck=false -Drepart=disabled -Dpstore=false -Dfirstboot=false" >> $GITHUB_ENV
 
           - name: dwarfs-bin
