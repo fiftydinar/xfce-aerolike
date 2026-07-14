@@ -163,10 +163,10 @@ _handle_down() {
     rm -f "$uuid_file"
 }
 
+mkdir -p "$PER_UUID_DIR" "$PER_DOMAIN_DIR" "$(dirname "$LOCKFILE")"
+
 exec 9>"$LOCKFILE"
 flock -x 9
-
-mkdir -p "$PER_UUID_DIR" "$PER_DOMAIN_DIR"
 
 _wait_unbound || exit 0
 
