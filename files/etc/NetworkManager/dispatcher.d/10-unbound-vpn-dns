@@ -15,7 +15,7 @@ PER_DOMAIN_DIR="/run/unbound-vpn-dns/per-domain"
 UC_TIMEOUT="5"
 
 _log() {
-    logger -t "unbound-vpn-dns" "$@"
+    logger -t "unbound-vpn-dns" "$@" 2>/dev/null || true
 }
 
 _wait_unbound() {
