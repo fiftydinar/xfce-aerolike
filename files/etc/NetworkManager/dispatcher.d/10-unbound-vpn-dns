@@ -1,62 +1,141 @@
 #!/bin/bash
 # Update unbound forward zones on VPN connect/disconnect for split-DNS
+# Uses flock for concurrency safety, waits for unbound-control readiness,
+# and reconciles stale state on startup.
 
-ACTION="$2"
-DOMAIN_DIR="/run/unbound-vpn-domains"
+set -euo pipefail
+
+ACTION="${2}"
+CONN_UUID="${CONNECTION_UUID:-}"
+LOCKFILE="/run/unbound-vpn-dns/lock"
+DOMAIN_DIR="/run/unbound-vpn-dns/domains"
+UC_TIMEOUT=5
+
+_log() { logger -t "unbound-vpn-dns" "$@"; }
+
+_wait_unbound() {
+    local i
+    for i in $(seq 1 10); do
+        if timeout 2 unbound-control status &>/dev/null; then
+            return 0
+        fi
+        sleep 1
+    done
+    _log "unbound-control not available after 10s, skipping"
+    return 1
+}
+
+_get_dns_servers() {
+    local uuid="$1" servers
+    servers=$(nmcli -g ipv4.dns con show "$uuid" 2>/dev/null || true)
+    if [ -z "$servers" ]; then
+        servers=$(nmcli -g ipv6.dns con show "$uuid" 2>/dev/null || true)
+    fi
+    echo "$servers"
+}
+
+_get_search_domains() {
+    local uuid="$1" domains
+    domains=$(nmcli -g ipv4.dns-search con show "$uuid" 2>/dev/null || true)
+    if [ -z "$domains" ]; then
+        domains=$(nmcli -g ipv6.dns-search con show "$uuid" 2>/dev/null || true)
+    fi
+    echo "$domains"
+}
+
+_add_forward_zone() {
+    local domain="$1" servers="$2"
+    local s
+    for s in $servers; do
+        timeout "$UC_TIMEOUT" unbound-control forward_add +i "$domain" "$s" 2>/dev/null &&
+            _log "forward_add $domain -> $s" ||
+            _log "forward_add $domain -> $s FAILED"
+    done
+}
+
+_remove_forward_zone() {
+    local domain="$1"
+    timeout "$UC_TIMEOUT" unbound-control forward_remove "$domain" 2>/dev/null &&
+        _log "forward_remove $domain" ||
+        _log "forward_remove $domain (no-op)"
+}
+
+# Reconcile stale state: remove domain files for connections that no longer exist
+_reconcile_stale() {
+    if [ ! -d "$DOMAIN_DIR" ]; then
+        return 0
+    fi
+    local f uuid active
+    active=$(nmcli -t con show --active 2>/dev/null | cut -d: -f2 || true)
+    for f in "$DOMAIN_DIR"/*; do
+        [ -f "$f" ] || continue
+        uuid=$(basename "$f")
+        if ! echo "$active" | grep -qx "$uuid"; then
+            _log "reconcile: removing stale state for $uuid"
+            while read -r domain; do
+                _remove_forward_zone "$domain"
+            done < "$f"
+            rm -f "$f"
+        fi
+    done
+}
+
+_handle_up() {
+    local uuid="$1"
+    local servers domains
+
+    servers=$(_get_dns_servers "$uuid")
+    [ -z "$servers" ] && return 0
+
+    domains=$(_get_search_domains "$uuid")
+    [ -z "$domains" ] && return 0
+
+    mkdir -p "$DOMAIN_DIR"
+    for domain in $domains; do
+        echo "$domain" >> "$DOMAIN_DIR/$uuid"
+        _add_forward_zone "$domain" "$servers"
+    done
+}
+
+_handle_down() {
+    local uuid="$1"
+    local domain_file="$DOMAIN_DIR/$uuid"
+
+    [ -f "$domain_file" ] || return 0
+
+    while read -r domain; do
+        _remove_forward_zone "$domain"
+    done < "$domain_file"
+    rm -f "$domain_file"
+}
+
+exec 9>"$LOCKFILE"
+flock -x 9
+
+mkdir -p "$DOMAIN_DIR"
+
+_wait_unbound || exit 0
+
+# Reconcile stale state on every event (lightweight if nothing is stale)
+_reconcile_stale
 
 case "$ACTION" in
     vpn-up)
-        DNS_SERVERS="${VPN_IP4_NAMESERVERS:-$VPN_IP6_NAMESERVERS}"
-        [ -z "$DNS_SERVERS" ] && exit 0
-
-        DNS_DOMAINS=$(nmcli -g ipv4.dns-search con show "$CONNECTION_UUID" 2>/dev/null)
-        [ -z "$DNS_DOMAINS" ] && DNS_DOMAINS=$(nmcli -g ipv6.dns-search con show "$CONNECTION_UUID" 2>/dev/null)
-        [ -z "$DNS_DOMAINS" ] && exit 0
-
-        mkdir -p "$DOMAIN_DIR"
-        for domain in $DNS_DOMAINS; do
-            echo "$domain" >> "$DOMAIN_DIR/$CONNECTION_UUID"
-            for server in $DNS_SERVERS; do
-                unbound-control forward_add +i "$domain" "$server"
-            done
-        done
+        _handle_up "$CONN_UUID"
         ;;
     up)
-        CONN_TYPE=$(nmcli -g connection.type con show "$CONNECTION_UUID" 2>/dev/null)
-        [ "$CONN_TYPE" != "wireguard" ] && exit 0
-
-        DNS_SERVERS=$(nmcli -g ipv4.dns con show "$CONNECTION_UUID" 2>/dev/null)
-        [ -z "$DNS_SERVERS" ] && DNS_SERVERS=$(nmcli -g ipv6.dns con show "$CONNECTION_UUID" 2>/dev/null)
-        [ -z "$DNS_SERVERS" ] && exit 0
-
-        DNS_DOMAINS=$(nmcli -g ipv4.dns-search con show "$CONNECTION_UUID" 2>/dev/null)
-        [ -z "$DNS_DOMAINS" ] && DNS_DOMAINS=$(nmcli -g ipv6.dns-search con show "$CONNECTION_UUID" 2>/dev/null)
-        [ -z "$DNS_DOMAINS" ] && exit 0
-
-        mkdir -p "$DOMAIN_DIR"
-        for domain in $DNS_DOMAINS; do
-            echo "$domain" >> "$DOMAIN_DIR/$CONNECTION_UUID"
-            for server in $DNS_SERVERS; do
-                unbound-control forward_add +i "$domain" "$server"
-            done
-        done
+        # WireGuard triggers 'up' not 'vpn-up'
+        local conn_type
+        conn_type=$(nmcli -g connection.type con show "$CONN_UUID" 2>/dev/null || true)
+        [ "$conn_type" = "wireguard" ] || exit 0
+        _handle_up "$CONN_UUID"
         ;;
     vpn-down)
-        DOMAIN_FILE="$DOMAIN_DIR/$CONNECTION_UUID"
-        [ -f "$DOMAIN_FILE" ] || exit 0
-        while read -r domain; do
-            unbound-control forward_remove "$domain" 2>/dev/null
-        done < "$DOMAIN_FILE"
-        rm -f "$DOMAIN_FILE"
+        _handle_down "$CONN_UUID"
         ;;
     down)
-        CONN_TYPE=$(nmcli -g connection.type con show "$CONNECTION_UUID" 2>/dev/null)
-        [ "$CONN_TYPE" != "wireguard" ] && exit 0
-        DOMAIN_FILE="$DOMAIN_DIR/$CONNECTION_UUID"
-        [ -f "$DOMAIN_FILE" ] || exit 0
-        while read -r domain; do
-            unbound-control forward_remove "$domain" 2>/dev/null
-        done < "$DOMAIN_FILE"
-        rm -f "$DOMAIN_FILE"
+        conn_type=$(nmcli -g connection.type con show "$CONN_UUID" 2>/dev/null || true)
+        [ "$conn_type" = "wireguard" ] || exit 0
+        _handle_down "$CONN_UUID"
         ;;
 esac
