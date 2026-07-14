@@ -31,6 +31,10 @@ _get_dns_servers() {
     uuid="$1"
     v4=$(nmcli -g ipv4.dns con show "$uuid" 2>/dev/null || true)
     v6=$(nmcli -g ipv6.dns con show "$uuid" 2>/dev/null || true)
+    if [ -z "${v4}${v6}" ]; then
+        # Both empty — likely a real failure, not just "no IPv6"
+        nmcli -g ipv4.dns con show "$uuid" >/dev/null 2>&1 || _log "nmcli failed for $uuid"
+    fi
     echo "${v4}${v4:+ }${v6}" | xargs
 }
 
@@ -38,6 +42,9 @@ _get_search_domains() {
     uuid="$1"
     v4=$(nmcli -g ipv4.dns-search con show "$uuid" 2>/dev/null || true)
     v6=$(nmcli -g ipv6.dns-search con show "$uuid" 2>/dev/null || true)
+    if [ -z "${v4}${v6}" ]; then
+        nmcli -g ipv4.dns-search con show "$uuid" >/dev/null 2>&1 || _log "nmcli failed for $uuid"
+    fi
     echo "${v4}${v4:+ }${v6}" | xargs
 }
 
