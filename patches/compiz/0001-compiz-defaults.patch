@@ -1,37 +1,10 @@
---- a/plugins/opengl/opengl.xml.in
-+++ b/plugins/opengl/opengl.xml.in
-@@ -62,7 +62,7 @@
- 	    <option name="unredirect_driver_blacklist" type="string">
- 		<_short>Unredirect Driver Blacklist</_short>
- 		<_long>If non-empty, specifies a POSIX (extended) regular expression to match against the OpenGL driver strings (newline separated): "GL_VENDOR\nGL_RENDERER\nGL_VERSION". If the regular expression matches a substring of that concatenation then no windows will ever be unredirected while using that particular graphics driver.</_long>
--		<default>(nouveau|Intel).*Mesa 8.0</default>
-+		<default></default>
- 	    </option>
- 
- 	    <group>
---- a/plugins/composite/composite.xml.in
-+++ b/plugins/composite/composite.xml.in
-@@ -29,12 +29,12 @@
- 	    <option name="unredirect_match" type="match">
- 		<_short>Unredirect Match</_short>
- 		<_long>Specifies which windows will be unredirected when they are fullscreen. You might want to exclude video players for example, to avoid tearing. But this will be at the expense of performance/frame rate. Note: "class=" matching requires the regex plugin to work.</_long>
--		<default>(any) &amp; !(class=Totem) &amp; !(class=MPlayer) &amp; !(class=vlc) &amp; !(class=Plugin-container) &amp; !(class=QtQmlViewer) &amp; !(class=Firefox) &amp; !(class=google-chrome) &amp; !(class=google-chrome-unstable) &amp; !(class=chromium-browser)</default>
-+		<default>(any) &amp; !(class=.*[Vv]lc) &amp; !(class=.*[Mm]pv) &amp; !(class=.*[Ff]irefox) &amp; !(class=.*[Cc]hromium) &amp; !(class=.*[Cc]hrome) &amp; !(class=.*[Bb]rave) &amp; !(class=.*[Vv]ivaldi) &amp; !(class=.*[Oo]pera) &amp; !(class=.*[Ee]dge) &amp; !(class=.*[Tt]otem) &amp; !(class=.*[Pp]layer.*) &amp; !(class=.*[Pp]lugin.*) &amp; !(class=.*[Ff]lash.*) &amp; !(class=.*[Vv]ideo.*) &amp; !(class=.*[Bb]rowser.*) &amp; !(class=.*[Qq]t[Qq]ml.*) &amp; !(class=.*[Dd]iscord) &amp; !(class=.*[Ss]lack) &amp; !(class=.*[Ss]ignal) &amp; !(class=.*[Ss]potify) &amp; !(class=.*[Tt]eams) &amp; !(class=.*[Tt]elegram) &amp; !(class=.*[Ww]hatsapp) &amp; !(class=.*[Oo]bsidian) &amp; !(class=.*[Pp]ostman) &amp; !(class=.*[Tt]witch)</default>
- 	    </option>
- 	    <option name="force_independent_output_painting" type="bool">
- 		<_short>Force independent output painting.</_short>
- 		<_long>Paint each output device independly, even if the output devices overlap</_long>
--		<default>false</default>
-+		<default>true</default>
- 	    </option>
- 	</options>
-      </plugin>
---- a/metadata/core.xml.in
-+++ b/metadata/core.xml.in
-@@ -8,7 +8,21 @@
- 	    <option name="active_plugins" type="list">
+diff -ruN '--exclude=.git' compiz-orig/metadata/core.xml.in compiz-patched/metadata/core.xml.in
+--- compiz-orig/metadata/core.xml.in	2026-07-14 21:43:54.223179558 +0200
++++ compiz-patched/metadata/core.xml.in	2026-07-14 21:44:06.882239583 +0200
+@@ -8,7 +8,22 @@
  		<_short>Active Plugins</_short>
  		<_long>List of currently active plugins</_long>
+ 		<type>string</type>
 -		<default_plugins/>
 +		<default>
 +		    <value>composite</value>
@@ -52,3 +25,147 @@
  	    </option>
  	    <option name="audible_bell" type="bool">
  		<_short>Audible Bell</_short>
+diff -ruN '--exclude=.git' compiz-orig/plugins/animation/animation.xml.in compiz-patched/plugins/animation/animation.xml.in
+--- compiz-orig/plugins/animation/animation.xml.in	2026-07-14 21:43:54.223410213 +0200
++++ compiz-patched/plugins/animation/animation.xml.in	2026-07-14 21:44:06.882526615 +0200
+@@ -168,7 +168,7 @@
+ 	    <extensible/>
+ 	    <sort start="2"/>
+ 	    <default>
+-	      <value>animation:Zoom</value>
++	      <value>animation:Glide 2</value>
+ 	    </default>
+ 	  </option>
+ 	  <option name="minimize_durations" type="list">
+@@ -226,7 +226,7 @@
+             <extensible/>
+             <sort start="2"/>
+             <default>
+-              <value>animation:Magic Lamp</value>
++              <value>animation:Glide 2</value>
+             </default>
+           </option>
+           <option name="unminimize_durations" type="list">
+@@ -768,7 +768,7 @@
+ 	<_name>Glide 2</_name>
+       </restriction>
+       <restriction>
+-	<value>animation:Magic Lamp</value>
++	<value>animation:Glide 2</value>
+ 	<_name>Magic Lamp</_name>
+       </restriction>
+       <restriction>
+@@ -780,7 +780,7 @@
+ 	<_name>Sidekick</_name>
+       </restriction>
+       <restriction>
+-	<value>animation:Zoom</value>
++	<value>animation:Glide 2</value>
+ 	<_name>Zoom</_name>
+       </restriction>
+     </extension>
+diff -ruN '--exclude=.git' compiz-orig/plugins/blur/blur.xml.in compiz-patched/plugins/blur/blur.xml.in
+--- compiz-orig/plugins/blur/blur.xml.in	2026-07-14 21:43:54.226217051 +0200
++++ compiz-patched/plugins/blur/blur.xml.in	2026-07-14 21:44:06.882361513 +0200
+@@ -42,7 +42,7 @@
+ 	    <option name="alpha_blur_match" type="match">
+ 		<_short>Alpha blur windows</_short>
+ 		<_long>Windows that should be use alpha blur by default</_long>
+-		<default></default>
++		<default>class=Xfce4-panel | class=Wrapper-2.0</default>
+ 	    </option>
+ 	    <option name="alpha_blur" type="bool">
+ 		<_short>Alpha Blur</_short>
+diff -ruN '--exclude=.git' compiz-orig/plugins/composite/composite.xml.in compiz-patched/plugins/composite/composite.xml.in
+--- compiz-orig/plugins/composite/composite.xml.in	2026-07-14 21:43:54.227228991 +0200
++++ compiz-patched/plugins/composite/composite.xml.in	2026-07-14 21:44:06.882292082 +0200
+@@ -29,7 +29,7 @@
+ 	    <option name="unredirect_match" type="match">
+ 		<_short>Unredirect Match</_short>
+ 		<_long>Specifies which windows will be unredirected when they are fullscreen. You might want to exclude video players for example, to avoid tearing. But this will be at the expense of performance/frame rate. Note: "class=" matching requires the regex plugin to work.</_long>
+-		<default>(any) &amp; !(class=Totem) &amp; !(class=MPlayer) &amp; !(class=vlc) &amp; !(class=Plugin-container) &amp; !(class=QtQmlViewer) &amp; !(class=Firefox) &amp; !(class=google-chrome) &amp; !(class=google-chrome-unstable) &amp; !(class=chromium-browser)</default>
++		<default>(any) &amp; !(class=.*[Vv]lc) &amp; !(class=.*[Mm]pv) &amp; !(class=.*[Ff]irefox) &amp; !(class=.*[Cc]hromium) &amp; !(class=.*[Cc]hrome) &amp; !(class=.*[Bb]rave) &amp; !(class=.*[Vv]ivaldi) &amp; !(class=.*[Oo]pera) &amp; !(class=.*[Ee]dge) &amp; !(class=.*[Tt]otem) &amp; !(class=.*[Pp]layer.*) &amp; !(class=.*[Pp]lugin.*) &amp; !(class=.*[Ff]lash.*) &amp; !(class=.*[Vv]ideo.*) &amp; !(class=.*[Bb]rowser.*) &amp; !(class=.*[Qq]t[Qq]ml.*) &amp; !(class=.*[Dd]iscord) &amp; !(class=.*[Ss]lack) &amp; !(class=.*[Ss]ignal) &amp; !(class=.*[Ss]potify) &amp; !(class=.*[Tt]eams) &amp; !(class=.*[Tt]elegram) &amp; !(class=.*[Ww]hatsapp) &amp; !(class=.*[Oo]bsidian) &amp; !(class=.*[Pp]ostman) &amp; !(class=.*[Tt]witch)</default>
+ 	    </option>
+ 	    <option name="force_independent_output_painting" type="bool">
+ 		<_short>Force independent output painting.</_short>
+diff -ruN '--exclude=.git' compiz-orig/plugins/grid/grid.xml.in compiz-patched/plugins/grid/grid.xml.in
+--- compiz-orig/plugins/grid/grid.xml.in	2026-07-14 21:43:54.231087905 +0200
++++ compiz-patched/plugins/grid/grid.xml.in	2026-07-14 21:44:06.882411658 +0200
+@@ -578,20 +578,20 @@
+ 			<_short>Preview Outline Color</_short>
+ 			<_long>Color and opacity of the resize indicator preview outline.</_long>
+ 			<default>
+-			    <red>0xfbfb</red>
+-			    <green>0x8b8b</green>
+-			    <blue>0x0</blue>
+-			    <alpha>0x9f9f</alpha>
++			    <red>0x3f3f</red>
++			    <green>0xb8b8</green>
++			    <blue>0xbfbf</blue>
++			    <alpha>0x7f7f</alpha>
+ 			</default>
+ 		</option>
+ 		<option name="fill_color" type="color">
+ 			<_short>Preview Fill Color</_short>
+ 			<_long>Fill color and opacity of the resize indicator preview.</_long>
+ 			<default>
+-			    <red>0xfbfb</red>
+-			    <green>0x8b8b</green>
+-			    <blue>0x0</blue>
+-			    <alpha>0x4f4f</alpha>
++			    <red>0x1818</red>
++			    <green>0x8787</green>
++			    <blue>0x7c7c</blue>
++			    <alpha>0x7f7f</alpha>
+ 			</default>
+ 		</option>
+ 		<option name="disable_blend" type="bool">
+diff -ruN '--exclude=.git' compiz-orig/plugins/opengl/opengl.xml.in compiz-patched/plugins/opengl/opengl.xml.in
+--- compiz-orig/plugins/opengl/opengl.xml.in	2026-07-14 21:43:54.234132171 +0200
++++ compiz-patched/plugins/opengl/opengl.xml.in	2026-07-14 21:44:06.882327619 +0200
+@@ -62,7 +62,7 @@
+ 	    <option name="unredirect_driver_blacklist" type="string">
+ 		<_short>Unredirect Driver Blacklist</_short>
+ 		<_long>If non-empty, specifies a POSIX (extended) regular expression to match against the OpenGL driver strings (newline separated): "GL_VENDOR\nGL_RENDERER\nGL_VERSION". If the regular expression matches a substring of that concatenation then no windows will ever be unredirected while using that particular graphics driver.</_long>
+-		<default>(nouveau|Intel).*Mesa 8.0</default>
++		<default></default>
+ 	    </option>
+ 
+ 	    <group>
+diff -ruN '--exclude=.git' compiz-orig/plugins/place/place.xml.in compiz-patched/plugins/place/place.xml.in
+--- compiz-orig/plugins/place/place.xml.in	2026-07-14 21:43:54.235105278 +0200
++++ compiz-patched/plugins/place/place.xml.in	2026-07-14 21:44:06.882582951 +0200
+@@ -84,21 +84,33 @@
+ 			<_short>Positioned windows</_short>
+ 			<_long>Windows that should be positioned by default</_long>
+ 			<type>match</type>
++			<default>
++			    <value>(name=xfce4-popup-whiskermenu) | (class=Wrapper-2.0)</value>
++			</default>
+ 		    </option>
+ 		    <option name="position_x_values" type="list">
+ 			<_short>X Positions</_short>
+ 			<_long>X position values</_long>
+ 			<type>int</type>
++			<default>
++			    <value>-32768</value>
++			</default>
+ 		    </option>
+ 		    <option name="position_y_values" type="list">
+ 			<_short>Y Positions</_short>
+ 			<_long>Y position values</_long>
+ 			<type>int</type>
++			<default>
++			    <value>32767</value>
++			</default>
+ 		    </option>
+ 		    <option name="position_constrain_workarea" type="list">
+ 			<_short>Keep In Workarea</_short>
+ 			<_long>Keep placed window in work area, even if that means that the position might differ from the specified position</_long>
+ 			<type>bool</type>
++			<default>
++			    <value>false</value>
++			</default>
+ 		    </option>
+ 		</subgroup>
+ 		<subgroup>
