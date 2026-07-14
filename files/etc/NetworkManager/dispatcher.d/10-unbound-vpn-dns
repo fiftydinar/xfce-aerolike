@@ -38,7 +38,7 @@ _get_dns_servers() {
     if [ -z "${v4}${v6}" ]; then
         nmcli -g ipv4.dns con show "$uuid" >/dev/null 2>&1 || _log "nmcli failed for $uuid"
     fi
-    echo "${v4}${v4:+ }${v6}" | xargs
+    echo "${v4}${v4:+ }${v6}" | tr ',' ' ' | xargs
 }
 
 _get_search_domains() {
@@ -48,7 +48,7 @@ _get_search_domains() {
     if [ -z "${v4}${v6}" ]; then
         nmcli -g ipv4.dns-search con show "$uuid" >/dev/null 2>&1 || _log "nmcli failed for $uuid"
     fi
-    echo "${v4}${v4:+ }${v6}" | xargs
+    echo "${v4}${v4:+ }${v6}" | tr ',' ' ' | xargs
 }
 
 # Add servers to a forward zone (no +i — servers accumulate)
@@ -141,6 +141,8 @@ _handle_up() {
     [ -z "$domains" ] && return
 
     mkdir -p "$PER_UUID_DIR"
+    # Write full domain list atomically (overwrite, not append)
+    > "$PER_UUID_DIR/$uuid"
     for domain in $domains; do
         mkdir -p "$PER_DOMAIN_DIR/$domain"
         echo "$servers" > "$PER_DOMAIN_DIR/$domain/$uuid"
