@@ -92,6 +92,7 @@ modules:
         - xdotool
         # DNS resolver (replaces systemd-resolved)
         - unbound
+        - dnssec-anchors
         - avahi
         - nss-mdns
         # OOM prevention
@@ -128,8 +129,8 @@ modules:
         wget --retry-connrefused --tries=10 "$PKGS_URL" -O /tmp/pkgs.tar.gz && tar -xzf /tmp/pkgs.tar.gz -C /tmp/
         pacman -U --noconfirm --ask 4 /tmp/packages/*.pkg.tar.zst
         rm -rf /tmp/packages/ /tmp/pkgs.tar.gz
-      # Fetch current DNSSEC root trust anchor (dns-root-data is a dependency of unbound)
-      - "cp /usr/share/dns-root-data/root.key /etc/unbound/root.key"
+      # Copy DNSSEC root anchor from dnssec-anchors package
+      - "cp /etc/trusted-key.key /etc/unbound/root.key"
       # Set compiz to use emerald decorator
       - |
         sed -i 's|USE_EMERALD="no"|USE_EMERALD="yes"|g' /usr/bin/compiz-decorator
