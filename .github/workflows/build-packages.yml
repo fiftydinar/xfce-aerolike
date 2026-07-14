@@ -84,7 +84,7 @@ jobs:
             repo: https://gitlab.archlinux.org/archlinux/packaging/packages/systemd.git
             skippgpcheck: true
             prepare: |
-              sed -i '/-Dsbat-distro-url=/a\    -Dresolve=false\n    -Dtimesyncd=false\n    -Doomd=false' ./PKGBUILD
+              sed -i '/-Dsbat-distro-url=/a\    -Dresolve=false\n    -Dtimesyncd=false\n    -Doomd=false\n    -Dcoredump=false' ./PKGBUILD
 
           - name: dwarfs-bin
             enabled: true
