@@ -4,7 +4,7 @@ Before=unbound.service
 
 [Service]
 Type=oneshot
-ExecStartPre=-/usr/bin/unbound-control-setup
+ExecStartPre=/bin/sh -c 'test -f /etc/unbound/unbound_server.pem || /usr/bin/unbound-control-setup || true'
 ExecStart=/usr/bin/chown -R unbound:unbound /etc/unbound
 RemainAfterExit=yes
 
