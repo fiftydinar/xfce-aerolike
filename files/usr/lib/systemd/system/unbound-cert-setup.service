@@ -1,0 +1,12 @@
+[Unit]
+Description=Set up unbound-control TLS certificates
+Before=unbound.service
+
+[Service]
+Type=oneshot
+ExecStartPre=-/usr/bin/unbound-control-setup
+ExecStart=/usr/bin/chown -R unbound:unbound /etc/unbound
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
