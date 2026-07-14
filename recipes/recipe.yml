@@ -129,7 +129,7 @@ modules:
         pacman -U --noconfirm --ask 4 /tmp/packages/*.pkg.tar.zst
         rm -rf /tmp/packages/ /tmp/pkgs.tar.gz
       # Generate unbound-control TLS certificates (chown at runtime)
-      - "unbound-control-setup -f"
+      - "unbound-control-setup"
       # Set compiz to use emerald decorator
       - |
         sed -i 's|USE_EMERALD="no"|USE_EMERALD="yes"|g' /usr/bin/compiz-decorator
