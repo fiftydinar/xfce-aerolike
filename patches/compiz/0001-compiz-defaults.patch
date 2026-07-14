@@ -1,0 +1,28 @@
+--- a/plugins/opengl/opengl.xml.in
++++ b/plugins/opengl/opengl.xml.in
+@@ -62,7 +62,7 @@
+ 	    <option name="unredirect_driver_blacklist" type="string">
+ 		<_short>Unredirect Driver Blacklist</_short>
+ 		<_long>If non-empty, specifies a POSIX (extended) regular expression to match against the OpenGL driver strings (newline separated): "GL_VENDOR\nGL_RENDERER\nGL_VERSION". If the regular expression matches a substring of that concatenation then no windows will ever be unredirected while using that particular graphics driver.</_long>
+-		<default>(nouveau|Intel).*Mesa 8.0</default>
++		<default></default>
+ 	    </option>
+ 
+ 	    <group>
+--- a/plugins/composite/composite.xml.in
++++ b/plugins/composite/composite.xml.in
+@@ -29,12 +29,12 @@
+ 	    <option name="unredirect_match" type="match">
+ 		<_short>Unredirect Match</_short>
+ 		<_long>Specifies which windows will be unredirected when they are fullscreen. You might want to exclude video players for example, to avoid tearing. But this will be at the expense of performance/frame rate. Note: "class=" matching requires the regex plugin to work.</_long>
+-		<default>(any) &amp; !(class=Totem) &amp; !(class=MPlayer) &amp; !(class=vlc) &amp; !(class=Plugin-container) &amp; !(class=QtQmlViewer) &amp; !(class=Firefox) &amp; !(class=google-chrome) &amp; !(class=google-chrome-unstable) &amp; !(class=chromium-browser)</default>
++		<default>(any)</default>
+ 	    </option>
+ 	    <option name="force_independent_output_painting" type="bool">
+ 		<_short>Force independent output painting.</_short>
+ 		<_long>Paint each output device independly, even if the output devices overlap</_long>
+-		<default>false</default>
++		<default>true</default>
+ 	    </option>
+ 	</options>
+     </plugin>
