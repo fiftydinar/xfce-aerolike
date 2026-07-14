@@ -26,7 +26,7 @@ diff -ruN '--exclude=.git' compiz-aur-patched/compizconfig/libcompizconfig/backe
      return 1;
 diff -ruN '--exclude=.git' compiz-aur-patched/metadata/core.xml.in compiz-final/metadata/core.xml.in
 --- compiz-aur-patched/metadata/core.xml.in	2026-07-14 21:54:15.609724128 +0200
-+++ compiz-final/metadata/core.xml.in	2026-07-14 21:54:35.706132239 +0200
++++ compiz-final/metadata/core.xml.in	2026-07-15 00:51:14.907772178 +0200
 @@ -8,7 +8,22 @@
  		<_short>Active Plugins</_short>
  		<_long>List of currently active plugins</_long>
@@ -51,6 +51,15 @@ diff -ruN '--exclude=.git' compiz-aur-patched/metadata/core.xml.in compiz-final/
  	    </option>
  	    <option name="audible_bell" type="bool">
  		<_short>Audible Bell</_short>
+@@ -254,7 +269,7 @@
+ 			<option name="hsize" type="int">
+ 			<_short>Horizontal Virtual Size</_short>
+ 			<_long>Screen size multiplier for horizontal virtual size</_long>
+-			<default>4</default>
++			<default>1</default>
+ 			<min>1</min>
+ 			<max>32</max>
+ 			</option>
 diff -ruN '--exclude=.git' compiz-aur-patched/plugins/animation/animation.xml.in compiz-final/plugins/animation/animation.xml.in
 --- compiz-aur-patched/plugins/animation/animation.xml.in	2026-07-14 21:54:15.559723532 +0200
 +++ compiz-final/plugins/animation/animation.xml.in	2026-07-14 21:54:47.968180423 +0200
