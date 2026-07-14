@@ -6,7 +6,7 @@ Before=unbound.service
 [Service]
 Type=oneshot
 ExecStart=/usr/bin/unbound-control-setup
-ExecStartPost=/usr/bin/chown -R unbound:unbound /etc/unbound/unbound_server.key /etc/unbound/unbound_server.pem /etc/unbound/unbound_control.key /etc/unbound/unbound_control.pem
+ExecStartPost=/usr/bin/chown -R unbound:unbound /etc/unbound
 
 [Install]
 WantedBy=multi-user.target
