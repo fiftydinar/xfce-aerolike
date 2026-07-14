@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily update of the root trust anchor for DNSSEC
+Documentation=man:unbound-anchor(8)
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+AccuracySec=24h
+
+[Install]
+WantedBy=timers.target

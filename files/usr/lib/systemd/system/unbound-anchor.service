@@ -5,7 +5,7 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/unbound-anchor -a /etc/unbound/root.key
+ExecStart=/usr/bin/unbound-anchor -a /etc/unbound/trusted-key.key
 SuccessExitStatus=1
 RemainAfterExit=yes
 
