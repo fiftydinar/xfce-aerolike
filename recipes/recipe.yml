@@ -188,10 +188,6 @@ modules:
       # Configure nsswitch for mDNS (replace systemd-resolved nss with avahi)
       - |
         sed -i 's/^hosts:.*/hosts: files mymachines myhostname mdns_minimal [NOTFOUND=return] dns/' /etc/nsswitch.conf
-      # Generate unbound-control TLS certificates for VPN split-DNS dispatcher
-      - "unbound-control-setup"
-      # Fix unbound permissions (runs as unbound user, needs write access to root.key)
-      - "chown -R unbound:unbound /etc/unbound"
   - type: systemd
     system:
       enabled:
@@ -215,6 +211,7 @@ modules:
         - memory-tweaks-aerolike.service
         - dirty-centisecs-aerolike.service
         - fix-resolv-conf.service
+        - unbound-cert-setup.service
         - unbound-anchor.service
   - type: signing
   - type: script
