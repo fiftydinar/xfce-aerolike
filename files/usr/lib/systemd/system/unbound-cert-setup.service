@@ -5,7 +5,7 @@ Before=unbound.service
 [Service]
 Type=oneshot
 ExecStartPre=-/usr/bin/unbound-control-setup
-ExecStart=/usr/bin/chown -R unbound:unbound /etc/unbound
+ExecStart=/usr/bin/chown -R root:unbound /etc/unbound
 RemainAfterExit=yes
 
 [Install]
