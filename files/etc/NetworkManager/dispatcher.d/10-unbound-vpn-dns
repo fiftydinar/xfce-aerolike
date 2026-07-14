@@ -29,22 +29,16 @@ _wait_unbound() {
 
 _get_dns_servers() {
     uuid="$1"
-    servers=""
-    servers=$(nmcli -g ipv4.dns con show "$uuid" 2>/dev/null || true)
-    if [ -z "$servers" ]; then
-        servers=$(nmcli -g ipv6.dns con show "$uuid" 2>/dev/null || true)
-    fi
-    echo "$servers"
+    v4=$(nmcli -g ipv4.dns con show "$uuid" 2>/dev/null || true)
+    v6=$(nmcli -g ipv6.dns con show "$uuid" 2>/dev/null || true)
+    echo "${v4}${v4:+ }${v6}" | xargs
 }
 
 _get_search_domains() {
     uuid="$1"
-    domains=""
-    domains=$(nmcli -g ipv4.dns-search con show "$uuid" 2>/dev/null || true)
-    if [ -z "$domains" ]; then
-        domains=$(nmcli -g ipv6.dns-search con show "$uuid" 2>/dev/null || true)
-    fi
-    echo "$domains"
+    v4=$(nmcli -g ipv4.dns-search con show "$uuid" 2>/dev/null || true)
+    v6=$(nmcli -g ipv6.dns-search con show "$uuid" 2>/dev/null || true)
+    echo "${v4}${v4:+ }${v6}" | xargs
 }
 
 _add_forward_zone() {
