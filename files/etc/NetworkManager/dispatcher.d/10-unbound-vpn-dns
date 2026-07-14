@@ -73,7 +73,7 @@ _reconcile_stale() {
     if [ ! -d "$DOMAIN_DIR" ]; then
         return
     fi
-    active=$(nmcli -t con show --active 2>/dev/null | cut -d: -f2 || true)
+    active=$(nmcli -g uuid con show --active 2>/dev/null || true)
     for f in "$DOMAIN_DIR"/*; do
         [ -f "$f" ] || continue
         uuid=$(basename "$f")
@@ -122,13 +122,13 @@ mkdir -p "$DOMAIN_DIR"
 
 _wait_unbound || exit 0
 
-_reconcile_stale
-
 case "$ACTION" in
     vpn-up)
+        _reconcile_stale
         _handle_up "$CONN_UUID"
         ;;
     up)
+        _reconcile_stale
         conn_type=$(nmcli -g connection.type con show "$CONN_UUID" 2>/dev/null || true)
         [ "$conn_type" = "wireguard" ] || exit 0
         _handle_up "$CONN_UUID"
