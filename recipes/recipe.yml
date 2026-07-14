@@ -192,17 +192,8 @@ modules:
       - "unbound-control-setup"
       # Fix unbound permissions (runs as unbound user, needs write access to root.key)
       - "chown -R unbound:unbound /etc/unbound"
-      # Remove D-Bus activation for systemd-resolved (masked units can still be D-Bus activated)
-      - "rm -f /usr/share/dbus-1/system-services/org.freedesktop.resolve1.service"
   - type: systemd
     system:
-      masked:
-        - systemd-timesyncd.service
-        - systemd-resolved.service
-        - systemd-resolved.socket
-        - systemd-resolved-varlink.socket
-        - systemd-resolved-monitor.socket
-        - systemd-oomd.service
       enabled:
         - NetworkManager.service
         - unbound.service
