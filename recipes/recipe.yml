@@ -198,7 +198,6 @@ modules:
         - memory-tweaks-aerolike.service
         - dirty-centisecs-aerolike.service
         - fix-resolv-conf.service
-        - unbound-cert-setup.service
         - unbound-anchor.timer
   - type: signing
   - type: script
