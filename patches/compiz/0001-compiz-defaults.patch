@@ -1,3 +1,29 @@
+diff -ruN '--exclude=.git' compiz-orig/compizconfig/ccsm/ccm/Pages.py compiz-patched/compizconfig/ccsm/ccm/Pages.py
+--- compiz-orig/compizconfig/ccsm/ccm/Pages.py	2026-07-14 21:43:54.208569521 +0200
++++ compiz-patched/compizconfig/ccsm/ccm/Pages.py	2026-07-14 21:51:11.844684197 +0200
+@@ -670,9 +670,9 @@
+             self.ProfileComboBox.append_text(profile.Name)
+             if name == self.Context.CurrentProfile.Name:
+                 active = i
++        self.ProfileComboBox.set_active(active+1)
+         self.ProfileHandler = self.ProfileComboBox.connect("changed",
+             self.ProfileChangedAddTimeout)
+-        self.ProfileComboBox.set_active(active+1)
+         profileAdd.connect("clicked", self.AddProfile)
+         profileRemove.connect("clicked", self.RemoveProfile)
+         profileBox.pack_start(self.ProfileComboBox, True, True, 0)
+diff -ruN '--exclude=.git' compiz-orig/compizconfig/libcompizconfig/backend/src/ini.c compiz-patched/compizconfig/libcompizconfig/backend/src/ini.c
+--- compiz-orig/compizconfig/libcompizconfig/backend/src/ini.c	2026-07-14 21:43:54.217971217 +0200
++++ compiz-patched/compizconfig/libcompizconfig/backend/src/ini.c	2026-07-14 21:51:11.844603855 +0200
+@@ -597,7 +597,7 @@
+ {
+     int length = strlen (name->d_name);
+ 
+-    if (strncmp (name->d_name + length - 6, ".ini++", 6))
++    if (strncmp (name->d_name + length - 6, ".ini", 6))
+ 	return 0;
+ 
+     return 1;
 diff -ruN '--exclude=.git' compiz-orig/metadata/core.xml.in compiz-patched/metadata/core.xml.in
 --- compiz-orig/metadata/core.xml.in	2026-07-14 21:43:54.223179558 +0200
 +++ compiz-patched/metadata/core.xml.in	2026-07-14 21:44:06.882239583 +0200
