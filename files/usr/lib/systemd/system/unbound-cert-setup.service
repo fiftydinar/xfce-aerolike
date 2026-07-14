@@ -1,10 +1,9 @@
 [Unit]
-Description=Set up unbound-control TLS certificates
+Description=Ensure unbound file permissions
 Before=unbound.service
 
 [Service]
 Type=oneshot
-ExecStartPre=-/usr/bin/unbound-control-setup -f
 ExecStart=/usr/bin/chown -R unbound:unbound /etc/unbound
 RemainAfterExit=yes
 
