@@ -1,13 +1,17 @@
 #!/bin/sh
 # Update unbound forward zones on VPN connect/disconnect for split-DNS.
 # POSIX sh. Uses flock via util-linux for concurrency safety.
+# Supports multiple VPNs with overlapping domains — on disconnect,
+# only the disconnecting VPN's servers are removed; if another VPN
+# still serves the same domain, its servers are re-added.
 
 set -eu
 
 ACTION="${2}"
 CONN_UUID="${CONNECTION_UUID:-}"
 LOCKFILE="/run/unbound-vpn-dns/lock"
-DOMAIN_DIR="/run/unbound-vpn-dns/domains"
+PER_UUID_DIR="/run/unbound-vpn-dns/per-uuid"
+PER_DOMAIN_DIR="/run/unbound-vpn-dns/per-domain"
 UC_TIMEOUT="5"
 
 _log() {
@@ -32,7 +36,6 @@ _get_dns_servers() {
     v4=$(nmcli -g ipv4.dns con show "$uuid" 2>/dev/null || true)
     v6=$(nmcli -g ipv6.dns con show "$uuid" 2>/dev/null || true)
     if [ -z "${v4}${v6}" ]; then
-        # Both empty — likely a real failure, not just "no IPv6"
         nmcli -g ipv4.dns con show "$uuid" >/dev/null 2>&1 || _log "nmcli failed for $uuid"
     fi
     echo "${v4}${v4:+ }${v6}" | xargs
@@ -48,10 +51,11 @@ _get_search_domains() {
     echo "${v4}${v4:+ }${v6}" | xargs
 }
 
+# Add servers to a forward zone (no +i — servers accumulate)
 _add_forward_zone() {
     domain="$1"; servers="$2"
     for s in $servers; do
-        if timeout "$UC_TIMEOUT" unbound-control forward_add +i "$domain" "$s" >/dev/null 2>&1; then
+        if timeout "$UC_TIMEOUT" unbound-control forward_add "$domain" "$s" >/dev/null 2>&1; then
             _log "forward_add $domain -> $s"
         else
             _log "forward_add $domain -> $s FAILED"
@@ -59,6 +63,7 @@ _add_forward_zone() {
     done
 }
 
+# Remove the entire forward zone for a domain
 _remove_forward_zone() {
     domain="$1"
     if timeout "$UC_TIMEOUT" unbound-control forward_remove "$domain" >/dev/null 2>&1; then
@@ -68,20 +73,59 @@ _remove_forward_zone() {
     fi
 }
 
-# Remove stale domain files for connections that no longer exist
+# Collect all remaining servers for a domain from all active UUIDs
+_collect_remaining_servers() {
+    domain="$1"
+    ddir="$PER_DOMAIN_DIR/$domain"
+    [ -d "$ddir" ] || return 0
+    for sf in "$ddir"/*; do
+        [ -f "$sf" ] || continue
+        cat "$sf"
+    done | tr ' ' '\n' | sort -u | xargs
+}
+
+# Remove a UUID's contribution to a domain; if no consumers remain,
+# remove the forward zone entirely
+_domain_remove_uuid() {
+    domain="$1"; uuid="$2"
+    ddir="$PER_DOMAIN_DIR/$domain"
+    ufile="$ddir/$uuid"
+
+    [ -f "$ufile" ] && rm -f "$ufile"
+
+    # Check if any other UUIDs still need this domain
+    remaining=0
+    if [ -d "$ddir" ]; then
+        for sf in "$ddir"/*; do
+            [ -f "$sf" ] && remaining=$((remaining + 1)) && break
+        done
+    fi
+
+    if [ "$remaining" -eq 0 ]; then
+        _remove_forward_zone "$domain"
+        rmdir "$ddir" 2>/dev/null || true
+    else
+        # Rebuild forward zone with remaining servers
+        _remove_forward_zone "$domain"
+        rest=$(_collect_remaining_servers "$domain")
+        [ -n "$rest" ] && _add_forward_zone "$domain" "$rest"
+    fi
+}
+
+# Reconcile stale state: remove state for connections that no longer exist
 _reconcile_stale() {
-    if [ ! -d "$DOMAIN_DIR" ]; then
+    if [ ! -d "$PER_UUID_DIR" ]; then
         return
     fi
     active=$(nmcli -g uuid con show --active 2>/dev/null || true)
-    for f in "$DOMAIN_DIR"/*; do
+    for f in "$PER_UUID_DIR"/*; do
         [ -f "$f" ] || continue
         uuid=$(basename "$f")
         match=$(echo "$active" | grep -Fx "$uuid" || true)
         if [ -z "$match" ]; then
             _log "reconcile: removing stale state for $uuid"
             while read -r domain; do
-                _remove_forward_zone "$domain"
+                _domain_remove_uuid "$domain" "$uuid"
             done < "$f"
             rm -f "$f"
         fi
@@ -96,29 +140,31 @@ _handle_up() {
     domains=$(_get_search_domains "$uuid")
     [ -z "$domains" ] && return
 
-    mkdir -p "$DOMAIN_DIR"
+    mkdir -p "$PER_UUID_DIR"
     for domain in $domains; do
-        echo "$domain" >> "$DOMAIN_DIR/$uuid"
+        mkdir -p "$PER_DOMAIN_DIR/$domain"
+        echo "$servers" > "$PER_DOMAIN_DIR/$domain/$uuid"
+        echo "$domain" >> "$PER_UUID_DIR/$uuid"
         _add_forward_zone "$domain" "$servers"
     done
 }
 
 _handle_down() {
     uuid="$1"
-    domain_file="$DOMAIN_DIR/$uuid"
+    uuid_file="$PER_UUID_DIR/$uuid"
 
-    [ -f "$domain_file" ] || return
+    [ -f "$uuid_file" ] || return
 
     while read -r domain; do
-        _remove_forward_zone "$domain"
-    done < "$domain_file"
-    rm -f "$domain_file"
+        _domain_remove_uuid "$domain" "$uuid"
+    done < "$uuid_file"
+    rm -f "$uuid_file"
 }
 
 exec 9>"$LOCKFILE"
 flock -x 9
 
-mkdir -p "$DOMAIN_DIR"
+mkdir -p "$PER_UUID_DIR" "$PER_DOMAIN_DIR"
 
 _wait_unbound || exit 0
 
