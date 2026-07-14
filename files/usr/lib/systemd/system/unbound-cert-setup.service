@@ -1,12 +1,12 @@
 [Unit]
-Description=Generate unbound-control TLS certificates
-ConditionPathExists=!/etc/unbound/unbound_server.pem
+Description=Set up unbound-control TLS certificates
 Before=unbound.service
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/unbound-control-setup
-ExecStartPost=/usr/bin/chown -R unbound:unbound /etc/unbound
+ExecStartPre=-/usr/bin/unbound-control-setup
+ExecStart=/usr/bin/chown -R unbound:unbound /etc/unbound
+RemainAfterExit=yes
 
 [Install]
 WantedBy=multi-user.target
