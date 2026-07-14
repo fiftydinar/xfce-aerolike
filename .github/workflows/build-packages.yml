@@ -84,8 +84,7 @@ jobs:
             repo: https://gitlab.archlinux.org/archlinux/packaging/packages/systemd.git
             skippgpcheck: true
             prepare: |
-              sed -i 's|-Dsysupdated=enabled|-Dsysupdated=disabled|; s|-Dapparmor=enabled|-Dapparmor=disabled|; s|-Dbootloader=enabled|-Dbootloader=disabled|' ./PKGBUILD
-              sed -i '/-Dsbat-distro-url=/a\    -Dresolve=false\n    -Dtimesyncd=false\n    -Doomd=false\n    -Dcoredump=false\n    -Dnetworkd=false\n    -Dhomed=disabled\n    -Dportabled=false\n    -Dmachined=false\n    -Dsysext=false\n    -Dnsresourced=false\n    -Dmountfsd=false\n    -Dimportd=disabled\n    -Dvmspawn=disabled\n    -Dstoragetm=false\n    -Dquotacheck=false\n    -Drepart=disabled\n    -Dpstore=false\n    -Dfirstboot=false' ./PKGBUILD
+              echo "MESON_EXTRA_CONFIGURE_OPTIONS=-Dapparmor=disabled -Dbootloader=disabled -Dsysupdated=disabled -Dresolve=false -Dtimesyncd=false -Doomd=false -Dcoredump=false -Dnetworkd=false -Dhomed=disabled -Dportabled=false -Dmachined=false -Dsysext=false -Dnsresourced=false -Dmountfsd=false -Dimportd=disabled -Dvmspawn=disabled -Dstoragetm=false -Dquotacheck=false -Drepart=disabled -Dpstore=false -Dfirstboot=false" >> $GITHUB_ENV
 
           - name: dwarfs-bin
             enabled: true
