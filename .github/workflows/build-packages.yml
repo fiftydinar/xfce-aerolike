@@ -68,6 +68,10 @@ jobs:
               patch -p1 < /build/0001-compiz-defaults.patch
               cd /build
 
+          - name: xfce4-docklike-plugin-git
+            enabled: true
+            repo: https://aur.archlinux.org/xfce4-docklike-plugin-git.git
+
           - name: glycin-ng
             enabled: true
             repo: https://aur.archlinux.org/glycin-ng.git
