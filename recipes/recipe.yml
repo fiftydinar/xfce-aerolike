@@ -100,7 +100,7 @@ modules:
       # Install all optional dependencies for xarchiver
       - "pacman -Syu --needed --noconfirm --asdeps $(expac -Ss '%o' xarchiver)"
       # Install lightdm without xorg-server (yserver replaces it)
-      - "pacman -S --noconfirm --ignore xorg-server lightdm lightdm-gtk-greeter"
+      - "pacman -Sdd --noconfirm lightdm lightdm-gtk-greeter"
       # Symlink dash to sh with pacman hook to persist across bash updates
       - "ln -sfT /usr/bin/dash /usr/bin/sh"
       - |
