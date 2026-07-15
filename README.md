@@ -37,6 +37,7 @@ Now that we know what's the theming base and other defaults, I'll highlight what
 
 - Image setup in shortly is explained like this:
   - arch-base + dracut + bootc (with composefs) + SystemD + yserver + LightDM + NetworkManager + chronyd + bluez + unbound + avahi + Pipewire + mesa (OpenGL) + vulkan + compiz + emerald + XFCE4 base + XFCE4 goodies like screenshotter and its applet plugins + theming
+- Uses [yserver](https://github.com/joske/yserver) instead of xorg-server
 - Uses `unbound` as the DNS resolver (recursive, DNSSEC-validating) instead of `systemd-resolved`, paired with `avahi` for mDNS and `NetworkManager` for connection management. Split-DNS for VPNs is handled via a NetworkManager dispatcher script.
 - Uses [facebook's `oomd`](https://github.com/facebookincubator/oomd) for proactive OOM prevention (PSI-based, per-cgroup, kills by memory size/growth) instead of `systemd-oomd`.
 - Has automatic seamless system updates enabled (runs atomic `bootc upgrade` once per day).
