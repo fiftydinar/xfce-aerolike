@@ -36,12 +36,12 @@ For the default icon set, I credit:
 Now that we know what's the theming base and other defaults, I'll highlight what I added on top of it.
 
 - Image setup in shortly is explained like this:
-  - arch-base + dracut + bootc (with composefs) + SystemD + Xorg + LightDM + NetworkManager + chronyd + bluez + unbound + avahi + Pipewire + mesa (OpenGL) + vulkan + compiz + emerald + XFCE4 base + XFCE4 goodies like screenshotter and its applet plugins + theming
+  - arch-base + dracut + bootc (with composefs) + SystemD + yserver + LightDM + NetworkManager + chronyd + bluez + unbound + avahi + Pipewire + mesa (OpenGL) + vulkan + compiz + emerald + XFCE4 base + XFCE4 goodies like screenshotter and its applet plugins + theming
 - Uses `unbound` as the DNS resolver (recursive, DNSSEC-validating) instead of `systemd-resolved`, paired with `avahi` for mDNS and `NetworkManager` for connection management. Split-DNS for VPNs is handled via a NetworkManager dispatcher script.
 - Uses [facebook's `oomd`](https://github.com/facebookincubator/oomd) for proactive OOM prevention (PSI-based, per-cgroup, kills by memory size/growth) instead of `systemd-oomd`.
 - Has automatic seamless system updates enabled (runs atomic `bootc upgrade` once per day).
 - Uses `compiz` as the compositing window manager and `emerald` as the window decorator.
-- Additional `compiz` defaults that enables blur, snap and grid plugins + blurs taskbar and start menu. Also modified grid plugin to use colors matching the default background.
+- Additional `compiz` defaults that enables blur, snap and grid plugins + blurs taskbar and start menu. Also modified grid plugin to use colors matching the default background. Disabled `sync_to_vblank` (no-op on yserver) and `unredirect_fullscreen_windows` to eliminate alt-tab glitches.
 - Modified XFCE-desktop GTK3 theme to make applets size square-consistent, to make all applets use the Aero button hover and press theme and to make Start menu coloring closer to taskbar.
 - Preconfigured variables, config and scripts for default theming, which includes: LightDM login screen, GTK2, GTK3, GTK4 (including Adwaita), Qt5, Qt6 and XFCE-desktop.
 - Force GTK apps to use server-side window decorations through [gtk-nocsd](https://codeberg.org/MorsMortium/gtk-nocsd)
