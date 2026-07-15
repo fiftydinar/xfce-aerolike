@@ -183,6 +183,16 @@ jobs:
           sudo -E -u builder makepkg --noconfirm --syncdeps --nocheck $PGP
           echo "────────── Building ${{ matrix.pkg.name }} finished ──────────"
 
+      - name: Sanitize filenames for artifact upload
+        if: ${{ matrix.pkg.enabled }}
+        run: |
+          cd /build
+          for f in *.pkg.tar.zst; do
+            [ -f "$f" ] || continue
+            newf=$(echo "$f" | tr ':' '_')
+            [ "$f" = "$newf" ] || mv -v "$f" "$newf"
+          done
+
       - name: Upload package
         if: ${{ matrix.pkg.enabled }}
         uses: actions/upload-artifact@v7
@@ -273,6 +283,15 @@ jobs:
           chown -R builder:builder /build
           sudo -E -u builder makepkg --noconfirm --syncdeps --nocheck
           echo "────────── Building ${{ matrix.pkg.name }} finished ──────────"
+
+      - name: Sanitize filenames for artifact upload
+        run: |
+          cd /build
+          for f in *.pkg.tar.zst; do
+            [ -f "$f" ] || continue
+            newf=$(echo "$f" | tr ':' '_')
+            [ "$f" = "$newf" ] || mv -v "$f" "$newf"
+          done
 
       - name: Upload package
         uses: actions/upload-artifact@v7
