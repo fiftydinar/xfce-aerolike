@@ -28,6 +28,7 @@ jobs:
 
               # Copy kernel module source into kernel tree
               rm -rf "$SRCDIR/fs/bcachefs"
+              mkdir -p "$SRCDIR/fs/bcachefs"
               cp -r /tmp/bcachefs-tools/fs/* "$SRCDIR/fs/bcachefs/"
 
               # Patch fs/Kconfig to add bcachefs entry
