@@ -29,9 +29,20 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-if [ ! -f "$CALAMARES_PKG" ]; then
+CALAMARES_DIR=""
+
+if [ -f "$CALAMARES_PKG" ]; then
+    case "$CALAMARES_PKG" in
+        *.tar.gz|*.tgz) CALAMARES_DIR=$(mktemp -d); tar -xzf "$CALAMARES_PKG" -C "$CALAMARES_DIR" ;;
+        *.pkg.tar.zst) ;;
+        *)
+            echo "ERROR: Calamares package must be .tar.gz (DESTDIR) or .pkg.tar.zst (pacman)"
+            exit 1
+            ;;
+    esac
+else
     echo "ERROR: Calamares package not found at '$CALAMARES_PKG'"
-    echo "Build it first via build-packages.yml or download from GitHub Releases"
+    echo "Build it first via GitHub Actions or download from Releases"
     exit 1
 fi
 
@@ -93,10 +104,15 @@ printf '%s\n' 'HOOKS=(base udev archiso block filesystems keyboard)' \
 KVER=$(find "${AIROOTFS}/usr/lib/modules" -maxdepth 1 -type d ! -name "*.img" ! -name "." -printf "%f\n" | head -1)
 chroot "${AIROOTFS}" mkinitcpio -k "${KVER}" -g /boot/initramfs-linux.img
 
-echo "=== Step 6: Install Calamares package ==="
-cp "${CALAMARES_PKG}" "${AIROOTFS}/tmp/calamares.pkg.tar.zst"
-chroot "${AIROOTFS}" pacman -U --noconfirm /tmp/calamares.pkg.tar.zst
-rm -f "${AIROOTFS}/tmp/calamares.pkg.tar.zst"
+echo "=== Step 6: Install Calamares ==="
+if [ -n "$CALAMARES_DIR" ]; then
+    cp -a "$CALAMARES_DIR/." "${AIROOTFS}/"
+    rm -rf "$CALAMARES_DIR"
+else
+    cp "${CALAMARES_PKG}" "${AIROOTFS}/tmp/calamares.pkg.tar.zst"
+    chroot "${AIROOTFS}" pacman -U --noconfirm /tmp/calamares.pkg.tar.zst
+    rm -f "${AIROOTFS}/tmp/calamares.pkg.tar.zst"
+fi
 
 # Ensure Calamares branding and module configs are in the right place
 mkdir -p "${AIROOTFS}/etc/calamares"

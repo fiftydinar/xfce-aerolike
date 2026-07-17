@@ -28,16 +28,16 @@ jobs:
           pacman-key --init
           pacman-key --populate
           pacman -Syu --noconfirm base-devel cmake extra-cmake-modules \
-            qt5-base kpmcore yaml-cpp python boost \
-            qt5-svg polkit-qt5 git
+            qt6-base qt6-svg kpmcore yaml-cpp python boost \
+            polkit-qt6 git
 
       - name: Build Calamares
         run: |
-          git clone --depth 1 --branch v3.3.13 https://codeberg.org/calamares/calamares.git /tmp/calamares
+          git clone --depth 1 --branch v3.4.2 https://codeberg.org/calamares/calamares.git /tmp/calamares
           cd /tmp/calamares
           mkdir build && cd build
           cmake .. -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release \
-            -DWITH_QML=OFF -DINSTALL_CONFIG=ON
+            -DWITH_QML=OFF -DWITH_QT6=ON -DINSTALL_CONFIG=ON
           make -j$(nproc)
           mkdir -p /tmp/pkg
           make DESTDIR=/tmp/pkg install
