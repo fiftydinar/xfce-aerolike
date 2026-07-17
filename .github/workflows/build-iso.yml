@@ -1,4 +1,4 @@
-name: build-iso
+name: Build ISO
 on:
   workflow_dispatch:
   push:
