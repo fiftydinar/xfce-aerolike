@@ -92,7 +92,8 @@ mount --bind /dev "${AIROOTFS}/dev"
 chroot "${AIROOTFS}" systemctl mask bootc-fetch-apply-updates.timer 2>/dev/null || true
 
 # Install live ISO boot support (mkinitcpio + archiso hooks for SquashFS live boot)
-chroot "${AIROOTFS}" pacman -S --needed --noconfirm mkinitcpio mkinitcpio-archiso
+# Also install bcachefs-tools for bcachefs support in Calamares partitioner
+chroot "${AIROOTFS}" pacman -S --needed --noconfirm mkinitcpio mkinitcpio-archiso bcachefs-tools
 
 # Configure mkinitcpio for live boot
 printf '%s\n' 'HOOKS=(base udev archiso block filesystems keyboard)' \
