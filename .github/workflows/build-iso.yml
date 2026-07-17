@@ -28,8 +28,8 @@ jobs:
           pacman-key --init
           pacman-key --populate
           pacman -Syu --noconfirm base-devel cmake extra-cmake-modules \
-            qt5-base qt5-webengine kpmcore yaml-cpp python boost \
-            networkmanager qt5-xmlpatterns qt5-svg polkit-qt5 git
+            qt5-base kpmcore yaml-cpp python boost \
+            qt5-svg polkit-qt5 git
 
       - name: Build Calamares
         run: |
