@@ -120,7 +120,7 @@ jobs:
 
     container:
       image: docker.io/archlinux:latest
-      options: --cap-add=SYS_ADMIN --tmpfs /build:size=28G,exec
+      options: --cap-add=SYS_ADMIN --tmpfs /build:size=14G,exec
 
     steps:
       - name: Prepare build container
