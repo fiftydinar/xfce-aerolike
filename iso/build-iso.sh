@@ -78,13 +78,7 @@ mount --bind /sys "${AIROOTFS}/sys"
 mount --bind /dev "${AIROOTFS}/dev"
 
 # Disable bootc auto-update timer in live environment
-chroot "${AIROOTFS}" systemctl disable bootc-fetch-apply-updates.timer 2>/dev/null || true
 chroot "${AIROOTFS}" systemctl mask bootc-fetch-apply-updates.timer 2>/dev/null || true
-chroot "${AIROOTFS}" systemctl disable bootc-fetch-apply-updates.service 2>/dev/null || true
-
-# Enable lightdm for graphical boot
-chroot "${AIROOTFS}" systemctl enable lightdm.service 2>/dev/null || true
-chroot "${AIROOTFS}" systemctl enable NetworkManager.service 2>/dev/null || true
 
 # Install live ISO boot support (mkinitcpio + archiso hooks for SquashFS live boot)
 chroot "${AIROOTFS}" pacman -S --needed --noconfirm mkinitcpio mkinitcpio-archiso
