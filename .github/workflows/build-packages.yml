@@ -142,6 +142,17 @@ jobs:
           echo "BUILDDIR=/build" >> $GITHUB_ENV
           echo "CARGO_HOME=/home/builder/.cargo" >> $GITHUB_ENV
 
+      - name: Free disk space
+        if: ${{ matrix.pkg.name == 'linux' && matrix.pkg.enabled }}
+        uses: hastd/free-disk-space@v1
+        with:
+          tool-cache: true
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          swap-storage: true
+
       - name: Cache ccache
         if: ${{ matrix.pkg.enabled }}
         id: ccache
