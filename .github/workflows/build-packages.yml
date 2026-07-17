@@ -37,10 +37,11 @@ jobs:
               # Patch fs/Makefile to build bcachefs
               echo 'obj-$(CONFIG_BCACHEFS_FS)  += bcachefs/' >> "$SRCDIR/fs/Makefile"
 
-              # Enable bcachefs kernel options
+              # Enable bcachefs kernel options, disable debug info to save space
               cd "$SRCDIR"
               scripts/config --enable CONFIG_BCACHEFS_FS
               scripts/config --enable CONFIG_UNICODE
+              scripts/config --disable CONFIG_DEBUG_INFO
               cd /build
 
           - name: xfce4-screensaver
@@ -119,7 +120,7 @@ jobs:
 
     container:
       image: docker.io/archlinux:latest
-      options: --cap-add=SYS_ADMIN
+      options: --cap-add=SYS_ADMIN --tmpfs /build:size=28G,exec
 
     steps:
       - name: Prepare build container
@@ -151,7 +152,7 @@ jobs:
           dotnet: true
           haskell: true
           large-packages: true
-          swap-storage: true
+          swap-storage: false
           exclude: |
             /usr/lib/llvm-*
             /opt/hostedtoolcache/Python
