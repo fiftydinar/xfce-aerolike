@@ -1,11 +1,11 @@
 name: bluebuild
 on:
   push:
-paths-ignore:
-  - "**.md"
-  - ".github/workflows/build-packages.yml"
-  - ".github/workflows/build-iso.yml"
-  - "iso/**"
+    paths-ignore:
+      - "**.md"
+      - ".github/workflows/build-packages.yml"
+      - ".github/workflows/build-iso.yml"
+      - "iso/**"
   workflow_dispatch:
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref || github.run_id }}
