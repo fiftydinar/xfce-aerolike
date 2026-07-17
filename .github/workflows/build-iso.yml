@@ -57,7 +57,9 @@ jobs:
     needs: build-calamares
     container:
       image: docker.io/archlinux:latest
-      options: --privileged --device /dev/fuse
+      options: --privileged
+    env:
+      CONTAINERS_STORAGE_DRIVER: vfs
     permissions:
       contents: read
       packages: read
@@ -79,9 +81,6 @@ jobs:
 
       - name: Log in to GHCR
         run: |
-          # VFS driver needed because podman runs nested inside container
-          mkdir -p /etc/containers
-          printf '[storage]\ndriver = "vfs"\n' > /etc/containers/storage.conf
           echo "${{ secrets.GITHUB_TOKEN }}" | podman login ghcr.io -u "${{ github.actor }}" --password-stdin
 
       - name: Build ISO
