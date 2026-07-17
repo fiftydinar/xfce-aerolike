@@ -1,0 +1,31 @@
+---
+componentName: calamares-xfce-aerolike
+name: xfce-aerolike
+version: "@ISO_VERSION@"
+
+welcomeStyle: Carousel
+welcomeExpanding: true
+
+strings:
+  productName: xfce-aerolike
+  shortProductName: xfce-aerolike
+  version: "@ISO_VERSION@"
+  shortVersion: "@ISO_VERSION@"
+  bootloaderEntryName: xfce-aerolike
+
+  welcomeMessage: Welcome to xfce-aerolike.
+  welcomeMessageAppendo: "<br/><br/>This live environment allows you to try xfce-aerolike before installing it to your computer."
+
+  preselectMessage: >
+    This is the xfce-aerolike installer.
+  okButtonText: "Next"
+  backButtonText: "Back"
+  nextButtonText: "Next"
+  quitButtonText: "Quit"
+
+  errorPopup: "Installation failed"
+  errorPopupContinue: "Continue"
+  errorPopupInfo: "Information"
+
+  slidePaths:
+    - "/usr/share/calamares/slideshow/"

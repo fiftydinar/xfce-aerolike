@@ -1,0 +1,119 @@
+name: build-iso
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'iso/**'
+      - '.github/workflows/build-iso.yml'
+      - 'recipes/recipe.yml'
+  schedule:
+    - cron: '0 6 * * 0'  # weekly Sunday
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  build-calamares:
+    name: Build Calamares
+    runs-on: ubuntu-latest
+    container:
+      image: docker.io/archlinux:latest
+      options: --cap-add=SYS_ADMIN
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build deps
+        run: |
+          pacman-key --init
+          pacman-key --populate
+          pacman -Syu --noconfirm base-devel cmake extra-cmake-modules \
+            qt5-base qt5-webengine kpmcore yaml-cpp python boost \
+            networkmanager qt5-xmlpatterns qt5-svg polkit-qt5 git
+
+      - name: Build Calamares
+        run: |
+          git clone --depth 1 --branch v3.3.13 https://codeberg.org/calamares/calamares.git /tmp/calamares
+          cd /tmp/calamares
+          mkdir build && cd build
+          cmake .. -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release \
+            -DWITH_QML=OFF -DINSTALL_CONFIG=ON
+          make -j$(nproc)
+          mkdir -p /tmp/pkg
+          make DESTDIR=/tmp/pkg install
+          cd /tmp/pkg
+          tar -czf /tmp/calamares-package.tar.gz .
+
+      - name: Upload Calamares artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: calamares-package
+          path: /tmp/calamares-package.tar.gz
+          retention-days: 7
+
+  build-iso:
+    name: Build ISO
+    runs-on: ubuntu-latest
+    needs: build-calamares
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: calamares-package
+          path: /tmp/calamares-package
+
+      - name: Set up environment
+        run: |
+          echo "IMAGE_REF=ghcr.io/fiftydinar/xfce-aerolike:latest" >> $GITHUB_ENV
+          echo "CALAMARES_PKG=/tmp/calamares-package/calamares-package.tar.gz" >> $GITHUB_ENV
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y podman arch-install-scripts squashfs-tools libisoburn mtools grub-pc
+
+      - name: Install archiso
+        run: |
+          git clone --depth 1 https://gitlab.archlinux.org/archlinux/archiso.git /tmp/archiso
+          cd /tmp/archiso/archiso
+          sudo make install
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build ISO
+        run: |
+          # Extract Calamares package (tar.gz of DESTDIR install)
+          mkdir -p /tmp/calamares-root
+          cd /tmp/calamares-package
+          tar -xzf calamares-package.tar.gz -C /tmp/calamares-root
+
+          # Run build script
+          sudo ./iso/build-iso.sh \
+            --image "${{ env.IMAGE_REF }}" \
+            --calamares-pkg /tmp/calamares-root \
+            --out ./iso-out
+
+      - name: Upload ISO
+        uses: actions/upload-artifact@v4
+        with:
+          name: xfce-aerolike-iso
+          path: ./iso-out/*.iso
+          retention-days: 30
+
+      - name: Create Release
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "xfce-aerolike ISO ${{ github.run_number }}"
+          tag_name: iso-${{ github.run_number }}
+          files: ./iso-out/*.iso
+          generate_release_notes: true

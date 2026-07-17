@@ -1,0 +1,2 @@
+# Extra packages for the live environment (installed via chroot after extraction)
+# The container image itself provides the base system and desktop

@@ -1,0 +1,43 @@
+#!/bin/sh
+set -eu
+
+# Called by Calamares shellprocess module.
+# ${ROOT} is the target root mount point set by Calamares mount module.
+# The container image OCI archive is at /run/install/xfce-aerolike.tar.zst
+
+ROOT="${ROOT:-/mnt/target}"
+IMAGE_ARCHIVE="/run/install/xfce-aerolike.tar.zst"
+IMAGE_NAME="ghcr.io/fiftydinar/xfce-aerolike:latest"
+
+echo "Installing xfce-aerolike to ${ROOT}..."
+
+# Load the container image into local storage
+if [ -f "${IMAGE_ARCHIVE}" ]; then
+    echo "Loading container image from ${IMAGE_ARCHIVE}..."
+    zstd -d -c "${IMAGE_ARCHIVE}" | podman load
+else
+    echo "Image archive not found at ${IMAGE_ARCHIVE}, pulling..."
+    podman pull "${IMAGE_NAME}"
+fi
+
+# Resolve the loaded image name
+LOADED_IMAGE="localhost/xfce-aerolike:latest"
+if podman image exists "${LOADED_IMAGE}" 2>/dev/null; then
+    IMAGE="${LOADED_IMAGE}"
+else
+    IMAGE="${IMAGE_NAME}"
+fi
+
+# Run bootc install from inside the container
+echo "Running bootc install to-filesystem..."
+podman run --rm --privileged --pid=host --ipc=host \
+    -v /dev:/dev \
+    -v /var/lib/containers:/var/lib/containers \
+    -v "${ROOT}:/target" \
+    "${IMAGE}" \
+    bootc install to-filesystem \
+        --bootloader grub \
+        --target-imgref "${IMAGE_NAME}" \
+        /target
+
+echo "Installation complete!"
