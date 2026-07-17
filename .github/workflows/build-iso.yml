@@ -28,7 +28,7 @@ jobs:
           pacman-key --init
           pacman-key --populate
           pacman -Syu --noconfirm base-devel cmake extra-cmake-modules \
-            qt6-base qt6-svg kpmcore yaml-cpp python boost \
+            qt6-base qt6-svg qt6-tools kpmcore yaml-cpp python boost \
             polkit-qt6 git
 
       - name: Build Calamares
