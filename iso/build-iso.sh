@@ -65,7 +65,7 @@ fi
 sed -i 's/^root:.*/root::14871::::::/' "${AIROOTFS}/etc/shadow" 2>/dev/null || true
 
 # Create live user for auto-login
-chroot "${AIROOTFS}" useradd -m -G wheel -s /bin/sh live 2>/dev/null || true
+chroot "${AIROOTFS}" useradd -m -G wheel live 2>/dev/null || true
 chroot "${AIROOTFS}" passwd -d live 2>/dev/null || true
 
 echo "=== Step 4: Save OCI archive for installer ==="

@@ -6,4 +6,3 @@ Exec=calamares
 Icon=drive-harddisk
 Terminal=false
 Categories=System;
-NoDisplay=false
