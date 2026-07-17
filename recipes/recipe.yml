@@ -95,6 +95,8 @@ modules:
         # Other
         - expac
         - dash
+        # bcachefs userspace tools (kernel module built in custom linux pkg)
+        - bcachefs-tools
   - type: script
     snippets:
       # Install all optional dependencies for xarchiver

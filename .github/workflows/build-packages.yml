@@ -21,15 +21,35 @@ jobs:
       matrix:
         pkg:
           - name: linux
-            enabled: false
+            enabled: true
             repo: https://gitlab.archlinux.org/archlinux/packaging/packages/linux.git
             skippgpcheck: true
             patch: |
               SRCDIR=$(find "${BUILDDIR:-/build}/src" -maxdepth 1 -type d -name 'linux-*' | head -1)
-              [ -n "$SRCDIR" ] || { echo "ERROR: source dir not found at ${BUILDDIR:-/build}/src"; exit 1; }
+              [ -n "$SRCDIR" ] || { echo "ERROR: source dir not found"; exit 1; }
+
+              # Install git for cloning bcachefs-tools
+              pacman -S --noconfirm --needed git
+
+              # Clone bcachefs-tools for the kernel module source
+              git clone --depth 1 https://evilpiepirate.org/git/bcachefs-tools.git /tmp/bcachefs-tools
+
+              # Copy kernel module source into kernel tree
+              rm -rf "$SRCDIR/fs/bcachefs"
+              cp -r /tmp/bcachefs-tools/fs/* "$SRCDIR/fs/bcachefs/"
+
+              # Patch fs/Kconfig to add bcachefs entry
+              sed -i '/source "fs\/zonefs\/Kconfig"/a source "fs/bcachefs\/Kconfig"' "$SRCDIR/fs/Kconfig"
+
+              # Patch fs/Makefile to build bcachefs
+              echo 'obj-$(CONFIG_BCACHEFS_FS)  += bcachefs/' >> "$SRCDIR/fs/Makefile"
+
+              # Enable kernel options
               cd "$SRCDIR"
               sed -i "s|# CONFIG_CMDLINE_BOOL is not set|CONFIG_CMDLINE_BOOL=y|" .config
               echo "CONFIG_CMDLINE=\"$KERNEL_CMDLINE\"" >> .config
+              scripts/config --enable CONFIG_BCACHEFS_FS
+              scripts/config --enable CONFIG_UNICODE
               cd /build
 
           - name: xfce4-screensaver
