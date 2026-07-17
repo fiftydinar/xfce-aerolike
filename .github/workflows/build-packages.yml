@@ -3,14 +3,6 @@ on:
   schedule:
     - cron: "00 03 * * *"
   workflow_dispatch:
-    inputs:
-      kernel-cmdline:
-        description: 'Kernel cmdline args, use commas between each arg'
-        required: false
-        default: ''
-
-env:
-  KERNEL_CMDLINE: "nmi_watchdog=0,modprobe.blacklist=i5500_temp,coretemp,intel_idle,intel_cstate,intel_uncore,acpi_cpufreq,pcc_cpufreq,intel_powerclamp,i7core_edac,intel_rapl_msr,intel_rapl_common,intel_pmc_bxt,k10temp,rapl,sp5100_tco,wmi,eeepc_wmi,asus_wmi,amd_pstate=disable,idle=halt,intel_pstate=disable,intel_idle.max_cstate=0,tsc=unstable,nowatchdog"
 
 jobs:
   build-foundation:
@@ -44,10 +36,8 @@ jobs:
               # Patch fs/Makefile to build bcachefs
               echo 'obj-$(CONFIG_BCACHEFS_FS)  += bcachefs/' >> "$SRCDIR/fs/Makefile"
 
-              # Enable kernel options
+              # Enable bcachefs kernel options
               cd "$SRCDIR"
-              sed -i "s|# CONFIG_CMDLINE_BOOL is not set|CONFIG_CMDLINE_BOOL=y|" .config
-              echo "CONFIG_CMDLINE=\"$KERNEL_CMDLINE\"" >> .config
               scripts/config --enable CONFIG_BCACHEFS_FS
               scripts/config --enable CONFIG_UNICODE
               cd /build
