@@ -132,6 +132,11 @@ jobs:
           sed -i 's/!ccache/ccache/' /etc/makepkg.conf
           sed -i '/^OPTIONS=(/ { s/ !debug//g; s/ debug/ !debug/; }' /etc/makepkg.conf
 
+      - name: Unmount tmpfs for linux
+        if: ${{ matrix.pkg.name == 'linux' && matrix.pkg.enabled }}
+        run: |
+          umount /build && mkdir -p /build
+
       - name: Configure compiler flags
         if: ${{ matrix.pkg.enabled }}
         run: |
@@ -142,15 +147,6 @@ jobs:
           echo "CXXFLAGS=-pipe" >> $GITHUB_ENV
           echo "BUILDDIR=/build" >> $GITHUB_ENV
           echo "CARGO_HOME=/home/builder/.cargo" >> $GITHUB_ENV
-
-      - name: Free disk space
-        if: ${{ matrix.pkg.name == 'linux' && matrix.pkg.enabled }}
-        uses: hastd/free-disk-space@v0.1.2
-        with:
-          swapoff: false
-          exclude: |
-            /usr/lib/llvm-*
-            /opt/hostedtoolcache/Python
 
       - name: Cache ccache
         if: ${{ matrix.pkg.enabled }}
