@@ -55,6 +55,9 @@ jobs:
     name: Build ISO
     runs-on: ubuntu-latest
     needs: build-calamares
+    container:
+      image: docker.io/archlinux:latest
+      options: --privileged --device /dev/fuse
     permissions:
       contents: read
       packages: read
@@ -68,38 +71,21 @@ jobs:
 
       - name: Set up environment
         run: |
-          echo "IMAGE_REF=ghcr.io/fiftydinar/xfce-aerolike:latest" >> $GITHUB_ENV
+          pacman-key --init
+          pacman-key --populate
+          # archiso provides mkarchiso, podman/skopeo for container ops
+          pacman -Syu --noconfirm archiso podman squashfs-tools zstd skopeo
           echo "CALAMARES_PKG=/tmp/calamares-package/calamares-package.tar.gz" >> $GITHUB_ENV
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y podman arch-install-scripts squashfs-tools libisoburn mtools grub-pc
-
-      - name: Install archiso
-        run: |
-          git clone --depth 1 https://gitlab.archlinux.org/archlinux/archiso.git /tmp/archiso
-          cd /tmp/archiso/archiso
-          sudo make install
-
       - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | podman login ghcr.io -u "${{ github.actor }}" --password-stdin
 
       - name: Build ISO
         run: |
-          # Extract Calamares package (tar.gz of DESTDIR install)
-          mkdir -p /tmp/calamares-root
-          cd /tmp/calamares-package
-          tar -xzf calamares-package.tar.gz -C /tmp/calamares-root
-
-          # Run build script
-          sudo ./iso/build-iso.sh \
-            --image "${{ env.IMAGE_REF }}" \
-            --calamares-pkg /tmp/calamares-root \
+          ./iso/build-iso.sh \
+            --image "ghcr.io/fiftydinar/xfce-aerolike:latest" \
+            --calamares-pkg "$CALAMARES_PKG" \
             --out ./iso-out
 
       - name: Upload ISO
