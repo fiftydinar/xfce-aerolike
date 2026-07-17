@@ -147,12 +147,7 @@ jobs:
         if: ${{ matrix.pkg.name == 'linux' && matrix.pkg.enabled }}
         uses: hastd/free-disk-space@v0.1.2
         with:
-          tool-cache: true
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          swap-storage: false
+          swapoff: false
           exclude: |
             /usr/lib/llvm-*
             /opt/hostedtoolcache/Python
