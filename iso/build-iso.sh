@@ -54,6 +54,9 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# Workaround for newer pacman which validates DBPath at startup
+mkdir -p /usr/lib/sysimage/lib/pacman 2>/dev/null || true
+
 echo "=== Step 1: Pull container image ==="
 echo "[build-iso] Image: ${IMAGE_REF}"
 podman pull "${IMAGE_REF}"
@@ -72,7 +75,7 @@ podman rm "${CID}" >/dev/null 2>&1 || true
 echo "[build-iso] Container removed"
 
 echo "=== Step 3: Prepare live environment ==="
-mkdir -p "${AIROOTFS}/proc" "${AIROOTFS}/sys" "${AIROOTFS}/dev" "${AIROOTFS}/run" "${AIROOTFS}/boot"
+mkdir -p "${AIROOTFS}/proc" "${AIROOTFS}/sys" "${AIROOTFS}/dev" "${AIROOTFS}/run" "${AIROOTFS}/boot" "${AIROOTFS}/root"
 
 # Provide DNS config for pacman inside chroot
 cp -L /etc/resolv.conf "${AIROOTFS}/etc/resolv.conf" 2>/dev/null || true

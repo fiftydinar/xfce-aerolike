@@ -73,6 +73,8 @@ jobs:
         run: |
           pacman-key --init
           pacman-key --populate
+          # Ensure pacman DBPath exists (newer pacman resolves DBPath at startup)
+          mkdir -p /usr/lib/sysimage/lib/pacman
           # archiso provides mkarchiso, podman for container ops
           # fuse-overlayfs lets overlay work on top of the CI runner's overlayfs
           pacman -Syu --noconfirm archiso grub dosfstools mtools syslinux podman squashfs-tools zstd skopeo fuse-overlayfs
