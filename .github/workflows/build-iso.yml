@@ -76,7 +76,7 @@ jobs:
           # archiso provides mkarchiso, docker for container ops via host socket
           # Using the host's Docker daemon avoids both the overlay-on-overlayfs issue
           # and the disk space blowup of podman's VFS driver.
-          pacman -Syu --noconfirm archiso docker-cli squashfs-tools zstd skopeo
+          pacman -Syu --noconfirm archiso docker squashfs-tools zstd skopeo
           # Create a podman → docker alias so build-iso.sh works without changes
           printf '#!/bin/sh\nexec /usr/bin/docker "$@"\n' > /usr/local/bin/podman
           chmod +x /usr/local/bin/podman
