@@ -114,6 +114,10 @@ echo "[build-iso] Masked bootc auto-update timer"
 # Install dracut + our custom archiso module for live ISO boot
 # Also install bcachefs-tools for bcachefs support in Calamares partitioner
 echo "[build-iso] Installing dracut, bcachefs-tools inside chroot..."
+# Fix dracut's lib hang on finding root device due to dash's hex escape
+sed -i 's/echo "\$hook"/printf '\''%s\\n'\'' "$hook"/g' \
+    "${AIROOTFS}/usr/lib/dracut/modules.d/80base/dracut-lib.sh" 2>/dev/null || true
+echo "[build-iso] Fixed dracut-lib.sh dash hex escape bug"
 chroot "${AIROOTFS}" pacman -S --needed --noconfirm dracut bcachefs-tools
 
 # Remove mkinitcpio if present to avoid conflicts
