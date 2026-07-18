@@ -58,8 +58,6 @@ jobs:
     container:
       image: docker.io/archlinux:latest
       options: --privileged
-    env:
-      CONTAINERS_STORAGE_DRIVER: vfs
     permissions:
       contents: read
       packages: read
@@ -75,11 +73,12 @@ jobs:
         run: |
           pacman-key --init
           pacman-key --populate
-          # archiso provides mkarchiso, podman/skopeo for container ops
-          pacman -Syu --noconfirm archiso podman squashfs-tools zstd skopeo
-          # VFS storage driver must be used — overlayfs cannot stack on GitHub runner's overlayfs.
-          # Config files and env vars are ignored by podman 6.x on Arch, so create a wrapper.
-          printf '#!/bin/sh\nexec /usr/bin/podman --storage-driver vfs "$@"\n' > /usr/local/bin/podman
+          # archiso provides mkarchiso, docker for container ops via host socket
+          # Using the host's Docker daemon avoids both the overlay-on-overlayfs issue
+          # and the disk space blowup of podman's VFS driver.
+          pacman -Syu --noconfirm archiso docker-cli squashfs-tools zstd skopeo
+          # Create a podman → docker alias so build-iso.sh works without changes
+          printf '#!/bin/sh\nexec /usr/bin/docker "$@"\n' > /usr/local/bin/podman
           chmod +x /usr/local/bin/podman
           echo "CALAMARES_PKG=/tmp/calamares-package/calamares-package.tar.gz" >> $GITHUB_ENV
 
