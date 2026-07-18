@@ -106,11 +106,4 @@ jobs:
           path: ./iso-out/*.iso
           retention-days: 30
 
-      - name: Create Release
-        if: github.ref == 'refs/heads/main'
-        uses: softprops/action-gh-release@v2
-        with:
-          name: "xfce-aerolike ISO ${{ github.run_number }}"
-          tag_name: iso-${{ github.run_number }}
-          files: ./iso-out/*.iso
-          generate_release_notes: true
+
