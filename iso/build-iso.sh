@@ -370,9 +370,9 @@ echo "[build-iso] Calamares config directory created"
 # (airootfs overlay from profile will be applied by mkarchiso)
 
 echo "=== Step 7: Build ISO ==="
-mkdir -p "${OUT_DIR}"
+mkdir -p "${OUT_DIR}" "${WORK_DIR}/iso-work"
 echo "[build-iso] Running mkarchiso (working dir: ${WORK_DIR}/iso-work, output: ${OUT_DIR})..."
-mkarchiso -w "${WORK_DIR}/iso-work" -o "${OUT_DIR}" "${PROFILE_DIR}"
+env -u TMPDIR mkarchiso -w "${WORK_DIR}/iso-work" -o "${OUT_DIR}" "${PROFILE_DIR}"
 echo "[build-iso] mkarchiso completed"
 
 echo "=== Done! ==="
