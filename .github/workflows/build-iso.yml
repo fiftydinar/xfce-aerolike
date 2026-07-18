@@ -61,7 +61,7 @@ jobs:
       image: docker.io/archlinux:latest
       options: --privileged
     permissions:
-      contents: write
+      contents: read
       packages: read
     steps:
       - uses: actions/checkout@v4
