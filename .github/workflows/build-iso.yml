@@ -20,6 +20,8 @@ jobs:
     container:
       image: docker.io/archlinux:latest
       options: --cap-add=SYS_ADMIN
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
@@ -59,7 +61,7 @@ jobs:
       image: docker.io/archlinux:latest
       options: --privileged
     permissions:
-      contents: read
+      contents: write
       packages: read
     steps:
       - uses: actions/checkout@v4
