@@ -354,6 +354,11 @@ else
     echo "[build-iso] WARNING: No kernel found, skipping initramfs build"
 fi
 
+# Unmount chroot filesystems before mkarchiso processes the rootfs
+umount -l "${AIROOTFS}/dev" 2>/dev/null || true
+umount "${AIROOTFS}/sys" 2>/dev/null || true
+umount "${AIROOTFS}/proc" 2>/dev/null || true
+
 echo "=== Step 6: Install Calamares ==="
 if [ -n "$CALAMARES_DIR" ]; then
     echo "[build-iso] Installing Calamares from DESTDIR package..."
