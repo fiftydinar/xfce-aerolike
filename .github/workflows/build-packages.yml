@@ -114,10 +114,6 @@ jobs:
             enabled: true
             repo: https://aur.archlinux.org/dwarfs-bin.git
 
-          - name: yserver-git
-            enabled: true
-            repo: https://aur.archlinux.org/yserver-git.git
-
     container:
       image: docker.io/archlinux:latest
       options: --cap-add=SYS_ADMIN --tmpfs /build:size=14G,exec
