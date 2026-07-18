@@ -162,7 +162,7 @@ modprobe -q loop
 mkdir -p /run/archiso
 [ -n "$archisodevice" ] && echo "$archisodevice" > /run/archiso/archisodevice
 if [ -n "$archisosearchuuid" ]; then
-    f=$(getarg archisosearchfilename=); [ -z "$f" ] && f="/${archisobasedir}/${arch}/${archisosearchuuid}.uuid"
+    f=$(getarg archisosearchfilename=); [ -z "$f" ] && f="/boot/${archisosearchuuid}.uuid"
     echo "$f" > /run/archiso/archisosearchfilename
     echo "$archisosearchuuid" > /run/archiso/archisosearchuuid
 fi
