@@ -13,7 +13,7 @@ CALAMARES_PKG="${CALAMARES_PKG:-}"
 OUT_DIR="${OUT_DIR:-./out}"
 PROFILE_DIR="$(cd "$(dirname "$0")" && pwd)"
 WORK_DIR="/tmp/archiso-work-$$"
-AIROOTFS="${PROFILE_DIR}/airootfs"
+AIROOTFS="${WORK_DIR}/iso-work/x86_64/airootfs"
 
 usage() {
     echo "Usage: $0 [--image IMAGE_REF] [--calamares-pkg CALAMARES_PKG.tar.zst] [--out OUT_DIR]"
@@ -47,10 +47,10 @@ else
 fi
 
 cleanup() {
-    rm -rf "${WORK_DIR}"
-    if mountpoint -q "${AIROOTFS}/proc" 2>/dev/null; then umount "${AIROOTFS}/proc"; fi
-    if mountpoint -q "${AIROOTFS}/sys" 2>/dev/null; then umount "${AIROOTFS}/sys"; fi
     if mountpoint -q "${AIROOTFS}/dev" 2>/dev/null; then umount -l "${AIROOTFS}/dev"; fi
+    if mountpoint -q "${AIROOTFS}/sys" 2>/dev/null; then umount "${AIROOTFS}/sys"; fi
+    if mountpoint -q "${AIROOTFS}/proc" 2>/dev/null; then umount "${AIROOTFS}/proc"; fi
+    rm -rf "${WORK_DIR}"
 }
 trap cleanup EXIT
 
@@ -370,7 +370,10 @@ echo "[build-iso] Calamares config directory created"
 # (airootfs overlay from profile will be applied by mkarchiso)
 
 echo "=== Step 7: Build ISO ==="
-mkdir -p "${OUT_DIR}" "${WORK_DIR}/iso-work"
+echo "[build-iso] Creating marker to skip mkarchiso pacstrap (rootfs already prepared)..."
+mkdir -p "${WORK_DIR}/iso-work"
+# _build_iso_base uses run_once_mode="base", so marker is <work_dir>/base._make_packages
+touch "${WORK_DIR}/iso-work/base._make_packages"
 echo "[build-iso] Running mkarchiso (working dir: ${WORK_DIR}/iso-work, output: ${OUT_DIR})..."
 env -u TMPDIR mkarchiso -w "${WORK_DIR}/iso-work" -o "${OUT_DIR}" "${PROFILE_DIR}"
 echo "[build-iso] mkarchiso completed"
