@@ -217,10 +217,10 @@ search_device() {
     searchfile=$(cat /run/archiso/archisosearchfilename 2>/dev/null)
     [ -z "$searchfile" ] && return 1
     mkdir -p /archisosearch
-    for dev in $(lsblk -no PATH -Q 'TYPE == "part" || TYPE == "rom"' 2>/dev/null); do
+    for dev in $(lsblk -o PATH -n -l 2>/dev/null); do
         [ -b "$dev" ] || continue
         mount -o ro "$dev" /archisosearch 2>/dev/null || continue
-        if [ -f "/archisosearch${searchfile}" ]; then
+        if [ -e "/archisosearch${searchfile}" ]; then
             echo "$dev" > /run/archiso/archisodevice
             umount /archisosearch 2>/dev/null; rmdir /archisosearch 2>/dev/null
             return 0
