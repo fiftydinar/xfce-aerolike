@@ -378,6 +378,14 @@ echo "[build-iso] Creating marker to skip mkarchiso pacstrap (rootfs already pre
 mkdir -p "${WORK_DIR}/iso-work"
 # _build_iso_base uses run_once_mode="base", so marker is <work_dir>/base._make_packages
 touch "${WORK_DIR}/iso-work/base._make_packages"
+
+# Copy syslinux files from host into the rootfs (mkarchiso reads them from
+# the rootfs, not the host, even though they're only needed on the ISO)
+if [ -d /usr/lib/syslinux/bios ]; then
+    mkdir -p "${AIROOTFS}/usr/lib/syslinux"
+    cp -r /usr/lib/syslinux/bios "${AIROOTFS}/usr/lib/syslinux/"
+fi
+
 echo "[build-iso] Running mkarchiso (working dir: ${WORK_DIR}/iso-work, output: ${OUT_DIR})..."
 env -u TMPDIR mkarchiso -w "${WORK_DIR}/iso-work" -o "${OUT_DIR}" "${PROFILE_DIR}"
 echo "[build-iso] mkarchiso completed"
