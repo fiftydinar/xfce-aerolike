@@ -75,7 +75,8 @@ podman rm "${CID}" >/dev/null 2>&1 || true
 echo "[build-iso] Container removed"
 
 echo "=== Step 3: Prepare live environment ==="
-mkdir -p "${AIROOTFS}/proc" "${AIROOTFS}/sys" "${AIROOTFS}/dev" "${AIROOTFS}/run" "${AIROOTFS}/boot" "${AIROOTFS}/root"
+mkdir -p "${AIROOTFS}/proc" "${AIROOTFS}/sys" "${AIROOTFS}/dev" "${AIROOTFS}/run" "${AIROOTFS}/boot"
+mkdir -p "${AIROOTFS}/root" 2>/dev/null || true
 
 # Provide DNS config for pacman inside chroot
 cp -L /etc/resolv.conf "${AIROOTFS}/etc/resolv.conf" 2>/dev/null || true
