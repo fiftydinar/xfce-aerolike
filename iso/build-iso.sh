@@ -78,11 +78,9 @@ mkdir -p "${AIROOTFS}/proc" "${AIROOTFS}/sys" "${AIROOTFS}/dev" "${AIROOTFS}/run
 cp -L /etc/resolv.conf "${AIROOTFS}/etc/resolv.conf" 2>/dev/null || true
 echo "[build-iso] Copied resolv.conf into chroot"
 
-# Container removes /boot/ but mkarchiso needs kernel there for ISO boot
-KVER=$(find "${AIROOTFS}/usr/lib/modules" -maxdepth 1 -type d ! -name "*.img" ! -name "." -printf "%f\n" | head -1)
-if [ -n "$KVER" ]; then
-    ln -sf "../usr/lib/modules/${KVER}/vmlinuz" "${AIROOTFS}/boot/vmlinuz-linux" 2>/dev/null || true
-fi
+# mkarchiso needs kernel at /boot/vmlinuz-linux for ISO boot.
+# The container may lack a kernel or have it in an unexpected location.
+# We handle this in Step 5 by installing the linux package inside the chroot.
 
 sed -i 's/^root:.*/root::14871::::::/' "${AIROOTFS}/etc/shadow" 2>/dev/null || true
 
@@ -106,24 +104,248 @@ echo "[build-iso] Mounted /dev"
 chroot "${AIROOTFS}" systemctl mask bootc-fetch-apply-updates.timer 2>/dev/null || true
 echo "[build-iso] Masked bootc auto-update timer"
 
-# Install live ISO boot support (mkinitcpio + archiso hooks for SquashFS live boot)
+# Install dracut + our custom archiso module for live ISO boot
 # Also install bcachefs-tools for bcachefs support in Calamares partitioner
-echo "[build-iso] Installing mkinitcpio, mkinitcpio-archiso, bcachefs-tools inside chroot..."
-chroot "${AIROOTFS}" pacman -S --needed --noconfirm mkinitcpio mkinitcpio-archiso bcachefs-tools
+echo "[build-iso] Installing dracut, bcachefs-tools inside chroot..."
+chroot "${AIROOTFS}" pacman -S --needed --noconfirm dracut bcachefs-tools
+
+# Remove mkinitcpio if present to avoid conflicts
+chroot "${AIROOTFS}" pacman -Rdd --noconfirm mkinitcpio mkinitcpio-archiso 2>/dev/null || true
 echo "[build-iso] Package install complete"
 
-# Configure mkinitcpio for live boot
-printf '%s\n' 'HOOKS=(base udev archiso block filesystems keyboard)' \
-    'MODULES=(loop overlay squashfs erofs)' \
-    'COMPRESSION=(zstd)' \
-    > "${AIROOTFS}/etc/mkinitcpio.conf.d/archiso.conf"
-echo "[build-iso] Written mkinitcpio archiso.conf"
+# Install the custom archiso dracut module
+DRACUT_MODDIR="${AIROOTFS}/usr/lib/dracut/modules.d/95archiso"
+mkdir -p "$DRACUT_MODDIR"
+cat > "$DRACUT_MODDIR/module-setup.sh" << 'DRACUTEOF'
+#!/bin/sh
+check() { return 255; }
+depends() { echo dm overlayfs img-lib; }
+installkernel() { hostonly='' instmods squashfs erofs loop iso9660 overlay; }
+install() {
+    inst_multiple losetup blkid blockdev mount umount mkdir rmdir rm ln cp truncate
+    inst_multiple lsblk grep sed sleep readlink realpath find head
+    inst_multiple -o sha512sum gpg openssl pv
+    inst_hook cmdline 30 "$moddir/parse-archiso.sh"
+    inst_hook pre-udev 30 "$moddir/archiso-genrules.sh"
+    inst_script "$moddir/archiso-root.sh" "/sbin/archiso-root"
+    if dracut_module_included "systemd"; then
+        inst_script "$moddir/archiso-generator.sh" "$systemdutildir"/system-generators/dracut-archiso-generator
+    fi
+}
+DRACUTEOF
 
-# Rebuild initramfs for live ISO boot
-KVER=$(find "${AIROOTFS}/usr/lib/modules" -maxdepth 1 -type d ! -name "*.img" ! -name "." -printf "%f\n" | head -1)
+cat > "$DRACUT_MODDIR/parse-archiso.sh" << 'DRACUTEOF'
+#!/bin/sh
+command -v getarg > /dev/null || . /lib/dracut-lib.sh
+[ -z "$root" ] && root=$(getarg root=)
+archisodevice=$(getarg archisodevice=)
+archisolabel=$(getarg archisolabel=)
+archisosearchuuid=$(getarg archisosearchuuid=)
+img_dev=$(getarg img_dev=)
+img_loop=$(getarg img_loop=)
+[ -n "$archisodevice" ] || [ -n "$archisolabel" ] || [ -n "$archisosearchuuid" ] || [ -n "$img_loop" ] || return 1
+modprobe -q loop
+[ -n "$archisolabel" ] && archisodevice="/dev/disk/by-label/${archisolabel}"
+mkdir -p /run/archiso
+[ -n "$archisodevice" ] && echo "$archisodevice" > /run/archiso/archisodevice
+if [ -n "$archisosearchuuid" ]; then
+    f=$(getarg archisosearchfilename=); [ -z "$f" ] && f="/boot/${archisosearchuuid}.uuid"
+    echo "$f" > /run/archiso/archisosearchfilename
+    echo "$archisosearchuuid" > /run/archiso/archisosearchuuid
+fi
+if [ -n "$img_dev" ]; then
+    echo "$img_dev" > /run/archiso/img_dev
+    echo "$img_loop" > /run/archiso/img_loop
+fi
+root=archiso; rootok=1
+wait_for_dev -n /dev/root
+return 0
+DRACUTEOF
+
+cat > "$DRACUT_MODDIR/archiso-genrules.sh" << 'DRACUTEOF'
+#!/bin/sh
+command -v getarg > /dev/null || . /lib/dracut-lib.sh
+if [ -e /run/archiso/archisodevice ]; then
+    d=$(cat /run/archiso/archisodevice)
+    case "$d" in /dev/*)
+        dev="${d#/dev/}"
+        printf 'KERNEL=="%s", RUN+="/sbin/initqueue --settled --onetime --unique /sbin/archiso-root %s"\n' "$dev" "$d" >> /etc/udev/rules.d/99-archiso.rules
+        printf 'SYMLINK=="%s", RUN+="/sbin/initqueue --settled --onetime --unique /sbin/archiso-root %s"\n' "$dev" "$d" >> /etc/udev/rules.d/99-archiso.rules
+        wait_for_dev -n "$d"
+    esac
+fi
+if [ -e /run/archiso/archisosearchfilename ]; then
+    /sbin/initqueue --settled --onetime --unique /sbin/archiso-root --search
+fi
+if [ -e /run/archiso/img_dev ] && [ -e /run/archiso/img_loop ]; then
+    /sbin/initqueue --settled --onetime --unique /sbin/archiso-root --loopimg
+fi
+DRACUTEOF
+
+cat > "$DRACUT_MODDIR/archiso-root.sh" << 'DRACUTEOF'
+#!/bin/sh
+command -v getarg > /dev/null || . /lib/dracut-lib.sh
+command -v det_fs > /dev/null || . /lib/fs-lib.sh
+command -v get_rd_overlay > /dev/null || . /lib/overlayfs-lib.sh
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+
+mnt_dev() {
+    local dev="$1" mnt="$2" flags="$3" opts="$4" rootdelay
+    rootdelay=$(getarg rootdelay 30)
+    while ! [ -b "$dev" ]; do
+        sleep 1; rootdelay=$((rootdelay - 1)); [ "$rootdelay" -le 0 ] && break
+    done
+    [ -b "$dev" ] || return 1
+    mount --mkdir -o "x-initrd.mount,${opts}" "$flags" "$dev" "$mnt"
+}
+
+search_device() {
+    local searchfile dev f
+    searchfile=$(cat /run/archiso/archisosearchfilename 2>/dev/null)
+    [ -z "$searchfile" ] && return 1
+    mkdir -p /archisosearch
+    for dev in $(lsblk -no PATH -Q 'TYPE == "part" || TYPE == "rom"' 2>/dev/null); do
+        [ -b "$dev" ] || continue
+        mount -o ro "$dev" /archisosearch 2>/dev/null || continue
+        if [ -f "/archisosearch${searchfile}" ]; then
+            echo "$dev" > /run/archiso/archisodevice
+            umount /archisosearch 2>/dev/null; rmdir /archisosearch 2>/dev/null
+            return 0
+        fi
+        umount /archisosearch 2>/dev/null
+    done
+    rmdir /archisosearch 2>/dev/null
+    return 1
+}
+
+main() {
+    local mode archisodevice archisobasedir arch cow_spacesize cow_device cow_persistent cow_directory cow_flags fs_img copytoram copytoram_img loopdev img_name loopimg_dev loopimg_path
+    mode="${1:-}"
+    mkdir -p /run/archiso
+    case "$mode" in
+        --search) search_device || { warn "archiso: device not found"; exit 1; } ;;
+        --loopimg)
+            loopimg_dev=$(cat /run/archiso/img_dev 2>/dev/null)
+            loopimg_path=$(cat /run/archiso/img_loop 2>/dev/null)
+            if [ -n "$loopimg_dev" ] && [ -n "$loopimg_path" ]; then
+                mnt_dev "$loopimg_dev" "/run/archiso/img_dev" "-r" "defaults" || exit 1
+                loopdev=$(losetup --find --show --read-only "/run/archiso/img_dev/$loopimg_path") || exit 1
+                echo "$loopdev" > /run/archiso/archisodevice
+            else
+                warn "archiso: loopimg missing device or path"; exit 1
+            fi
+            ;;
+        --resume) exit 0 ;;
+        /dev/* | UUID=* | LABEL=* | PARTUUID=* | PARTLABEL=*)
+            echo "$mode" > /run/archiso/archisodevice
+    esac
+    archisodevice=$(cat /run/archiso/archisodevice 2>/dev/null)
+    [ -z "$archisodevice" ] && exit 1
+    archisobasedir=$(getarg archisobasedir=); [ -z "$archisobasedir" ] && archisobasedir="arch"
+    arch=$(getarg arch=); [ -z "$arch" ] && arch=$(uname -m)
+    cow_spacesize=$(getarg cow_spacesize=); [ -z "$cow_spacesize" ] && cow_spacesize="256M"
+    cow_device=$(getarg cow_device=)
+    cow_label=$(getarg cow_label=)
+    if [ -n "$cow_label" ]; then cow_device="/dev/disk/by-label/${cow_label}"; cow_persistent="P"
+    elif [ -n "$cow_device" ]; then cow_persistent="P"
+    else cow_persistent="N"; fi
+    cow_flags=$(getarg cow_flags=); [ -z "$cow_flags" ] && cow_flags="defaults"
+    archisolabel=$(getarg archisolabel=)
+    cow_directory=$(getarg cow_directory=)
+    if [ -z "$cow_directory" ]; then
+        if [ -n "$archisolabel" ]; then cow_directory="persistent_${archisolabel}/${arch}"
+        else cow_directory="persistent/${arch}"; fi
+    fi
+    copytoram=$(getarg copytoram=)
+
+    mountpoint -q /run/archiso/bootmnt || mnt_dev "$archisodevice" "/run/archiso/bootmnt" "-r" "defaults" || exit 1
+
+    if [ -f "/run/archiso/bootmnt/${archisobasedir}/${arch}/airootfs.sfs" ]; then
+        fs_img="/run/archiso/bootmnt/${archisobasedir}/${arch}/airootfs.sfs"
+    elif [ -f "/run/archiso/bootmnt/${archisobasedir}/${arch}/airootfs.erofs" ]; then
+        fs_img="/run/archiso/bootmnt/${archisobasedir}/${arch}/airootfs.erofs"
+    else
+        warn "archiso: no airootfs image found"; exit 1
+    fi
+
+    if [ "$copytoram" = "y" ]; then
+        img_name="${fs_img##*/}"; mkdir -p /run/archiso/copytoram
+        cp "$fs_img" "/run/archiso/copytoram/${img_name}"
+        fs_img="/run/archiso/copytoram/${img_name}"
+    fi
+
+    if [ -n "$cow_device" ]; then
+        mnt_dev "$cow_device" "/run/archiso/cowspace" "-r" "$cow_flags" || exit 1
+        mount -o remount,rw /run/archiso/cowspace 2>/dev/null || true
+    else
+        mount --mkdir -t tmpfs -o "size=${cow_spacesize},mode=0755" cowspace /run/archiso/cowspace
+    fi
+    mkdir -p "/run/archiso/cowspace/${cow_directory}" && chmod 0700 "/run/archiso/cowspace/${cow_directory}"
+
+    mkdir -p /run/archiso/airootfs
+    loopdev=$(losetup --find --show --read-only "$fs_img")
+    mount -n -o ro "$loopdev" /run/archiso/airootfs
+
+    mkdir -m 0755 -p /run/rootfsbase && mount --bind /run/archiso/airootfs /run/rootfsbase
+    mkdir -m 0755 -p /run/initramfs/overlay/overlayfs /run/initramfs/overlay/ovlwork
+    ln -sf /run/archiso/cowspace/"${cow_directory}"/upperdir /run/overlayfs
+    ln -sf /run/archiso/cowspace/"${cow_directory}"/workdir /run/ovlwork
+    ln -sf /run/archiso/cowspace/"${cow_directory}"/upperdir /run/initramfs/overlay/overlayfs
+    ln -sf /run/archiso/cowspace/"${cow_directory}"/workdir /run/initramfs/overlay/ovlwork
+    ln -s null /dev/root
+    need_shutdown
+    info "archiso: root ready"
+    exit 0
+}
+main "$@"
+DRACUTEOF
+
+cat > "$DRACUT_MODDIR/archiso-generator.sh" << 'DRACUTEOF'
+#!/bin/sh
+command -v getarg > /dev/null || . /lib/dracut-lib.sh
+[ "${root}" != "archiso" ] && exit 0
+GENERATOR_DIR="$2"
+[ -z "$GENERATOR_DIR" ] && exit 1; [ -d "$GENERATOR_DIR" ] || mkdir -p "$GENERATOR_DIR"
+ROOTFLAGS="$(getarg rootflags)"
+{
+    echo "# Automatically generated by ${0##*/}"
+    echo "[Unit]"; echo "Before=initrd-root-fs.target"
+    echo "[Mount]"; echo "Where=/sysroot"
+    echo "What=archiso_rootfs"
+    echo "Options=${ROOTFLAGS},lowerdir=/run/rootfsbase,upperdir=/run/overlayfs,workdir=/run/ovlwork"
+    echo "Type=overlay"
+} > "$GENERATOR_DIR/sysroot.mount"
+mkdir -p "$GENERATOR_DIR/archiso_rootfs.device.d"
+{
+    echo "[Unit]"; echo "JobTimeoutSec=3000"; echo "JobRunningTimeoutSec=3000"
+} > "$GENERATOR_DIR/archiso_rootfs.device.d/timeout.conf"
+DRACUTEOF
+
+chmod -R +x "$DRACUT_MODDIR"
+
+# Configure dracut to include the archiso module
+mkdir -p "${AIROOTFS}/etc/dracut.conf.d"
+cat > "${AIROOTFS}/etc/dracut.conf.d/50-archiso.conf" << 'CONFEOF'
+add_dracutmodules+=" archiso "
+omit_dracutmodules+=" dmsquash-live dmsquash-live-autooverlay livenet "
+hostonly="no"
+compress="zstd"
+CONFEOF
+
+# Find kernel version and regenerate initramfs with dracut
+KVER=$(find "${AIROOTFS}/usr/lib/modules" -maxdepth 1 -type d -name "[0-9]*" -printf "%f\n" | sort -V | tail -1)
 echo "[build-iso] Kernel version: ${KVER}"
-chroot "${AIROOTFS}" mkinitcpio -k "${KVER}" -g /boot/initramfs-linux.img
-echo "[build-iso] Initramfs rebuilt"
+
+if [ -n "$KVER" ]; then
+    # Ensure /boot/vmlinuz-linux exists (kernel binary from container)
+    if [ ! -f "${AIROOTFS}/boot/vmlinuz-linux" ] && [ -f "${AIROOTFS}/usr/lib/modules/${KVER}/vmlinuz" ]; then
+        cp "${AIROOTFS}/usr/lib/modules/${KVER}/vmlinuz" "${AIROOTFS}/boot/vmlinuz-linux"
+    fi
+    chroot "${AIROOTFS}" dracut --force --add archiso /boot/initramfs-linux.img "${KVER}"
+    echo "[build-iso] dracut initramfs built"
+else
+    echo "[build-iso] WARNING: No kernel found, skipping initramfs build"
+fi
 
 echo "=== Step 6: Install Calamares ==="
 if [ -n "$CALAMARES_DIR" ]; then
