@@ -100,6 +100,9 @@ echo "[build-iso] Mounted /sys"
 mount --bind /dev "${AIROOTFS}/dev"
 echo "[build-iso] Mounted /dev"
 
+# Ensure /var/tmp exists (dracut uses it as default TMPDIR)
+mkdir -p "${AIROOTFS}/var/tmp"
+
 # Disable bootc auto-update timer in live environment
 chroot "${AIROOTFS}" systemctl mask bootc-fetch-apply-updates.timer 2>/dev/null || true
 echo "[build-iso] Masked bootc auto-update timer"
@@ -341,7 +344,7 @@ if [ -n "$KVER" ]; then
     if [ ! -f "${AIROOTFS}/boot/vmlinuz-linux" ] && [ -f "${AIROOTFS}/usr/lib/modules/${KVER}/vmlinuz" ]; then
         cp "${AIROOTFS}/usr/lib/modules/${KVER}/vmlinuz" "${AIROOTFS}/boot/vmlinuz-linux"
     fi
-    chroot "${AIROOTFS}" dracut --force --add archiso /boot/initramfs-linux.img "${KVER}"
+    chroot "${AIROOTFS}" env TMPDIR=/tmp dracut --force --add archiso /boot/initramfs-linux.img "${KVER}"
     echo "[build-iso] dracut initramfs built"
 else
     echo "[build-iso] WARNING: No kernel found, skipping initramfs build"
