@@ -77,6 +77,9 @@ jobs:
           pacman-key --populate
           # archiso provides mkarchiso, podman/skopeo for container ops
           pacman -Syu --noconfirm archiso podman squashfs-tools zstd skopeo
+          # Force VFS storage driver — overlayfs cannot stack on GitHub runner's overlayfs
+          mkdir -p /etc/containers
+          printf '[storage]\ndriver = "vfs"\n' > /etc/containers/storage.conf
           echo "CALAMARES_PKG=/tmp/calamares-package/calamares-package.tar.gz" >> $GITHUB_ENV
 
       - name: Log in to GHCR
