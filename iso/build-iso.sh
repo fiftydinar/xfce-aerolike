@@ -148,6 +148,8 @@ command -v getarg > /dev/null || . /lib/dracut-lib.sh
 archisodevice=$(getarg archisodevice=)
 archisolabel=$(getarg archisolabel=)
 archisosearchuuid=$(getarg archisosearchuuid=)
+archisobasedir=$(getarg archisobasedir=); [ -z "$archisobasedir" ] && archisobasedir="arch"
+arch=$(getarg arch=); [ -z "$arch" ] && arch=$(uname -m)
 img_dev=$(getarg img_dev=)
 img_loop=$(getarg img_loop=)
 [ -n "$archisodevice" ] || [ -n "$archisolabel" ] || [ -n "$archisosearchuuid" ] || [ -n "$img_loop" ] || return 1
@@ -156,7 +158,7 @@ modprobe -q loop
 mkdir -p /run/archiso
 [ -n "$archisodevice" ] && echo "$archisodevice" > /run/archiso/archisodevice
 if [ -n "$archisosearchuuid" ]; then
-    f=$(getarg archisosearchfilename=); [ -z "$f" ] && f="/boot/${archisosearchuuid}.uuid"
+    f=$(getarg archisosearchfilename=); [ -z "$f" ] && f="/${archisobasedir}/${arch}/${archisosearchuuid}.uuid"
     echo "$f" > /run/archiso/archisosearchfilename
     echo "$archisosearchuuid" > /run/archiso/archisosearchuuid
 fi
