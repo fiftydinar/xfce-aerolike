@@ -130,6 +130,7 @@ chroot "${AIROOTFS}" pacman -S --needed --noconfirm dracut bcachefs-tools
 
 # bcachefs wrapper: KPMCore's findExternal("bcachefs") calls bcachefs with no
 # args and expects exit 0, but bcachefs exits 1 (usage). Make it exit 0.
+mkdir -p "${AIROOTFS}/usr/local/bin"
 cat > "${AIROOTFS}/usr/local/bin/bcachefs" << 'BCACHEFSWRAPPER'
 #!/bin/sh
 /usr/bin/bcachefs "$@"
