@@ -78,11 +78,7 @@ echo "=== Step 3: Prepare live environment ==="
 mkdir -p "${AIROOTFS}/proc" "${AIROOTFS}/sys" "${AIROOTFS}/dev" "${AIROOTFS}/run" "${AIROOTFS}/boot"
 mkdir -p "${AIROOTFS}/root" 2>/dev/null || true
 
-# Provide DNS config for pacman inside chroot
-cp -L /etc/resolv.conf "${AIROOTFS}/etc/resolv.conf" 2>/dev/null || true
-echo "[build-iso] Copied resolv.conf into chroot"
-
-# mkarchiso needs kernel at /boot/vmlinuz-linux for ISO boot.
+echo "[build-iso] Step 3: Prepare live environment"
 # The container may lack a kernel or have it in an unexpected location.
 # We handle this in Step 5 by installing the linux package inside the chroot.
 
