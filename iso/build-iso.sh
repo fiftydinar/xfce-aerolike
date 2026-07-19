@@ -392,6 +392,10 @@ else
     echo "[build-iso] WARNING: No kernel found, skipping initramfs build"
 fi
 
+# Install Calamares runtime dependencies (not in the base image, ISO-only)
+chroot "${AIROOTFS}" pacman -S --needed --noconfirm yaml-cpp kpmcore polkit-qt6 python
+echo "[build-iso] Calamares dependencies installed"
+
 # Unmount chroot filesystems before mkarchiso processes the rootfs
 umount -l "${AIROOTFS}/dev" 2>/dev/null || true
 umount "${AIROOTFS}/sys" 2>/dev/null || true
@@ -410,17 +414,6 @@ else
     rm -f "${AIROOTFS}/tmp/calamares.pkg.tar.zst"
     echo "[build-iso] Calamares package installed"
 fi
-
-# Install Calamares runtime dependencies (not in the base image)
-mount --bind /proc "${AIROOTFS}/proc"
-mount --bind /sys "${AIROOTFS}/sys"
-mount --bind /dev "${AIROOTFS}/dev"
-echo "[build-iso] Installing Calamares runtime dependencies..."
-chroot "${AIROOTFS}" pacman -S --needed --noconfirm yaml-cpp kpmcore polkit-qt6 python
-echo "[build-iso] Calamares dependencies installed"
-umount -l "${AIROOTFS}/dev" 2>/dev/null || true
-umount "${AIROOTFS}/sys" 2>/dev/null || true
-umount "${AIROOTFS}/proc" 2>/dev/null || true
 
 # Place desktop icon directly on live user's Desktop (skel doesn't apply to pre-existing users)
 mkdir -p "${AIROOTFS}/home/live/Desktop"
