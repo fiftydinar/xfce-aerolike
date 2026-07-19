@@ -2,7 +2,7 @@
 Type=Application
 Name=Install xfce-aerolike
 Comment=Install xfce-aerolike to your computer
-Exec=pkexec calamares
+Exec=pkexec env QT_QPA_PLATFORMTHEME=qt6ct calamares
 Icon=drive-harddisk
 Terminal=false
 Categories=System;
