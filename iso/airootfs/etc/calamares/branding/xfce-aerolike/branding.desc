@@ -27,5 +27,4 @@ strings:
   errorPopupContinue: "Continue"
   errorPopupInfo: "Information"
 
-  slidePaths:
-    - "/usr/share/calamares/slideshow/"
+  slideshow: []
