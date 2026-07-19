@@ -295,6 +295,15 @@ main() {
         img_name="${fs_img##*/}"; mkdir -p /run/archiso/copytoram
         cp "$fs_img" "/run/archiso/copytoram/${img_name}"
         fs_img="/run/archiso/copytoram/${img_name}"
+    elif [ -z "$copytoram" ]; then
+        img_size_kb=$(du -k "$fs_img" | awk '{print $1}')
+        avail_kb=$(awk '/MemAvailable/{print $2}' /proc/meminfo)
+        if [ -n "$img_size_kb" ] && [ -n "$avail_kb" ] && [ "$avail_kb" -ge "$((img_size_kb + img_size_kb / 2))" ]; then
+            info "archiso: auto-enabling copytoram (img=${img_size_kb}kB, avail=${avail_kb}kB)"
+            img_name="${fs_img##*/}"; mkdir -p /run/archiso/copytoram
+            cp "$fs_img" "/run/archiso/copytoram/${img_name}"
+            fs_img="/run/archiso/copytoram/${img_name}"
+        fi
     fi
 
     if ! mountpoint -q /run/archiso/cowspace 2>/dev/null; then
