@@ -129,6 +129,15 @@ diff -ruN '--exclude=.git' compiz-aur-patched/plugins/grid/grid.xml.in compiz-fi
 diff -ruN '--exclude=.git' compiz-aur-patched/plugins/opengl/opengl.xml.in compiz-final/plugins/opengl/opengl.xml.in
 --- compiz-aur-patched/plugins/opengl/opengl.xml.in	2026-07-14 21:54:15.511111834 +0200
 +++ compiz-final/plugins/opengl/opengl.xml.in	2026-07-14 21:54:35.706023524 +0200
+@@ -34,7 +34,7 @@
+ 	    <option name="sync_to_vblank" type="bool">
+ 		<_short>Sync To VBlank</_short>
+ 		<_long>Only perform screen updates during vertical blanking period</_long>
+-		<default>true</default>
++		<default>false</default>
+ 	    </option>
+ 	    <option name="texture_compression" type="bool">
+ 		<_short>Texture Compression</_short>
 @@ -58,7 +58,7 @@
  	    <option name="unredirect_driver_blacklist" type="string">
  		<_short>Unredirect Driver Blacklist</_short>
