@@ -130,17 +130,19 @@ chroot "${AIROOTFS}" pacman -S --needed --noconfirm dracut bcachefs-tools
 
 # bcachefs wrapper: KPMCore's findExternal("bcachefs") calls bcachefs with no
 # args and expects exit 0, but bcachefs exits 1 (usage). Make it exit 0.
-mkdir -p "${AIROOTFS}/usr/local/bin"
-cat > "${AIROOTFS}/usr/local/bin/bcachefs" << 'BCACHEFSWRAPPER'
+if [ -f "${AIROOTFS}/usr/bin/bcachefs" ]; then
+    mv "${AIROOTFS}/usr/bin/bcachefs" "${AIROOTFS}/usr/bin/bcachefs.real"
+fi
+cat > "${AIROOTFS}/usr/bin/bcachefs" << 'BCACHEFSWRAPPER'
 #!/bin/sh
-/usr/bin/bcachefs "$@"
+/usr/bin/bcachefs.real "$@"
 rc=$?
 # bcachefs exits 1 when called without arguments (prints usage);
 # KPMCore's findExternal() requires exit code 0 for detection.
 [ $# -eq 0 ] && exit 0
 exit $rc
 BCACHEFSWRAPPER
-chmod +x "${AIROOTFS}/usr/local/bin/bcachefs"
+chmod +x "${AIROOTFS}/usr/bin/bcachefs"
 
 # Remove mkinitcpio if present to avoid conflicts
 chroot "${AIROOTFS}" pacman -Rdd --noconfirm mkinitcpio mkinitcpio-archiso 2>/dev/null || true
