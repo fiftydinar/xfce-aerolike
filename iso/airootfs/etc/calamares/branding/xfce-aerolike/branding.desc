@@ -27,4 +27,4 @@ strings:
   errorPopupContinue: "Continue"
   errorPopupInfo: "Information"
 
-  slideshow: []
+slideshow: []
