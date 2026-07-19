@@ -86,7 +86,7 @@ echo "[build-iso] Copied resolv.conf into chroot"
 # The container may lack a kernel or have it in an unexpected location.
 # We handle this in Step 5 by installing the linux package inside the chroot.
 
-sed -i 's/^root:.*/root::14871::::::/' "${AIROOTFS}/etc/shadow" 2>/dev/null || true
+sed -i 's|^root:[^:]*:|root::|' "${AIROOTFS}/etc/shadow" 2>/dev/null || true
 
 # Create live user for auto-login
 chroot "${AIROOTFS}" useradd -m -G wheel live 2>/dev/null || true
@@ -345,6 +345,10 @@ hostonly="no"
 compress="zstd"
 CONFEOF
 
+cat > "${AIROOTFS}/etc/dracut.conf.d/99-initramfs-root.conf" << 'CONFEOF'
+install_items+=" /etc/passwd /etc/shadow "
+CONFEOF
+
 # Find kernel version and regenerate initramfs with dracut
 KVER=$(find "${AIROOTFS}/usr/lib/modules" -maxdepth 1 -type d -name "[0-9]*" -printf "%f\n" | sort -V | tail -1)
 echo "[build-iso] Kernel version: ${KVER}"
@@ -354,7 +358,7 @@ if [ -n "$KVER" ]; then
     if [ ! -f "${AIROOTFS}/boot/vmlinuz-linux" ] && [ -f "${AIROOTFS}/usr/lib/modules/${KVER}/vmlinuz" ]; then
         cp "${AIROOTFS}/usr/lib/modules/${KVER}/vmlinuz" "${AIROOTFS}/boot/vmlinuz-linux"
     fi
-    chroot "${AIROOTFS}" env TMPDIR=/tmp dracut --force --add archiso /boot/initramfs-linux.img "${KVER}"
+    chroot "${AIROOTFS}" env TMPDIR=/tmp dracut --force --add archiso --install "/etc/passwd /etc/shadow" /boot/initramfs-linux.img "${KVER}"
     echo "[build-iso] dracut initramfs built"
 else
     echo "[build-iso] WARNING: No kernel found, skipping initramfs build"
