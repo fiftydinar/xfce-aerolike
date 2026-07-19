@@ -92,6 +92,13 @@ sed -i 's|^root:[^:]*:|root::|' "${AIROOTFS}/etc/shadow" 2>/dev/null || true
 # Create live user for auto-login
 chroot "${AIROOTFS}" useradd -m -G wheel live 2>/dev/null || true
 chroot "${AIROOTFS}" passwd -d live 2>/dev/null || true
+# LightDM PAM requires autologin group membership for passwordless autologin
+chroot "${AIROOTFS}" groupadd -rf autologin 2>/dev/null || true
+chroot "${AIROOTFS}" gpasswd -a live autologin 2>/dev/null || true
+# Passwordless sudo for live user (Calamares needs root via sudo -E)
+mkdir -p "${AIROOTFS}/etc/sudoers.d"
+echo "live ALL=(ALL) NOPASSWD: ALL" > "${AIROOTFS}/etc/sudoers.d/live"
+chmod 440 "${AIROOTFS}/etc/sudoers.d/live"
 
 echo "=== Step 4: Save OCI archive for installer ==="
 mkdir -p "${AIROOTFS}/run/install"
@@ -120,6 +127,19 @@ sed -i 's/echo "\$hook"/printf '\''%s\\n'\'' "$hook"/g' \
     "${AIROOTFS}/usr/lib/dracut/modules.d/80base/dracut-lib.sh" 2>/dev/null || true
 echo "[build-iso] Fixed dracut-lib.sh dash hex escape bug"
 chroot "${AIROOTFS}" pacman -S --needed --noconfirm dracut bcachefs-tools
+
+# bcachefs wrapper: KPMCore's findExternal("bcachefs") calls bcachefs with no
+# args and expects exit 0, but bcachefs exits 1 (usage). Make it exit 0.
+cat > "${AIROOTFS}/usr/local/bin/bcachefs" << 'BCACHEFSWRAPPER'
+#!/bin/sh
+/usr/bin/bcachefs "$@"
+rc=$?
+# bcachefs exits 1 when called without arguments (prints usage);
+# KPMCore's findExternal() requires exit code 0 for detection.
+[ $# -eq 0 ] && exit 0
+exit $rc
+BCACHEFSWRAPPER
+chmod +x "${AIROOTFS}/usr/local/bin/bcachefs"
 
 # Remove mkinitcpio if present to avoid conflicts
 chroot "${AIROOTFS}" pacman -Rdd --noconfirm mkinitcpio mkinitcpio-archiso 2>/dev/null || true
