@@ -133,7 +133,7 @@ check() { return 255; }
 depends() { echo dm overlayfs img-lib; }
 installkernel() { hostonly='' instmods squashfs erofs loop iso9660 overlay; }
 install() {
-    inst_multiple losetup blkid blockdev mount umount mkdir rmdir rm ln cp truncate
+    inst_multiple losetup blkid blockdev mount umount mkdir rmdir rm ln cp truncate mountpoint
     inst_multiple lsblk grep sed sleep readlink realpath find head
     inst_multiple -o sha512sum gpg openssl pv
     inst_hook cmdline 30 "$moddir/parse-archiso.sh"
@@ -189,12 +189,6 @@ if [ -e /run/archiso/archisodevice ]; then
         wait_for_dev -n "$d"
     esac
 fi
-if [ -e /run/archiso/archisosearchfilename ]; then
-    /sbin/initqueue --settled --onetime --unique /sbin/archiso-root --search
-fi
-if [ -e /run/archiso/img_dev ] && [ -e /run/archiso/img_loop ]; then
-    /sbin/initqueue --settled --onetime --unique /sbin/archiso-root --loopimg
-fi
 DRACUTEOF
 
 cat > "$DRACUT_MODDIR/archiso-root.sh" << 'DRACUTEOF'
@@ -241,6 +235,16 @@ main() {
     local mode archisodevice archisobasedir arch cow_spacesize cow_device cow_persistent cow_directory cow_flags fs_img copytoram copytoram_img loopdev img_name loopimg_dev loopimg_path
     mode="${1:-}"
     mkdir -p /run/archiso
+    # Auto-detect mode when called without arguments (from systemd service)
+    if [ -z "$mode" ]; then
+        if [ -f /run/archiso/archisodevice ]; then
+            mode=$(cat /run/archiso/archisodevice)
+        elif [ -f /run/archiso/archisosearchfilename ]; then
+            mode="--search"
+        elif [ -f /run/archiso/img_dev ]; then
+            mode="--loopimg"
+        fi
+    fi
     case "$mode" in
         --search) search_device || { warn "archiso: device not found"; exit 1; } ;;
         --loopimg)
@@ -293,23 +297,32 @@ main() {
         fs_img="/run/archiso/copytoram/${img_name}"
     fi
 
-    if [ -n "$cow_device" ]; then
-        mnt_dev "$cow_device" "/run/archiso/cowspace" "-r" "$cow_flags" || exit 1
-        mount -o remount,rw /run/archiso/cowspace 2>/dev/null || true
-    else
-        mount --mkdir -t tmpfs -o "size=${cow_spacesize},mode=0755" cowspace /run/archiso/cowspace
+    if ! mountpoint -q /run/archiso/cowspace 2>/dev/null; then
+        if [ -n "$cow_device" ]; then
+            mnt_dev "$cow_device" "/run/archiso/cowspace" "-r" "$cow_flags" || exit 1
+            mount -o remount,rw /run/archiso/cowspace 2>/dev/null || true
+        else
+            mount --mkdir -t tmpfs -o "size=${cow_spacesize},mode=0755" cowspace /run/archiso/cowspace
+        fi
     fi
     mkdir -p "/run/archiso/cowspace/${cow_directory}" && chmod 0700 "/run/archiso/cowspace/${cow_directory}"
 
+    if mountpoint -q /sysroot 2>/dev/null; then
+        info "archiso: root already ready"
+        exit 0
+    fi
+
     mkdir -p /run/archiso/airootfs
-    loopdev=$(losetup --find --show --read-only "$fs_img")
-    mount -n -o ro "$loopdev" /run/archiso/airootfs
+    if ! mountpoint -q /run/archiso/airootfs 2>/dev/null; then
+        loopdev=$(losetup --find --show --read-only "$fs_img")
+        mount -n -o ro "$loopdev" /run/archiso/airootfs
+    fi
 
     mkdir -p "/run/archiso/cowspace/${cow_directory}/upperdir"
     mkdir -p "/run/archiso/cowspace/${cow_directory}/workdir"
     mkdir -m 0755 -p /sysroot
     mount -t overlay -o "lowerdir=/run/archiso/airootfs,upperdir=/run/archiso/cowspace/${cow_directory}/upperdir,workdir=/run/archiso/cowspace/${cow_directory}/workdir" overlay /sysroot
-    ln -s /sysroot /dev/root
+    ln -sf /sysroot /dev/root
     need_shutdown
     info "archiso: root ready"
     exit 0
@@ -334,7 +347,7 @@ Before=dracut-mount.service initrd.target
 
 [Service]
 Type=oneshot
-ExecStart=/sbin/archiso-root --search
+ExecStart=/sbin/archiso-root
 RemainAfterExit=yes
 
 [Install]
