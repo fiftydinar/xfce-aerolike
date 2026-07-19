@@ -134,7 +134,7 @@ depends() { echo dm overlayfs img-lib; }
 installkernel() { hostonly='' instmods squashfs erofs loop iso9660 overlay; }
 install() {
     inst_multiple losetup blkid blockdev mount umount mkdir rmdir rm ln cp truncate mountpoint
-    inst_multiple lsblk grep sed sleep readlink realpath find head
+    inst_multiple lsblk grep sed awk sleep readlink realpath find head
     inst_multiple -o sha512sum gpg openssl pv
     inst_hook cmdline 30 "$moddir/parse-archiso.sh"
     inst_hook pre-udev 30 "$moddir/archiso-genrules.sh"
