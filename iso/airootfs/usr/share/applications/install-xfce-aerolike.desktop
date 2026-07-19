@@ -2,7 +2,7 @@
 Type=Application
 Name=Install xfce-aerolike
 Comment=Install xfce-aerolike to your computer
-Exec=calamares
+Exec=pkexec calamares
 Icon=drive-harddisk
 Terminal=false
 Categories=System;
