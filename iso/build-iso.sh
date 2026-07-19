@@ -79,7 +79,10 @@ mkdir -p "${AIROOTFS}/proc" "${AIROOTFS}/sys" "${AIROOTFS}/dev" "${AIROOTFS}/run
 mkdir -p "${AIROOTFS}/root" 2>/dev/null || true
 
 echo "[build-iso] Step 3: Prepare live environment"
-# Write DNS config for pacman inside chroot (public DNS, not host's Docker resolv.conf)
+# Save container's original resolv.conf, then write temporary DNS for pacman
+if [ -f "${AIROOTFS}/etc/resolv.conf" ]; then
+    cp "${AIROOTFS}/etc/resolv.conf" "${AIROOTFS}/etc/resolv.conf.container"
+fi
 echo -e "nameserver 8.8.8.8\nnameserver 8.8.4.4" > "${AIROOTFS}/etc/resolv.conf"
 # The container may lack a kernel or have it in an unexpected location.
 # We handle this in Step 5 by installing the linux package inside the chroot.
@@ -429,6 +432,11 @@ touch "${WORK_DIR}/iso-work/base._make_packages"
 if [ -d /usr/lib/syslinux/bios ]; then
     mkdir -p "${AIROOTFS}/usr/lib/syslinux"
     cp -r /usr/lib/syslinux/bios "${AIROOTFS}/usr/lib/syslinux/"
+fi
+
+# Restore container's original resolv.conf (chroot used temporary DNS for pacman)
+if [ -f "${AIROOTFS}/etc/resolv.conf.container" ]; then
+    mv "${AIROOTFS}/etc/resolv.conf.container" "${AIROOTFS}/etc/resolv.conf"
 fi
 
 echo "[build-iso] Running mkarchiso (working dir: ${WORK_DIR}/iso-work, output: ${OUT_DIR})..."
