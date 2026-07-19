@@ -106,6 +106,7 @@ modules:
       - "pacman -Syu --needed --noconfirm --asdeps $(expac -Ss '%o' xarchiver)"
       # Install lightdm without xorg-server (only applicable when yserver is in use)
       #- "pacman -S --assume-installed xorg-server --noconfirm lightdm lightdm-gtk-greeter"
+      #- "mkdir -p /etc/lightdm/lightdm.conf.d/ && echo -e '[Seat:*]\nxserver-command=/usr/bin/yserver' > /etc/lightdm/lightdm.conf.d/99-yserver.conf"
       # Symlink dash to sh with pacman hook to persist across bash updates
       - "ln -sfT /usr/bin/dash /usr/bin/sh"
       - |
