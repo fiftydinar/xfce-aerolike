@@ -215,19 +215,23 @@ mnt_dev() {
 }
 
 search_device() {
-    local searchfile dev f
+    local searchfile dev f rootdelay
     searchfile=$(cat /run/archiso/archisosearchfilename 2>/dev/null)
     [ -z "$searchfile" ] && return 1
+    rootdelay=$(getarg rootdelay=); [ -z "$rootdelay" ] && rootdelay=30
     mkdir -p /archisosearch
-    for dev in $(lsblk -o PATH -n -l 2>/dev/null); do
-        [ -b "$dev" ] || continue
-        mount -o ro "$dev" /archisosearch 2>/dev/null || continue
-        if [ -e "/archisosearch${searchfile}" ]; then
-            echo "$dev" > /run/archiso/archisodevice
-            umount /archisosearch 2>/dev/null; rmdir /archisosearch 2>/dev/null
-            return 0
-        fi
-        umount /archisosearch 2>/dev/null
+    while [ "$rootdelay" -gt 0 ]; do
+        for dev in $(lsblk -o PATH -n -l 2>/dev/null); do
+            [ -b "$dev" ] || continue
+            mount -o ro "$dev" /archisosearch 2>/dev/null || continue
+            if [ -e "/archisosearch${searchfile}" ]; then
+                echo "$dev" > /run/archiso/archisodevice
+                umount /archisosearch 2>/dev/null; rmdir /archisosearch 2>/dev/null
+                return 0
+            fi
+            umount /archisosearch 2>/dev/null
+        done
+        sleep 1; rootdelay=$((rootdelay - 1))
     done
     rmdir /archisosearch 2>/dev/null
     return 1
