@@ -27,4 +27,7 @@ strings:
   errorPopupContinue: "Continue"
   errorPopupInfo: "Information"
 
+images:
+  productIcon: "icon.png"
+
 slideshow: []
