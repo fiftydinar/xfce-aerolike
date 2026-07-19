@@ -115,7 +115,7 @@ jobs:
             repo: https://aur.archlinux.org/dwarfs-bin.git
 
           - name: yserver-git
-            enabled: true
+            enabled: false
             repo: https://aur.archlinux.org/yserver-git.git
 
     container:
