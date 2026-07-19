@@ -134,7 +134,7 @@ depends() { echo dm overlayfs img-lib; }
 installkernel() { hostonly='' instmods squashfs erofs loop iso9660 overlay; }
 install() {
     inst_multiple losetup blkid blockdev mount umount mkdir rmdir rm ln cp truncate mountpoint
-    inst_multiple lsblk grep sed awk sleep readlink realpath find head
+    inst_multiple lsblk grep sed sleep readlink realpath find head
     inst_multiple -o sha512sum gpg openssl pv
     inst_hook cmdline 30 "$moddir/parse-archiso.sh"
     inst_hook pre-udev 30 "$moddir/archiso-genrules.sh"
@@ -295,14 +295,6 @@ main() {
         img_name="${fs_img##*/}"; mkdir -p /run/archiso/copytoram
         cp "$fs_img" "/run/archiso/copytoram/${img_name}"
         fs_img="/run/archiso/copytoram/${img_name}"
-    elif [ -z "$copytoram" ]; then
-        avail_kb=$(awk '/MemAvailable/{print $2}' /proc/meminfo)
-        if [ -n "$avail_kb" ] && [ "$avail_kb" -ge 8388608 ]; then
-            info "archiso: auto-enabling copytoram (avail=${avail_kb}kB >= 8GB)"
-            img_name="${fs_img##*/}"; mkdir -p /run/archiso/copytoram
-            cp "$fs_img" "/run/archiso/copytoram/${img_name}"
-            fs_img="/run/archiso/copytoram/${img_name}"
-        fi
     fi
 
     if ! mountpoint -q /run/archiso/cowspace 2>/dev/null; then
