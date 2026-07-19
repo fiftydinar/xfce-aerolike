@@ -427,6 +427,9 @@ mkdir -p "${AIROOTFS}/home/live/Desktop"
 cp "${PROFILE_DIR}/airootfs/usr/share/applications/install-xfce-aerolike.desktop" \
    "${AIROOTFS}/home/live/Desktop/install-xfce-aerolike.desktop"
 
+# Remove upstream Calamares desktop file (we ship our own)
+rm -f "${AIROOTFS}/usr/share/applications/calamares.desktop" 2>/dev/null || true
+
 # Ensure Calamares branding and module configs are in the right place
 mkdir -p "${AIROOTFS}/etc/calamares"
 echo "[build-iso] Calamares config directory created"
