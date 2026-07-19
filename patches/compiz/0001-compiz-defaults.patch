@@ -93,7 +93,18 @@ diff -ruN '--exclude=.git' compiz-aur-patched/plugins/blur/blur.xml.in compiz-fi
  	    </option>
  	    <option name="alpha_blur" type="bool">
  		<_short>Alpha Blur</_short>
-
+diff -ruN '--exclude=.git' compiz-aur-patched/plugins/composite/composite.xml.in compiz-final/plugins/composite/composite.xml.in
+--- compiz-aur-patched/plugins/composite/composite.xml.in	2026-07-14 21:54:15.504039497 +0200
++++ compiz-final/plugins/composite/composite.xml.in	2026-07-14 21:54:35.706098616 +0200
+@@ -26,7 +26,7 @@
+ 	    <option name="unredirect_match" type="match">
+ 		<_short>Unredirect Match</_short>
+ 		<_long>Specifies which windows will be unredirected when they are fullscreen. You might want to exclude video players for example, to avoid tearing. But this will be at the expense of performance/frame rate. Note: "class=" matching requires the regex plugin to work.</_long>
+-		<default>(any) &amp; !(class=Totem) &amp; !(class=MPlayer) &amp; !(class=vlc) &amp; !(class=Plugin-container) &amp; !(class=QtQmlViewer) &amp; !(class=Firefox) &amp; !(class=google-chrome) &amp; !(class=google-chrome-unstable) &amp; !(class=chromium-browser)</default>
++		<default>(any)</default>
+ 	    </option>
+ 	</options>
+     </plugin>
 diff -ruN '--exclude=.git' compiz-aur-patched/plugins/grid/grid.xml.in compiz-final/plugins/grid/grid.xml.in
 --- compiz-aur-patched/plugins/grid/grid.xml.in	2026-07-14 21:54:15.583723818 +0200
 +++ compiz-final/plugins/grid/grid.xml.in	2026-07-14 21:54:35.706288574 +0200
