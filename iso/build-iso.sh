@@ -325,7 +325,7 @@ cat > "$DRACUT_MODDIR/archiso-root.service" << 'DRACUTEOF'
 [Unit]
 Description=archiso root setup
 DefaultDependencies=false
-After=systemd-udevd.service
+After=systemd-udevd.service systemd-udev-settle.service
 Before=dracut-mount.service initrd.target
 
 [Service]
