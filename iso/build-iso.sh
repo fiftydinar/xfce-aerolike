@@ -411,6 +411,22 @@ else
     echo "[build-iso] Calamares package installed"
 fi
 
+# Install Calamares runtime dependencies (not in the base image)
+mount --bind /proc "${AIROOTFS}/proc"
+mount --bind /sys "${AIROOTFS}/sys"
+mount --bind /dev "${AIROOTFS}/dev"
+echo "[build-iso] Installing Calamares runtime dependencies..."
+chroot "${AIROOTFS}" pacman -S --needed --noconfirm yaml-cpp kpmcore polkit-qt6 python
+echo "[build-iso] Calamares dependencies installed"
+umount -l "${AIROOTFS}/dev" 2>/dev/null || true
+umount "${AIROOTFS}/sys" 2>/dev/null || true
+umount "${AIROOTFS}/proc" 2>/dev/null || true
+
+# Place desktop icon directly on live user's Desktop (skel doesn't apply to pre-existing users)
+mkdir -p "${AIROOTFS}/home/live/Desktop"
+cp "${PROFILE_DIR}/airootfs/usr/share/applications/install-xfce-aerolike.desktop" \
+   "${AIROOTFS}/home/live/Desktop/install-xfce-aerolike.desktop"
+
 # Ensure Calamares branding and module configs are in the right place
 mkdir -p "${AIROOTFS}/etc/calamares"
 echo "[build-iso] Calamares config directory created"
