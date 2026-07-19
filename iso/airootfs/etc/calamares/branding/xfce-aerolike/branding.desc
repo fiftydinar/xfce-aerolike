@@ -1,5 +1,5 @@
 ---
-componentName: calamares-xfce-aerolike
+componentName: xfce-aerolike
 name: xfce-aerolike
 version: "@ISO_VERSION@"
 
