@@ -299,13 +299,11 @@ main() {
     loopdev=$(losetup --find --show --read-only "$fs_img")
     mount -n -o ro "$loopdev" /run/archiso/airootfs
 
-    mkdir -m 0755 -p /run/rootfsbase && mount --bind /run/archiso/airootfs /run/rootfsbase
-    mkdir -m 0755 -p /run/initramfs/overlay/overlayfs /run/initramfs/overlay/ovlwork
-    ln -sf /run/archiso/cowspace/"${cow_directory}"/upperdir /run/overlayfs
-    ln -sf /run/archiso/cowspace/"${cow_directory}"/workdir /run/ovlwork
-    ln -sf /run/archiso/cowspace/"${cow_directory}"/upperdir /run/initramfs/overlay/overlayfs
-    ln -sf /run/archiso/cowspace/"${cow_directory}"/workdir /run/initramfs/overlay/ovlwork
-    ln -s null /dev/root
+    mkdir -p "/run/archiso/cowspace/${cow_directory}/upperdir"
+    mkdir -p "/run/archiso/cowspace/${cow_directory}/workdir"
+    mkdir -m 0755 -p /sysroot
+    mount -t overlay -o "lowerdir=/run/archiso/airootfs,upperdir=/run/archiso/cowspace/${cow_directory}/upperdir,workdir=/run/archiso/cowspace/${cow_directory}/workdir" overlay /sysroot
+    ln -s /sysroot /dev/root
     need_shutdown
     info "archiso: root ready"
     exit 0
