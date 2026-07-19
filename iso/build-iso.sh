@@ -79,6 +79,8 @@ mkdir -p "${AIROOTFS}/proc" "${AIROOTFS}/sys" "${AIROOTFS}/dev" "${AIROOTFS}/run
 mkdir -p "${AIROOTFS}/root" 2>/dev/null || true
 
 echo "[build-iso] Step 3: Prepare live environment"
+# Write DNS config for pacman inside chroot (public DNS, not host's Docker resolv.conf)
+echo -e "nameserver 8.8.8.8\nnameserver 8.8.4.4" > "${AIROOTFS}/etc/resolv.conf"
 # The container may lack a kernel or have it in an unexpected location.
 # We handle this in Step 5 by installing the linux package inside the chroot.
 
