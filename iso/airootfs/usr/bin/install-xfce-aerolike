@@ -9,16 +9,23 @@ IMAGE_NAME="ghcr.io/fiftydinar/xfce-aerolike:latest"
 
 echo "Installing xfce-aerolike to ${ROOT}..."
 
+# Use storage on the target disk (real filesystem) to avoid filling up
+# the live ISO's small tmpfs with container image layers.
+PODMAN_ROOT="${ROOT}/var/lib/containers-staging"
+mkdir -p "$PODMAN_ROOT"
+export TMPDIR="${ROOT}/tmp"
+mkdir -p "$TMPDIR"
+
 if [ -f "${IMAGE_ARCHIVE}" ]; then
     echo "Loading container image from ${IMAGE_ARCHIVE}..."
-    zstd -d -c "${IMAGE_ARCHIVE}" | podman load
+    zstd -d -c "${IMAGE_ARCHIVE}" | podman --root "$PODMAN_ROOT" load
 else
     echo "Image archive not found at ${IMAGE_ARCHIVE}, pulling..."
-    podman pull "${IMAGE_NAME}"
+    podman --root "$PODMAN_ROOT" pull "${IMAGE_NAME}"
 fi
 
 echo "Running bootc install to-filesystem..."
-podman run --rm --privileged --pid=host --ipc=host \
+podman --root "$PODMAN_ROOT" run --rm --privileged --pid=host --ipc=host \
     -v /dev:/dev \
     -v "${ROOT}:/target" \
     "${IMAGE_NAME}" \
@@ -26,5 +33,8 @@ podman run --rm --privileged --pid=host --ipc=host \
         --bootloader grub \
         --target-imgref "${IMAGE_NAME}" \
         /target
+
+echo "Cleaning up staging storage..."
+rm -rf "$PODMAN_ROOT" "${TMPDIR}"
 
 echo "Installation complete!"
