@@ -25,7 +25,18 @@ if [ -f "${IMAGE_ARCHIVE}" ]; then
         IMAGE_NAME=$(cat "${IMAGE_REF_FILE}")
     fi
 else
-    echo "Image archive not found at ${IMAGE_ARCHIVE}, pulling..."
+    if [ -f "${IMAGE_REF_FILE}" ]; then
+        TAG=$(cat "${IMAGE_REF_FILE}" | sed 's/.*://')
+        TAG_PREFIX=$(printf '%s' "$TAG" | sed 's/[0-9]\{8\}$//')
+        if [ -n "$TAG_PREFIX" ]; then
+            LATEST=$(skopeo list-tags "docker://ghcr.io/fiftydinar/xfce-aerolike" 2>/dev/null | \
+                jq -r --arg p "$TAG_PREFIX" '.Tags[] | select(. | startswith($p))' | sort -r | head -1)
+            if [ -n "$LATEST" ]; then
+                IMAGE_NAME="ghcr.io/fiftydinar/xfce-aerolike:${LATEST}"
+            fi
+        fi
+    fi
+    echo "Image archive not found at ${IMAGE_ARCHIVE}, pulling ${IMAGE_NAME}..."
     podman --root "$PODMAN_ROOT" pull "${IMAGE_NAME}"
 fi
 

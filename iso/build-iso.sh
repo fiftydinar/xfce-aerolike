@@ -139,7 +139,7 @@ echo "[build-iso] Installing dracut, bcachefs-tools inside chroot..."
 sed -i 's/echo "\$hook"/printf '\''%s\\n'\'' "$hook"/g' \
     "${AIROOTFS}/usr/lib/dracut/modules.d/80base/dracut-lib.sh" 2>/dev/null || true
 echo "[build-iso] Fixed dracut-lib.sh dash hex escape bug"
-chroot "${AIROOTFS}" pacman -S --needed --noconfirm dracut bcachefs-tools fuse-overlayfs
+chroot "${AIROOTFS}" pacman -S --needed --noconfirm dracut bcachefs-tools fuse-overlayfs jq
 
 # bcachefs wrapper: KPMCore's findExternal("bcachefs") calls bcachefs with no
 # args and expects exit 0, but bcachefs exits 1 (usage). Make it exit 0.
