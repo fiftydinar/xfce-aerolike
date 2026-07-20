@@ -1,0 +1,18 @@
+/* Calamares stylesheet matching compiz grid teal (#3fb8bf) */
+
+QProgressBar::chunk {
+    background-color: #3fb8bf;
+}
+
+QPushButton#button-install {
+    background-color: #3fb8bf;
+    border: 1px solid #2a8a91;
+}
+
+QPushButton#button-install:hover {
+    background-color: #4dc9d0;
+}
+
+QPushButton:pressed {
+    background-color: #2a8a91;
+}
