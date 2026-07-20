@@ -17,5 +17,5 @@ file_permissions=(
   ["/etc/shadow"]="0:0:400"
   ["/root"]="0:0:750"
   ["/run/install/xfce-aerolike.tar.zst"]="0:0:644"
-  ["/etc/skel/Desktop/install-xfce-aerolike.desktop"]="0:0:755"
+  ["/usr/bin/install-xfce-aerolike"]="0:0:755"
 )
