@@ -100,19 +100,17 @@ mkdir -p "${AIROOTFS}/etc/sudoers.d"
 echo "live ALL=(ALL) NOPASSWD: ALL" > "${AIROOTFS}/etc/sudoers.d/live"
 chmod 440 "${AIROOTFS}/etc/sudoers.d/live"
 
-echo "=== Step 3b: Fix bcachefs mount/mkfs helpers ==="
-# mount.bcachefs and mkfs.bcachefs are symlinks to the 'bcachefs' binary,
-# but the standard mount/mkfs interface passes different args than bcachefs expects.
-# Wrap them to delegate to the proper subcommand.
-for helper in mount.bcachefs mkfs.bcachefs fsck.bcachefs; do
-    helper_path="${AIROOTFS}/usr/bin/${helper}"
-    subcmd="${helper%%.*}"  # mount, mkfs, fsck
-    if [ -f "$helper_path" ] || [ -L "$helper_path" ]; then
-        rm -f "$helper_path"
-        printf '#!/bin/sh\nexec /usr/bin/bcachefs %s "$@"\n' "$subcmd" > "$helper_path"
-        chmod +x "$helper_path"
-    fi
-done
+echo "=== Step 3b: Fix mount.bcachefs helper ==="
+# KPMcore calls mount -t bcachefs for resize (bcachefs.cpp:126) and
+# Calamares mount module calls mount -t bcachefs.
+# mount.bcachefs is a hardlink to bcachefs, but mount passes args
+# as /dev/vda1 /mnt, while bcachefs expects "mount /dev/vda1 /mnt".
+# Replace with a wrapper that adds the missing subcommand.
+if [ -f "${AIROOTFS}/usr/bin/mount.bcachefs" ] || [ -L "${AIROOTFS}/usr/bin/mount.bcachefs" ]; then
+    rm -f "${AIROOTFS}/usr/bin/mount.bcachefs"
+    printf '#!/bin/sh\nexec /usr/bin/bcachefs mount "$@"\n' > "${AIROOTFS}/usr/bin/mount.bcachefs"
+    chmod +x "${AIROOTFS}/usr/bin/mount.bcachefs"
+fi
 
 echo "=== Step 4: Save OCI archive for installer ==="
 mkdir -p "${AIROOTFS}/run/install"
