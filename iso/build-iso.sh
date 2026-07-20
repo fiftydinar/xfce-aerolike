@@ -113,6 +113,10 @@ if [ -f "${AIROOTFS}/usr/bin/mount.bcachefs" ] || [ -L "${AIROOTFS}/usr/bin/moun
 fi
 
 echo "=== Step 4: Save OCI archive for installer ==="
+# Ensure /opt is a regular directory (container might have it as a symlink)
+if [ -L "${AIROOTFS}/opt" ]; then
+    rm -f "${AIROOTFS}/opt"
+fi
 mkdir -p "${AIROOTFS}/opt/install"
 podman save "${IMAGE_REF}" | zstd -c > "${AIROOTFS}/opt/install/xfce-aerolike.tar.zst"
 printf '%s\n' "${IMAGE_REF}" > "${AIROOTFS}/opt/install/image-ref"
