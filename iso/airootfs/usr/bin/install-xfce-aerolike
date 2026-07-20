@@ -9,22 +9,16 @@ IMAGE_NAME="ghcr.io/fiftydinar/xfce-aerolike:latest"
 
 echo "Installing xfce-aerolike to ${ROOT}..."
 
-# Podman's overlay driver doesn't work on top of overlayfs (live ISO boot).
-# Use VFS driver with storage on the target disk (real filesystem).
-PODMAN_ROOT="${ROOT}/var/lib/containers-staging"
-mkdir -p "$PODMAN_ROOT"
-STORAGE="--storage-driver vfs --root ${PODMAN_ROOT}"
-
 if [ -f "${IMAGE_ARCHIVE}" ]; then
     echo "Loading container image from ${IMAGE_ARCHIVE}..."
-    zstd -d -c "${IMAGE_ARCHIVE}" | podman $STORAGE load
+    zstd -d -c "${IMAGE_ARCHIVE}" | podman load
 else
     echo "Image archive not found at ${IMAGE_ARCHIVE}, pulling..."
-    podman $STORAGE pull "${IMAGE_NAME}"
+    podman pull "${IMAGE_NAME}"
 fi
 
 echo "Running bootc install to-filesystem..."
-podman $STORAGE run --rm --privileged --pid=host --ipc=host \
+podman run --rm --privileged --pid=host --ipc=host \
     -v /dev:/dev \
     -v "${ROOT}:/target" \
     "${IMAGE_NAME}" \
@@ -32,8 +26,5 @@ podman $STORAGE run --rm --privileged --pid=host --ipc=host \
         --bootloader grub \
         --target-imgref "${IMAGE_NAME}" \
         /target
-
-echo "Cleaning up staging storage..."
-rm -rf "$PODMAN_ROOT"
 
 echo "Installation complete!"

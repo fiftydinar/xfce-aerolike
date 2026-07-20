@@ -138,7 +138,7 @@ echo "[build-iso] Installing dracut, bcachefs-tools inside chroot..."
 sed -i 's/echo "\$hook"/printf '\''%s\\n'\'' "$hook"/g' \
     "${AIROOTFS}/usr/lib/dracut/modules.d/80base/dracut-lib.sh" 2>/dev/null || true
 echo "[build-iso] Fixed dracut-lib.sh dash hex escape bug"
-chroot "${AIROOTFS}" pacman -S --needed --noconfirm dracut bcachefs-tools
+chroot "${AIROOTFS}" pacman -S --needed --noconfirm dracut bcachefs-tools fuse-overlayfs
 
 # bcachefs wrapper: KPMCore's findExternal("bcachefs") calls bcachefs with no
 # args and expects exit 0, but bcachefs exits 1 (usage). Make it exit 0.
@@ -159,6 +159,18 @@ chmod +x "${AIROOTFS}/usr/bin/bcachefs"
 # Remove mkinitcpio if present to avoid conflicts
 chroot "${AIROOTFS}" pacman -Rdd --noconfirm mkinitcpio mkinitcpio-archiso 2>/dev/null || true
 echo "[build-iso] Package install complete"
+
+# Configure podman storage to use fuse-overlayfs as mount_program.
+# This is required because the live ISO rootfs is overlayfs, and podman's
+# default kernel overlay driver does not work on top of overlayfs.
+# fuse-overlayfs works as a FUSE-based overlay that nests correctly.
+mkdir -p "${AIROOTFS}/etc/containers"
+cat > "${AIROOTFS}/etc/containers/storage.conf" << 'CONFEOF'
+[storage]
+driver = "overlay"
+mount_program = "/usr/bin/fuse-overlayfs"
+CONFEOF
+echo "[build-iso] Created containers/storage.conf with fuse-overlayfs"
 
 # Install the custom archiso dracut module
 DRACUT_MODDIR="${AIROOTFS}/usr/lib/dracut/modules.d/95archiso"
