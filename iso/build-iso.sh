@@ -526,7 +526,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ISO_BASENAME="$(basename "$0" .reassemble.sh)"
 echo "Reassembling ${ISO_BASENAME}..."
 sha256sum -c "${SCRIPT_DIR}/${ISO_BASENAME}.part.sha256"
-cat "${SCRIPT_DIR}/${ISO_BASENAME}.part".part?? > "${SCRIPT_DIR}/${ISO_BASENAME}"
+cat "${SCRIPT_DIR}/${ISO_BASENAME}.part"?? > "${SCRIPT_DIR}/${ISO_BASENAME}"
 echo "Done: ${SCRIPT_DIR}/${ISO_BASENAME}"
 REASM
         chmod +x "${OUT_DIR}/${ISO_BASENAME}.reassemble.sh"
