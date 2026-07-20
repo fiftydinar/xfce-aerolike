@@ -7,7 +7,7 @@ on:
       - '.github/workflows/build-iso.yml'
       - 'recipes/recipe.yml'
   schedule:
-    - cron: '0 6 * * 0'  # weekly Sunday
+    - cron: '0 6 * * *'  # daily
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref || github.run_id }}
@@ -63,7 +63,7 @@ jobs:
       image: docker.io/archlinux:latest
       options: --privileged
     permissions:
-      contents: read
+      contents: write
       packages: read
     steps:
       - uses: actions/checkout@v7
@@ -96,16 +96,56 @@ jobs:
 
       - name: Build ISO
         run: |
+          if [ "${{ github.ref_name }}" = "main" ]; then
+            IMAGE_TAG="latest"
+            ISO_VERSION_SUFFIX=""
+          else
+            IMAGE_TAG=$(skopeo list-tags "docker://ghcr.io/fiftydinar/xfce-aerolike" | jq -r '.Tags[] | select(. | startswith("br-${{ github.ref_name }}-"))' | sort -r | head -1)
+            if [ -z "$IMAGE_TAG" ]; then
+              echo "ERROR: no image found for branch ${{ github.ref_name }}"
+              exit 1
+            fi
+            ISO_VERSION_SUFFIX="-${{ github.ref_name }}"
+          fi
+          echo "Using image tag: ${IMAGE_TAG}"
+          export ISO_VERSION_SUFFIX
           ./iso/build-iso.sh \
-            --image "ghcr.io/fiftydinar/xfce-aerolike:latest" \
+            --image "ghcr.io/fiftydinar/xfce-aerolike:${IMAGE_TAG}" \
             --calamares-pkg "$CALAMARES_PKG" \
             --out ./iso-out
 
-      - name: Upload ISO
+      - name: Prepare ISO for release
+        id: iso
+        run: |
+          FILE=$(ls ./iso-out/*.iso.zst 2>/dev/null | head -1)
+          if [ -z "$FILE" ]; then
+            FILE=$(ls ./iso-out/*.zst 2>/dev/null | head -1)
+          fi
+          echo "file=$FILE" >> $GITHUB_OUTPUT
+          echo "name=$(basename "$FILE")" >> $GITHUB_OUTPUT
+          echo "tag=iso-${{ github.ref_name }}-$(date +%Y%m%d)" >> $GITHUB_OUTPUT
+
+      - name: Upload ISO artifact
         uses: actions/upload-artifact@v7
         with:
           name: xfce-aerolike-iso
           path: ./iso-out/*
           retention-days: 30
+
+      - name: Delete old ISO releases (keep 30)
+        run: |
+          gh release list --repo ${{ github.repository }} --limit 100 --json tagName,createdAt \
+            --jq '.[] | select(.tagName | startswith("iso-${{ github.ref_name }}-")) | .tagName' \
+            | sort -r | tail -n +31 | xargs -r -I{} gh release delete {} --repo ${{ github.repository }} --yes --cleanup-tag
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Create ISO release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ steps.iso.outputs.tag }}
+          name: xfce-aerolike ${{ github.ref_name }} ${{ steps.iso.outputs.tag }}
+          files: ${{ steps.iso.outputs.file }}
+          fail_on_unmatched_files: false
 
 

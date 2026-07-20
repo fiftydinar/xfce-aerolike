@@ -5,7 +5,7 @@ iso_name="xfce-aerolike"
 iso_label="XFCELK_$(date --date="@${SOURCE_DATE_EPOCH:-$(date +%s)}" +%Y%m)"
 iso_publisher="fiftydinar <https://github.com/fiftydinar>"
 iso_application="xfce-aerolike Live/Installer DVD"
-iso_version="$(date --date="@${SOURCE_DATE_EPOCH:-$(date +%s)}" +%Y.%m.%d)"
+iso_version="$(date --date="@${SOURCE_DATE_EPOCH:-$(date +%s)}" +%Y%m%d)${ISO_VERSION_SUFFIX:-}"
 install_dir="arch"
 buildmodes=('iso')
 bootmodes=('bios.syslinux' 'uefi.grub')
@@ -16,6 +16,6 @@ bootstrap_tarball_compression=('zstd' '-c' '-T0' '--auto-threads=logical' '--lon
 file_permissions=(
   ["/etc/shadow"]="0:0:400"
   ["/root"]="0:0:750"
-  ["/run/install/xfce-aerolike.tar.zst"]="0:0:644"
+  ["/opt/install/xfce-aerolike.tar.zst"]="0:0:644"
   ["/usr/bin/install-xfce-aerolike"]="0:0:755"
 )
