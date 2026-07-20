@@ -115,6 +115,7 @@ fi
 echo "=== Step 4: Save OCI archive for installer ==="
 mkdir -p "${AIROOTFS}/opt/install"
 podman save "${IMAGE_REF}" | zstd -c > "${AIROOTFS}/opt/install/xfce-aerolike.tar.zst"
+printf '%s\n' "${IMAGE_REF}" > "${AIROOTFS}/opt/install/image-ref"
 
 echo "=== Step 5: Chroot and customize ==="
 mount --bind /proc "${AIROOTFS}/proc"
