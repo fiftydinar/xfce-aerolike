@@ -437,6 +437,17 @@ cp "${PROFILE_DIR}/airootfs/usr/share/applications/install-xfce-aerolike.desktop
    "${AIROOTFS}/home/live/Desktop/install-xfce-aerolike.desktop"
 chmod +x "${AIROOTFS}/home/live/Desktop/install-xfce-aerolike.desktop"
 
+# Systemd user service: mark installer desktop file as trusted after session is ready
+mkdir -p "${AIROOTFS}/usr/lib/systemd/user"
+cp "${PROFILE_DIR}/airootfs/etc/skel/.config/systemd/user/trust-installer.service" \
+   "${AIROOTFS}/usr/lib/systemd/user/trust-installer.service"
+# Enable globally — systemctl --global creates symlinks in /etc/systemd/user/
+chroot "${AIROOTFS}" systemctl --global enable trust-installer.service 2>/dev/null || {
+    mkdir -p "${AIROOTFS}/etc/systemd/user/graphical-session.target.wants"
+    ln -sf "/usr/lib/systemd/user/trust-installer.service" \
+       "${AIROOTFS}/etc/systemd/user/graphical-session.target.wants/trust-installer.service"
+}
+
 # Remove upstream Calamares desktop file (we ship our own)
 rm -f "${AIROOTFS}/usr/share/applications/calamares.desktop" 2>/dev/null || true
 
