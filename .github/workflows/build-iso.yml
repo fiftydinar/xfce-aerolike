@@ -123,7 +123,7 @@ jobs:
           fi
           echo "file=$FILE" >> $GITHUB_OUTPUT
           echo "name=$(basename "$FILE")" >> $GITHUB_OUTPUT
-          echo "tag=iso-${{ github.ref_name }}-$(date +%Y%m%d)" >> $GITHUB_OUTPUT
+          echo "tag=iso-${{ github.ref_name }}-$(date +%Y%m%d)-${{ github.run_id }}" >> $GITHUB_OUTPUT
 
       - name: Upload ISO artifact
         uses: actions/upload-artifact@v7
