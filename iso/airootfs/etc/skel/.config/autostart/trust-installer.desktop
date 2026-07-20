@@ -1,8 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Trust installer launcher
-Comment=Mark installer desktop file as trusted to suppress untrusted-launcher dialog
-Exec=sh -c "gio set \"$HOME/Desktop/install-xfce-aerolike.desktop\" metadata::trusted true 2>/dev/null || true"
-Terminal=false
-X-GNOME-Autostart-enabled=true
-Hidden=false
