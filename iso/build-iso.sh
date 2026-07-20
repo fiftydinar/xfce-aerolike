@@ -113,8 +113,8 @@ if [ -f "${AIROOTFS}/usr/bin/mount.bcachefs" ] || [ -L "${AIROOTFS}/usr/bin/moun
 fi
 
 echo "=== Step 4: Save OCI archive for installer ==="
-mkdir -p "${AIROOTFS}/run/install"
-podman save "${IMAGE_REF}" | zstd -c > "${AIROOTFS}/run/install/xfce-aerolike.tar.zst"
+mkdir -p "${AIROOTFS}/opt/install"
+podman save "${IMAGE_REF}" | zstd -c > "${AIROOTFS}/opt/install/xfce-aerolike.tar.zst"
 
 echo "=== Step 5: Chroot and customize ==="
 mount --bind /proc "${AIROOTFS}/proc"

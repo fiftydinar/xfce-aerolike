@@ -2,7 +2,7 @@
 set -eu
 
 ROOT="${1:-}"
-IMAGE_ARCHIVE="/run/install/xfce-aerolike.tar.zst"
+IMAGE_ARCHIVE="/opt/install/xfce-aerolike.tar.zst"
 IMAGE_NAME="ghcr.io/fiftydinar/xfce-aerolike:latest"
 
 [ -z "$ROOT" ] && { echo "ERROR: target root not specified"; exit 1; }
