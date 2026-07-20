@@ -81,7 +81,7 @@ jobs:
           mkdir -p /usr/lib/sysimage/lib/pacman
           # archiso provides mkarchiso, podman for container ops
           # fuse-overlayfs lets overlay work on top of the CI runner's overlayfs
-          pacman -Syu --noconfirm archiso grub dosfstools mtools syslinux podman squashfs-tools zstd skopeo fuse-overlayfs jq
+          pacman -Syu --noconfirm archiso grub dosfstools mtools syslinux podman squashfs-tools zstd skopeo fuse-overlayfs jq github-cli
           # Use fuse-overlayfs as the mount program — this works on top of the
           # GitHub runner's overlayfs (unlike kernel overlay), and avoids the
           # disk-space blowup of VFS and the layer-depth limit of Docker.
