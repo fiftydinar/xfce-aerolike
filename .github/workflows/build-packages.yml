@@ -359,10 +359,14 @@ jobs:
             done
           done
           tar -czf xfce-aerolike-packages.tar.gz packages/
+      - name: Delete old packages release
+        run: gh release delete packages --yes --cleanup-tag 2>/dev/null || true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
       - name: Create GitHub release
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: packages-${{ github.run_id }}
+          tag_name: packages
           files: |
             xfce-aerolike-packages.tar.gz
             packages/*.pkg.tar.zst

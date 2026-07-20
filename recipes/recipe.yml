@@ -128,7 +128,7 @@ modules:
         sed -i 's/echo "\$hook"/printf '\''%s\\n'\'' "$hook"/g' /usr/lib/dracut/modules.d/80base/dracut-lib.sh
       # Download and install pre-built packages (avoids 1+ hour of compilation per build)
       - |
-        PKGS_URL="https://github.com/fiftydinar/xfce-aerolike/releases/latest/download/xfce-aerolike-packages.tar.gz"
+        PKGS_URL="https://github.com/fiftydinar/xfce-aerolike/releases/download/packages/xfce-aerolike-packages.tar.gz"
         wget --retry-connrefused --tries=10 "$PKGS_URL" -O /tmp/pkgs.tar.gz && tar -xzf /tmp/pkgs.tar.gz -C /tmp/
         pacman -U --noconfirm --ask 4 /tmp/packages/*.pkg.tar.zst
         rm -rf /tmp/packages/ /tmp/pkgs.tar.gz
