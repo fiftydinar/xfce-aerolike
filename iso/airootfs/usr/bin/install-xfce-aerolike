@@ -1,44 +1,39 @@
 #!/bin/sh
 set -eu
 
-# Called by Calamares shellprocess module with target root as first arg.
-# The container image OCI archive is at /run/install/xfce-aerolike.tar.zst
-
 ROOT="${1:-}"
 IMAGE_ARCHIVE="/run/install/xfce-aerolike.tar.zst"
 IMAGE_NAME="ghcr.io/fiftydinar/xfce-aerolike:latest"
 
-if [ -z "$ROOT" ]; then
-    echo "ERROR: target root not specified"
-    exit 1
-fi
+[ -z "$ROOT" ] && { echo "ERROR: target root not specified"; exit 1; }
 
 echo "Installing xfce-aerolike to ${ROOT}..."
 
+# Podman's overlay driver doesn't work on top of overlayfs (live ISO boot).
+# Use VFS driver with storage on the target disk (real filesystem).
+PODMAN_ROOT="${ROOT}/var/lib/containers-staging"
+mkdir -p "$PODMAN_ROOT"
+STORAGE="--storage-driver vfs --root ${PODMAN_ROOT}"
+
 if [ -f "${IMAGE_ARCHIVE}" ]; then
     echo "Loading container image from ${IMAGE_ARCHIVE}..."
-    zstd -d -c "${IMAGE_ARCHIVE}" | podman load
+    zstd -d -c "${IMAGE_ARCHIVE}" | podman $STORAGE load
 else
     echo "Image archive not found at ${IMAGE_ARCHIVE}, pulling..."
-    podman pull "${IMAGE_NAME}"
-fi
-
-LOADED_IMAGE="localhost/xfce-aerolike:latest"
-if podman image exists "${LOADED_IMAGE}" 2>/dev/null; then
-    IMAGE="${LOADED_IMAGE}"
-else
-    IMAGE="${IMAGE_NAME}"
+    podman $STORAGE pull "${IMAGE_NAME}"
 fi
 
 echo "Running bootc install to-filesystem..."
-podman run --rm --privileged --pid=host --ipc=host \
+podman $STORAGE run --rm --privileged --pid=host --ipc=host \
     -v /dev:/dev \
-    -v /var/lib/containers:/var/lib/containers \
     -v "${ROOT}:/target" \
-    "${IMAGE}" \
+    "${IMAGE_NAME}" \
     bootc install to-filesystem \
         --bootloader grub \
         --target-imgref "${IMAGE_NAME}" \
         /target
+
+echo "Cleaning up staging storage..."
+rm -rf "$PODMAN_ROOT"
 
 echo "Installation complete!"
