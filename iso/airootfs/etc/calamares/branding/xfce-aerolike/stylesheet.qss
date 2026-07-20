@@ -1,35 +1,71 @@
-/* Calamares stylesheet matching compiz grid teal (#3fb8bf) */
+/* Calamares stylesheet matching xfce-aerolike teal (#3fb8bf) */
+
+/* --- Sidebar --- */
 
 #sidebarApp {
-    background-color: #3fb8bf;
+    background-color: #293538;
 }
 
 #sidebarMenuApp {
+    background-color: transparent;
+    padding: 4px;
+}
+
+#sidebarMenuApp QListWidget {
+    background-color: transparent;
+    border: none;
+}
+
+#sidebarMenuApp QListWidget::item {
+    color: #c0d0d4;
+    padding: 10px 14px;
+    border-radius: 4px;
+    margin: 2px 4px;
+}
+
+#sidebarMenuApp QListWidget::item:selected {
     background-color: #3fb8bf;
-}
-
-#sidebarMenuApp QLabel {
-    color: white;
-}
-
-#sidebarMenuApp QLabel[active="true"] {
-    color: white;
+    color: #ffffff;
     font-weight: bold;
 }
 
-QProgressBar::chunk {
-    background-color: #3fb8bf;
+#sidebarMenuApp QListWidget::item:hover:!selected {
+    background-color: rgba(63, 184, 191, 0.15);
+}
+
+/* --- Buttons --- */
+
+QPushButton#button-next,
+QPushButton#button-back {
+    min-width: 100px;
+    padding: 8px 16px;
 }
 
 QPushButton#button-install {
     background-color: #3fb8bf;
-    border: 1px solid #2a8a91;
+    color: #ffffff;
+    border: 1px solid #2d9ea6;
+    border-radius: 4px;
+    padding: 8px 24px;
+    font-weight: bold;
 }
 
 QPushButton#button-install:hover {
     background-color: #4dc9d0;
 }
 
-QPushButton:pressed {
-    background-color: #2a8a91;
+QPushButton#button-install:pressed {
+    background-color: #2d9ea6;
+}
+
+QPushButton#button-install:disabled {
+    background-color: #3a4a4e;
+    color: #7a8a8e;
+    border: 1px solid #3a4a4e;
+}
+
+/* --- General --- */
+
+QWidget {
+    font-family: "Segoe UI", "Noto Sans", sans-serif;
 }

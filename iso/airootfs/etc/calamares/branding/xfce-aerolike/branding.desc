@@ -31,9 +31,9 @@ images:
   productIcon: "icon.png"
 
 style:
-  SidebarBackground: "#292F34"
-  SidebarText: "#FFFFFF"
-  SidebarTextCurrent: "#292F34"
-  SidebarBackgroundCurrent: "#D35400"
+  SidebarBackground: "#293538"
+  SidebarText: "#c0d0d4"
+  SidebarTextCurrent: "#FFFFFF"
+  SidebarBackgroundCurrent: "#3fb8bf"
 
 slideshow: []
