@@ -438,10 +438,7 @@ cp "${PROFILE_DIR}/airootfs/usr/share/applications/install-xfce-aerolike.desktop
 chmod +x "${AIROOTFS}/home/live/Desktop/install-xfce-aerolike.desktop"
 
 # Systemd user service: mark installer desktop file as trusted after session is ready
-mkdir -p "${AIROOTFS}/usr/lib/systemd/user"
-cp "${PROFILE_DIR}/airootfs/etc/skel/.config/systemd/user/trust-installer.service" \
-   "${AIROOTFS}/usr/lib/systemd/user/trust-installer.service"
-# Enable globally — systemctl --global creates symlinks in /etc/systemd/user/
+# (service file shipped via iso/airootfs/usr/lib/systemd/user/trust-installer.service)
 chroot "${AIROOTFS}" systemctl --global enable trust-installer.service 2>/dev/null || {
     mkdir -p "${AIROOTFS}/etc/systemd/user/graphical-session.target.wants"
     ln -sf "/usr/lib/systemd/user/trust-installer.service" \
