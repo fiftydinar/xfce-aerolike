@@ -504,16 +504,19 @@ echo "[build-iso] mkarchiso completed"
 echo "=== Done! ==="
 ISO_FILE=$(ls "${OUT_DIR}"/*.iso 2>/dev/null | head -1)
 if [ -n "$ISO_FILE" ]; then
-    ISO_SIZE=$(stat -c%s "$ISO_FILE" 2>/dev/null || echo 0)
+    echo "[build-iso] Compressing ISO with zstd --ultra (this may take a while)..."
+    zstd --ultra -22 -T0 -f -o "${ISO_FILE}.zst" "${ISO_FILE}"
+    rm -f "${ISO_FILE}"
+    ISO_SIZE=$(stat -c%s "${ISO_FILE}.zst" 2>/dev/null || echo 0)
     # GitHub release limit is 2 GiB per file
     if [ "$ISO_SIZE" -gt 2147483648 ]; then
-        echo "[build-iso] ISO exceeds 2GiB, splitting into 2GiB chunks..."
+        echo "[build-iso] Compressed ISO still exceeds 2GiB, splitting into 2GiB chunks..."
         cd "${OUT_DIR}"
         split -b 2147483648 --numeric-suffixes=1 \
             --suffix-length=2 \
-            "${ISO_FILE}" "${ISO_FILE}.part"
-        sha256sum "${ISO_FILE}".part* > "${ISO_FILE}.part.sha256"
-        rm -f "${ISO_FILE}"
+            "${ISO_FILE}.zst" "${ISO_FILE}.zst.part"
+        sha256sum "${ISO_FILE}.zst.part"* > "${ISO_FILE}.zst.part.sha256"
+        rm -f "${ISO_FILE}.zst"
         # Create reassemble script
         cat > "${ISO_FILE}.reassemble.sh" << 'REASM'
 #!/bin/sh
@@ -521,12 +524,13 @@ set -eu
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ISO_BASENAME="$(basename "$0" .reassemble.sh)"
 echo "Reassembling ${ISO_BASENAME}..."
-sha256sum -c "${SCRIPT_DIR}/${ISO_BASENAME}.part.sha256"
-cat "${SCRIPT_DIR}/${ISO_BASENAME}.part".part?? > "${SCRIPT_DIR}/${ISO_BASENAME}"
+sha256sum -c "${SCRIPT_DIR}/${ISO_BASENAME}.zst.part.sha256"
+cat "${SCRIPT_DIR}/${ISO_BASENAME}.zst.part".part?? > "${SCRIPT_DIR}/${ISO_BASENAME}.zst"
+unzstd "${SCRIPT_DIR}/${ISO_BASENAME}.zst"
 echo "Done: ${SCRIPT_DIR}/${ISO_BASENAME}"
 REASM
         chmod +x "${ISO_FILE}.reassemble.sh"
-        echo "[build-iso] Split into $(ls "${ISO_FILE}".part* | wc -l) parts"
+        echo "[build-iso] Split into $(ls "${ISO_FILE}".zst.part* | wc -l) parts"
         echo "Use ${ISO_FILE}.reassemble.sh to reassemble after download"
     fi
     ls -lh "${OUT_DIR}"/
