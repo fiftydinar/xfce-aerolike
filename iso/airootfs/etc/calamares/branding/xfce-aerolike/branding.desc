@@ -14,7 +14,7 @@ strings:
   bootloaderEntryName: xfce-aerolike
 
   welcomeMessage: Welcome to xfce-aerolike.
-  welcomeMessageAppendo: "<br/><br/>This live environment allows you to try xfce-aerolike before installing it to your computer."
+  welcomeMessageAppendo: "<br/><br/>This live environment allows you to try xfce-aerolike before installing it to your computer.<br/><br/>Install mode: <b>Offline</b> (uses ISO image). To switch to Online (pull latest), use the desktop shortcut first."
 
   preselectMessage: >
     This is the xfce-aerolike installer.

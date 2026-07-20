@@ -17,9 +17,14 @@ mkdir -p "$PODMAN_ROOT"
 export TMPDIR="${ROOT}/tmp"
 mkdir -p "$TMPDIR"
 
+INSTALL_MODE="offline"
+if [ -f /opt/install/install-mode ]; then
+    INSTALL_MODE=$(cat /opt/install/install-mode)
+fi
+
 IMAGE_NAME="${DEFAULT_IMAGE}"
-if [ -f "${IMAGE_ARCHIVE}" ]; then
-    echo "Loading container image from ${IMAGE_ARCHIVE}..."
+if [ "${INSTALL_MODE}" = "offline" ] && [ -f "${IMAGE_ARCHIVE}" ]; then
+    echo "Installing in OFFLINE mode (loading image from ${IMAGE_ARCHIVE})..."
     zstd -d -c "${IMAGE_ARCHIVE}" | podman --root "$PODMAN_ROOT" load
     if [ -f "${IMAGE_REF_FILE}" ]; then
         IMAGE_NAME=$(cat "${IMAGE_REF_FILE}")
@@ -36,7 +41,7 @@ else
             fi
         fi
     fi
-    echo "Image archive not found at ${IMAGE_ARCHIVE}, pulling ${IMAGE_NAME}..."
+    echo "Installing in ONLINE mode, pulling ${IMAGE_NAME}..."
     podman --root "$PODMAN_ROOT" pull "${IMAGE_NAME}"
 fi
 

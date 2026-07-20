@@ -116,6 +116,7 @@ echo "=== Step 4: Save OCI archive for installer ==="
 mkdir -p "${AIROOTFS}/opt/install"
 podman save "${IMAGE_REF}" | zstd -c > "${AIROOTFS}/opt/install/xfce-aerolike.tar.zst"
 printf '%s\n' "${IMAGE_REF}" > "${AIROOTFS}/opt/install/image-ref"
+printf 'offline\n' > "${AIROOTFS}/opt/install/install-mode"
 
 echo "=== Step 5: Chroot and customize ==="
 mount --bind /proc "${AIROOTFS}/proc"
@@ -456,11 +457,19 @@ else
     echo "[build-iso] Calamares package installed"
 fi
 
-# Place desktop icon directly on live user's Desktop (skel doesn't apply to pre-existing users)
+# Place desktop icons directly on live user's Desktop (skel doesn't apply to pre-existing users)
 mkdir -p "${AIROOTFS}/home/live/Desktop"
 cp "${PROFILE_DIR}/airootfs/usr/share/applications/install-xfce-aerolike.desktop" \
    "${AIROOTFS}/home/live/Desktop/install-xfce-aerolike.desktop"
 chmod +x "${AIROOTFS}/home/live/Desktop/install-xfce-aerolike.desktop"
+# Online install desktop shortcut (toggles mode to online before launching Calamares)
+cp "${PROFILE_DIR}/airootfs/usr/share/applications/install-xfce-aerolike.desktop" \
+   "${AIROOTFS}/home/live/Desktop/install-xfce-aerolike-online.desktop"
+sed -i 's/Name=Install xfce-aerolike/Name=Install xfce-aerolike (Online)/' \
+   "${AIROOTFS}/home/live/Desktop/install-xfce-aerolike-online.desktop"
+sed -i 's|Exec=sudo.*|Exec=sudo sh -c '"'"'printf "online\\n" > /opt/install/install-mode && env QT_QPA_PLATFORMTHEME=qt6ct calamares'"'"'|' \
+   "${AIROOTFS}/home/live/Desktop/install-xfce-aerolike-online.desktop"
+chmod +x "${AIROOTFS}/home/live/Desktop/install-xfce-aerolike-online.desktop"
 
 # Systemd user service: mark installer desktop file as trusted after session is ready
 # (service file shipped via iso/airootfs/usr/lib/systemd/user/trust-installer.service)
