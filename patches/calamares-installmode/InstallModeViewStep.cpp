@@ -1,6 +1,7 @@
 #include "InstallModeViewStep.h"
 
 #include "GlobalStorage.h"
+#include "JobQueue.h"
 #include "utils/Logger.h"
 #include "utils/Variant.h"
 
