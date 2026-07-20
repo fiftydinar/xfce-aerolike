@@ -37,6 +37,7 @@ jobs:
         run: |
           git clone --depth 1 --branch v3.4.2 https://codeberg.org/calamares/calamares.git /tmp/calamares
           cd /tmp/calamares
+          git apply "$GITHUB_WORKSPACE/patches/calamares-bcachefs.patch"
           mkdir build && cd build
           cmake .. -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release \
             -DWITH_QML=OFF -DWITH_QT6=ON -DINSTALL_CONFIG=ON

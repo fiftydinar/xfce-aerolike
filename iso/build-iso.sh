@@ -437,6 +437,11 @@ cp "${PROFILE_DIR}/airootfs/usr/share/applications/install-xfce-aerolike.desktop
    "${AIROOTFS}/home/live/Desktop/install-xfce-aerolike.desktop"
 chmod +x "${AIROOTFS}/home/live/Desktop/install-xfce-aerolike.desktop"
 
+# Autostart entry: mark installer desktop file as trusted (suppresses XFCE untrusted-launcher dialog)
+mkdir -p "${AIROOTFS}/home/live/.config/autostart"
+cp "${PROFILE_DIR}/airootfs/etc/skel/.config/autostart/trust-installer.desktop" \
+   "${AIROOTFS}/home/live/.config/autostart/trust-installer.desktop"
+
 # Remove upstream Calamares desktop file (we ship our own)
 rm -f "${AIROOTFS}/usr/share/applications/calamares.desktop" 2>/dev/null || true
 
