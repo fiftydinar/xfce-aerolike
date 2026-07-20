@@ -59,7 +59,7 @@ InstallModeViewStep::onActivate()
 void
 InstallModeViewStep::onLeave()
 {
-    auto* gs = Calamares::GlobalStorage::instance();
+    auto* gs = Calamares::JobQueue::instance()->globalStorage();
     QVariant mode = gs->value( QStringLiteral( "installMode" ) );
     if ( mode.isValid() )
     {
