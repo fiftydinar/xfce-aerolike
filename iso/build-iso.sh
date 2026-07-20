@@ -435,7 +435,7 @@ else
 fi
 
 # Install Calamares runtime dependencies (not in the base image, ISO-only)
-chroot "${AIROOTFS}" pacman -S --needed --noconfirm yaml-cpp kpmcore polkit-qt6 python python-pyqt6
+chroot "${AIROOTFS}" pacman -S --needed --noconfirm yaml-cpp kpmcore polkit-qt6 python qt6-declarative
 echo "[build-iso] Calamares dependencies installed"
 
 # Unmount chroot filesystems before mkarchiso processes the rootfs
