@@ -133,8 +133,8 @@ jobs:
           ISO_BASENAME=$(basename "$ISO_FILE")
           # GitHub release limit is 2 GiB per file
           if [ "$ISO_SIZE" -gt 2147483648 ]; then
-            echo "[release] ISO exceeds 2GiB, splitting into 2GiB chunks..."
-            split -b 2147483648 --numeric-suffixes=1 --suffix-length=2 \
+            echo "[release] ISO exceeds 2GiB, splitting into ~1.5GiB chunks..."
+            split -b 1500M --numeric-suffixes=1 --suffix-length=2 \
               "$ISO_FILE" "./iso-out/${ISO_BASENAME}.part"
             sha256sum ./iso-out/"${ISO_BASENAME}".part* > ./iso-out/"${ISO_BASENAME}".part.sha256
             rm -f "$ISO_FILE"
