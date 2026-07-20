@@ -1,0 +1,34 @@
+diff --git a/src/modules/partition/core/PartitionActions.cpp b/src/modules/partition/core/PartitionActions.cpp
+index f572e94..746410a 100644
+--- a/src/modules/partition/core/PartitionActions.cpp
++++ b/src/modules/partition/core/PartitionActions.cpp
+@@ -178,6 +178,29 @@ doAutopartition( PartitionCoreModule* core, Device* dev, Choices::AutoPartitionO
+         }
+     }
+ 
++    // For bcachefs root, create a separate /boot partition on ext4
++    // (GRUB cannot read bcachefs directly)
++    if ( type == FileSystem::Type::Bcachefs )
++    {
++        const qint64 bootPartSizeB = 500_MiB;
++        qint64 bootSectorCount = Calamares::bytesToSectors( bootPartSizeB, dev->logicalSize() );
++        Q_ASSERT( bootSectorCount > 0 );
++
++        qint64 lastSector = firstFreeSector + bootSectorCount - 1;
++        Partition* bootPartition = KPMHelpers::createNewPartition( dev->partitionTable(),
++                                                                   *dev,
++                                                                   PartitionRole( PartitionRole::Primary ),
++                                                                   FileSystem::Ext4,
++                                                                   QStringLiteral( "boot" ),
++                                                                   firstFreeSector,
++                                                                   lastSector,
++                                                                   KPM_PARTITION_FLAG( None ) );
++        PartitionInfo::setFormat( bootPartition, true );
++        PartitionInfo::setMountPoint( bootPartition, QStringLiteral( "/boot" ) );
++        core->createPartition( dev, bootPartition, KPM_PARTITION_FLAG( Boot ) );
++        firstFreeSector = lastSector + 1;
++    }
++
+     const bool mayCreateSwap
+         = ( o.swap == Config::SwapChoice::SmallSwap ) || ( o.swap == Config::SwapChoice::FullSwap );
+     bool shouldCreateSwap = false;
