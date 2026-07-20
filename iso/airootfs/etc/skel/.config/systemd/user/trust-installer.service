@@ -5,7 +5,7 @@ PartOf=graphical-session.target
 
 [Service]
 Type=oneshot
-ExecStart=bash -c 'gio set "%h/Desktop/install-xfce-aerolike.desktop" metadata::trusted true'
+ExecStart=gio set "%h/Desktop/install-xfce-aerolike.desktop" metadata::trusted true
 RemainAfterExit=yes
 
 [Install]
