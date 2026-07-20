@@ -114,23 +114,42 @@ jobs:
             --calamares-pkg "$CALAMARES_PKG" \
             --out ./iso-out
 
-      - name: Prepare ISO for release
-        id: iso
-        run: |
-          FILE=$(ls ./iso-out/*.iso.zst 2>/dev/null | head -1)
-          if [ -z "$FILE" ]; then
-            FILE=$(ls ./iso-out/*.zst 2>/dev/null | head -1)
-          fi
-          echo "file=$FILE" >> $GITHUB_OUTPUT
-          echo "name=$(basename "$FILE")" >> $GITHUB_OUTPUT
-          echo "tag=iso-${{ github.ref_name }}-$(date +%Y%m%d)-${{ github.run_id }}" >> $GITHUB_OUTPUT
-
       - name: Upload ISO artifact
         uses: actions/upload-artifact@v7
         with:
           name: xfce-aerolike-iso
           path: ./iso-out/*
           retention-days: 30
+
+      - name: Prepare ISO for release (split if >2GiB)
+        id: iso
+        run: |
+          echo "tag=iso-${{ github.ref_name }}-$(date +%Y%m%d)-${{ github.run_id }}" >> $GITHUB_OUTPUT
+          ISO_FILE=$(ls ./iso-out/*.iso 2>/dev/null | head -1)
+          if [ -z "$ISO_FILE" ]; then
+            exit 0
+          fi
+          ISO_SIZE=$(stat -c%s "$ISO_FILE")
+          ISO_BASENAME=$(basename "$ISO_FILE")
+          # GitHub release limit is 2 GiB per file
+          if [ "$ISO_SIZE" -gt 2147483648 ]; then
+            echo "[release] ISO exceeds 2GiB, splitting into 2GiB chunks..."
+            split -b 2147483648 --numeric-suffixes=1 --suffix-length=2 \
+              "$ISO_FILE" "./iso-out/${ISO_BASENAME}.part"
+            sha256sum ./iso-out/"${ISO_BASENAME}".part* > ./iso-out/"${ISO_BASENAME}".part.sha256
+            rm -f "$ISO_FILE"
+            cat > ./iso-out/"${ISO_BASENAME}".reassemble.sh << 'REASM'
+#!/bin/sh
+set -eu
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ISO_BASENAME="$(basename "$0" .reassemble.sh)"
+echo "Reassembling ${ISO_BASENAME}..."
+sha256sum -c "${SCRIPT_DIR}/${ISO_BASENAME}.part.sha256"
+cat "${SCRIPT_DIR}/${ISO_BASENAME}.part"?? > "${SCRIPT_DIR}/${ISO_BASENAME}"
+echo "Done: ${SCRIPT_DIR}/${ISO_BASENAME}"
+REASM
+            chmod +x ./iso-out/"${ISO_BASENAME}".reassemble.sh
+          fi
 
       - name: Delete old ISO releases (keep 30)
         run: |
@@ -145,7 +164,7 @@ jobs:
         with:
           tag_name: ${{ steps.iso.outputs.tag }}
           name: xfce-aerolike ${{ github.ref_name }} ${{ steps.iso.outputs.tag }}
-          files: ${{ steps.iso.outputs.file }}
+          files: ./iso-out/*
           fail_on_unmatched_files: false
 
 
