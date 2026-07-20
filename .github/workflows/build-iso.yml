@@ -81,7 +81,7 @@ jobs:
           mkdir -p /usr/lib/sysimage/lib/pacman
           # archiso provides mkarchiso, podman for container ops
           # fuse-overlayfs lets overlay work on top of the CI runner's overlayfs
-          pacman -Syu --noconfirm archiso grub dosfstools mtools syslinux podman squashfs-tools zstd skopeo fuse-overlayfs jq github-cli
+          pacman -Syu --noconfirm archiso grub dosfstools mtools syslinux podman squashfs-tools zstd skopeo fuse-overlayfs jq
           # Use fuse-overlayfs as the mount program — this works on top of the
           # GitHub runner's overlayfs (unlike kernel overlay), and avoids the
           # disk-space blowup of VFS and the layer-depth limit of Docker.
@@ -149,11 +149,14 @@ jobs:
 
       - name: Delete old ISO releases (keep 30)
         run: |
-          gh release list --repo ${{ github.repository }} --limit 100 --json tagName,createdAt \
-            --jq '.[] | select(.tagName | startswith("iso-${{ github.ref_name }}-")) | .tagName' \
-            | sort -r | tail -n +31 | xargs -r -I{} gh release delete {} --repo ${{ github.repository }} --yes --cleanup-tag
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
+          API_URL="https://api.github.com/repos/${{ github.repository }}/releases?per_page=100"
+          curl -sS -H "Authorization: token ${{ github.token }}" "$API_URL" \
+            | jq -r '.[] | select(.tag_name | startswith("iso-${{ github.ref_name }}-")) | .id' \
+            | sort -r | tail -n +31 | while read id; do
+              echo "Deleting release $id..."
+              curl -sS -X DELETE -H "Authorization: token ${{ github.token }}" \
+                "https://api.github.com/repos/${{ github.repository }}/releases/$id"
+            done
 
       - name: Create ISO release
         uses: softprops/action-gh-release@v3
