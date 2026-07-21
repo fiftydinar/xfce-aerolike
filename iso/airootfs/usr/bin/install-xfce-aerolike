@@ -61,6 +61,12 @@ STORAGECONF
 # Also fix newuidmap setuid (needed for podman on Arch)
 chmod u+s /usr/bin/newuidmap /usr/bin/newgidmap 2>/dev/null || true
 
+# Bind-mount podman storage to host's default path so that bootc's
+# imageid_to_digest can find the image (it runs podman inspect in the
+# host mount namespace via /proc/1/ns/mnt, bypassing container mounts).
+mkdir -p /var/lib/containers/storage
+mount --bind "$PODMAN_ROOT" /var/lib/containers/storage
+
 echo "Running bootc install to-filesystem using image ${IMAGE_NAME}..."
 podman --root "$PODMAN_ROOT" run --rm --privileged --pid=host --ipc=host \
     -e CONTAINERS_STORAGE_CONF=/etc/containers/storage.conf \
@@ -76,6 +82,9 @@ podman --root "$PODMAN_ROOT" run --rm --privileged --pid=host --ipc=host \
         --bootloader grub \
         --target-imgref "${IMAGE_NAME}" \
         /target
+
+echo "Unmounting host storage bind mount..."
+umount /var/lib/containers/storage 2>/dev/null || true
 
 echo "Cleaning up staging storage..."
 rm -rf "$PODMAN_ROOT" "${TMPDIR}"
