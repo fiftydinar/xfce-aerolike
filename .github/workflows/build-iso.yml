@@ -30,7 +30,7 @@ jobs:
           pacman-key --init
           pacman-key --populate
           pacman -Syu --noconfirm base-devel cmake extra-cmake-modules \
-            qt6-base qt6-svg qt6-tools qt6-declarative kpmcore yaml-cpp python boost \
+            qt6-base qt6-svg qt6-tools kpmcore yaml-cpp python boost \
             polkit-qt6 git
 
       - name: Build Calamares
@@ -42,7 +42,7 @@ jobs:
           cp -r "$GITHUB_WORKSPACE/patches/calamares-installmode" src/modules/installmode
           mkdir build && cd build
           cmake .. -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release \
-            -DWITH_QML=ON -DWITH_QT6=ON -DINSTALL_CONFIG=ON
+            -DWITH_QML=OFF -DWITH_QT6=ON -DINSTALL_CONFIG=ON
           make -j$(nproc)
           mkdir -p /tmp/pkg
           make DESTDIR=/tmp/pkg install

@@ -2,7 +2,7 @@
 Type=Application
 Name=Install xfce-aerolike
 Comment=Install xfce-aerolike to your computer
-Exec=sudo -E env QT_QPA_PLATFORMTHEME=qt6ct QT_QUICK_CONTROLS_STYLE=NativeStyle calamares
+Exec=sudo -E env QT_QPA_PLATFORMTHEME=qt6ct calamares
 Icon=drive-harddisk
 Terminal=false
 Categories=System;

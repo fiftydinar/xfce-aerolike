@@ -4,9 +4,11 @@
 #include "DllMacro.h"
 #include "locale/TranslatableConfiguration.h"
 #include "utils/PluginFactory.h"
-#include "viewpages/QmlViewStep.h"
+#include "viewpages/ViewStep.h"
 
-class PLUGINDLLEXPORT InstallModeViewStep : public Calamares::QmlViewStep
+class QRadioButton;
+
+class PLUGINDLLEXPORT InstallModeViewStep : public Calamares::ViewStep
 {
     Q_OBJECT
 public:
@@ -14,6 +16,7 @@ public:
     ~InstallModeViewStep() override;
 
     QString prettyName() const override;
+    QWidget* widget() override;
     bool isNextEnabled() const override;
     bool isBackEnabled() const override;
     bool isAtBeginning() const override;
@@ -26,6 +29,9 @@ public:
     void setConfigurationMap( const QVariantMap& configurationMap ) override;
 
 private:
+    QWidget* m_widget;
+    QRadioButton* m_offlineBtn;
+    QRadioButton* m_onlineBtn;
     Calamares::Locale::TranslatedString* m_name;
 };
 
