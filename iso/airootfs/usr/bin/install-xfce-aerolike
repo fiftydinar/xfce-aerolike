@@ -17,7 +17,6 @@ echo "Installing xfce-aerolike to ${ROOT}..."
 # via /proc/1/ns/mnt) finds the image at the expected location.
 mkdir -p "${ROOT}/var/lib/containers-staging" /var/lib/containers/storage
 mount --bind "${ROOT}/var/lib/containers-staging" /var/lib/containers/storage
-STORAGE_ROOT="/var/lib/containers/storage"
 
 # Use target disk for podman's temporary unpacking (avoids filling live ISO's small tmpfs)
 export TMPDIR="${ROOT}/tmp"
