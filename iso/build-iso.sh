@@ -174,9 +174,13 @@ mkdir -p "${AIROOTFS}/etc/containers"
 cat > "${AIROOTFS}/etc/containers/storage.conf" << 'CONFEOF'
 [storage]
 driver = "overlay"
+
+[storage.options]
 mount_program = "/usr/bin/fuse-overlayfs"
 CONFEOF
 echo "[build-iso] Created containers/storage.conf with fuse-overlayfs"
+# Fix newuidmap/newgidmap setuid (needed for podman on Arch with fuse-overlayfs)
+chroot "${AIROOTFS}" chmod u+s /usr/bin/newuidmap /usr/bin/newgidmap 2>/dev/null || true
 
 # Install the custom archiso dracut module
 DRACUT_MODDIR="${AIROOTFS}/usr/lib/dracut/modules.d/95archiso"

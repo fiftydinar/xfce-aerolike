@@ -56,6 +56,8 @@ driver = "overlay"
 [storage.options]
 mount_program = "/usr/bin/fuse-overlayfs"
 STORAGECONF
+# Also fix newuidmap setuid (needed for podman on Arch)
+chmod u+s /usr/bin/newuidmap /usr/bin/newgidmap 2>/dev/null || true
 
 echo "Running bootc install to-filesystem using image ${IMAGE_NAME}..."
 podman --root "$PODMAN_ROOT" run --rm --privileged --pid=host --ipc=host \
@@ -66,6 +68,7 @@ podman --root "$PODMAN_ROOT" run --rm --privileged --pid=host --ipc=host \
     -v "${ROOT}/etc/containers/storage.conf:/etc/containers/storage.conf" \
     -v /usr/bin/fuse-overlayfs:/usr/bin/fuse-overlayfs:ro \
     -v /usr/bin/fusermount3:/usr/bin/fusermount3:ro \
+    -v /usr/lib/libfuse3.so.4:/usr/lib/libfuse3.so.4:ro \
     "${IMAGE_NAME}" \
     bootc install to-filesystem \
         --bootloader grub \
