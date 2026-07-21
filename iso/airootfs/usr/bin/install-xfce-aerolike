@@ -12,14 +12,8 @@ echo "Installing xfce-aerolike to ${ROOT}..."
 
 # Use storage on the target disk (real filesystem) to avoid filling up
 # the live ISO's small tmpfs with container image layers.
-# Bind-mount it to the default podman storage path so that bootc's
-# imageid_to_digest (which runs podman inspect in the host mount namespace
-# via /proc/1/ns/mnt) finds the image at the expected location.
-mkdir -p "${ROOT}/var/lib/containers-staging" /var/lib/containers/storage
-mount --bind "${ROOT}/var/lib/containers-staging" /var/lib/containers/storage
-STORAGE_ROOT="/var/lib/containers/storage"
-
-# Use target disk for podman's temporary unpacking (avoids filling live ISO's small tmpfs)
+PODMAN_ROOT="${ROOT}/var/lib/containers-staging"
+mkdir -p "$PODMAN_ROOT"
 export TMPDIR="${ROOT}/tmp"
 mkdir -p "$TMPDIR"
 
@@ -31,7 +25,7 @@ fi
 IMAGE_NAME="${DEFAULT_IMAGE}"
 if [ "${INSTALL_MODE}" = "offline" ] && [ -f "${IMAGE_ARCHIVE}" ]; then
     echo "Installing in OFFLINE mode (loading image from ${IMAGE_ARCHIVE})..."
-    zstd -d -c "${IMAGE_ARCHIVE}" | podman load
+    zstd -d -c "${IMAGE_ARCHIVE}" | podman --root "$PODMAN_ROOT" load
     if [ -f "${IMAGE_REF_FILE}" ]; then
         IMAGE_NAME=$(cat "${IMAGE_REF_FILE}")
     fi
@@ -48,36 +42,37 @@ else
         fi
     fi
     echo "Installing in ONLINE mode, pulling ${IMAGE_NAME}..."
-    podman pull "${IMAGE_NAME}"
+    podman --root "$PODMAN_ROOT" pull "${IMAGE_NAME}"
 fi
 
 # Configure podman storage inside bootc container to use fuse-overlayfs
+# (avoids 'overlay is not supported over overlayfs' error when
+# running bootc inside a container that's already on overlayfs)
 # and point graphroot to the default storage path.
-mkdir -p "${ROOT}/etc/containers"
-cat > "${ROOT}/etc/containers/storage.conf" << 'STORAGECONF'
+# Created in /tmp (not inside target root) so bootc's empty-root check passes.
+STORAGE_CONF="/tmp/bootc-storage.conf"
+cat > "$STORAGE_CONF" << 'STORAGECONF'
 [storage]
 driver = "overlay"
+graphroot = "/var/lib/containers/storage"
 
 [storage.options]
 mount_program = "/usr/bin/fuse-overlayfs"
 STORAGECONF
-# Also fix newuidmap setuid (needed for podman on Arch)
-chmod u+s /usr/bin/newuidmap /usr/bin/newgidmap 2>/dev/null || true
 
-# bootc requires the target to contain only mount points (no regular directories).
-# Switch TMPDIR to host tmpfs and clean up target's tmp dir so bootc passes verification.
-export TMPDIR=/tmp/install-tmp
-mkdir -p "$TMPDIR"
-rm -rf "${ROOT}/tmp"
+# Bind mount host's /var/lib/containers/storage into the container so that
+# bootc's internal podman can use the same storage path with fuse-overlayfs
+mkdir -p "${ROOT}/var/lib/containers/storage"
+mount --bind /var/lib/containers/storage "${ROOT}/var/lib/containers/storage"
 
 echo "Running bootc install to-filesystem using image ${IMAGE_NAME}..."
-podman run --rm --privileged --pid=host --ipc=host \
+podman --root "$PODMAN_ROOT" run --rm --privileged --pid=host --ipc=host \
     -e CONTAINERS_STORAGE_CONF=/etc/containers/storage.conf \
     -v /dev:/dev \
     -v /dev/fuse:/dev/fuse \
     -v "${ROOT}:/target" \
     -v /var/lib/containers/storage:/var/lib/containers/storage:rslave \
-    -v "${ROOT}/etc/containers/storage.conf:/etc/containers/storage.conf" \
+    -v "$STORAGE_CONF:/etc/containers/storage.conf" \
     -v /usr/bin/fuse-overlayfs:/usr/bin/fuse-overlayfs:ro \
     -v /usr/bin/fusermount3:/usr/bin/fusermount3:ro \
     -v /usr/lib/libfuse3.so.4:/usr/lib/libfuse3.so.4:ro \
@@ -91,6 +86,6 @@ echo "Unmounting host storage bind mount..."
 umount /var/lib/containers/storage 2>/dev/null || true
 
 echo "Cleaning up staging storage..."
-rm -rf "${ROOT}/var/lib/containers-staging" "${TMPDIR}"
+rm -rf "$PODMAN_ROOT" "${TMPDIR}" "${STORAGE_CONF}"
 
 echo "Installation complete!"
