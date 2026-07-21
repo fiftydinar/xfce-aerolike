@@ -65,6 +65,7 @@ podman --root "$PODMAN_ROOT" run --rm --privileged --pid=host --ipc=host \
     -v /dev:/dev \
     -v /dev/fuse:/dev/fuse \
     -v "${ROOT}:/target" \
+    -v "${PODMAN_ROOT}:/var/lib/containers/storage" \
     -v "${ROOT}/etc/containers/storage.conf:/etc/containers/storage.conf" \
     -v /usr/bin/fuse-overlayfs:/usr/bin/fuse-overlayfs:ro \
     -v /usr/bin/fusermount3:/usr/bin/fusermount3:ro \
