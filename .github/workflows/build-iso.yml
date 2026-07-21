@@ -153,11 +153,13 @@ jobs:
         run: |
           API_URL="https://api.github.com/repos/${{ github.repository }}/releases?per_page=100"
           curl -sS -H "Authorization: token ${{ github.token }}" "$API_URL" \
-            | jq -r '.[] | select(.tag_name | startswith("iso-${{ github.ref_name }}-")) | .id' \
-            | sort -r | tail -n +31 | while read id; do
-              echo "Deleting release $id..."
+            | jq -r '.[] | select(.tag_name | startswith("iso-${{ github.ref_name }}-")) | "\(.id) \(.tag_name)"' \
+            | sort -r | tail -n +31 | while read id tag; do
+              echo "Deleting release $id ($tag)..."
               curl -sS -X DELETE -H "Authorization: token ${{ github.token }}" \
                 "https://api.github.com/repos/${{ github.repository }}/releases/$id"
+              curl -sS -X DELETE -H "Authorization: token ${{ github.token }}" \
+                "https://api.github.com/repos/${{ github.repository }}/git/refs/tags/$tag"
             done
 
       - name: Create ISO release
