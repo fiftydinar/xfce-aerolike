@@ -50,6 +50,14 @@ else
     podman pull "${IMAGE_NAME}"
 fi
 
+# bootc requires the target to contain only mount points.
+# Overlay the staging dir with an empty bind mount so bootc skips it.
+# The image data is still accessible via /var/lib/containers/storage
+# (which is bind-mounted into the bootc container below).
+EMPTY_OVERLAY="/tmp/.empty-staging"
+mkdir -p "$EMPTY_OVERLAY"
+mount --bind "$EMPTY_OVERLAY" "${ROOT}/var/lib/containers-staging"
+
 # Configure podman storage inside bootc container to use fuse-overlayfs
 # and point graphroot to the default storage path.
 # Created in /tmp (not inside target root) so bootc's empty-root check passes.
@@ -85,10 +93,11 @@ podman run --rm --privileged --pid=host --ipc=host \
         --target-imgref "${IMAGE_NAME}" \
         /target
 
-echo "Unmounting host storage bind mount..."
+echo "Unmounting host storage and overlay bind mounts..."
+umount "${ROOT}/var/lib/containers-staging" 2>/dev/null || true
 umount /var/lib/containers/storage 2>/dev/null || true
 
 echo "Cleaning up staging storage..."
-rm -rf "${ROOT}/var/lib/containers-staging" "${TMPDIR}" "${STORAGE_CONF}"
+rm -rf "${ROOT}/var/lib/containers-staging" "${TMPDIR}" "${STORAGE_CONF}" "${EMPTY_OVERLAY}"
 
 echo "Installation complete!"
