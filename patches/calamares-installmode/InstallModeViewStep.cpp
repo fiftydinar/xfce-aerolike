@@ -1,6 +1,7 @@
 #include "InstallModeViewStep.h"
 
 #include "GlobalStorage.h"
+#include "JobQueue.h"
 #include "utils/Logger.h"
 #include "utils/Variant.h"
 
@@ -109,10 +110,9 @@ InstallModeViewStep::onLeave()
         ? QStringLiteral( "online" )
         : QStringLiteral( "offline" );
 
-    auto* gs = Calamares::GlobalStorage::instance();
+    auto* gs = Calamares::JobQueue::instance()->globalStorage();
     gs->insert( QStringLiteral( "installMode" ), mode );
 
-    // Also write to file for shellprocess module to read
     QFile file( QStringLiteral( "/opt/install/install-mode" ) );
     if ( file.open( QIODevice::WriteOnly | QIODevice::Truncate ) )
     {
@@ -130,21 +130,18 @@ InstallModeViewStep::onLeave()
 void
 InstallModeViewStep::setConfigurationMap( const QVariantMap& configurationMap )
 {
-    bool ok = false;
-    auto label = Calamares::getSubMap( configurationMap, QStringLiteral( "label" ), ok );
-    if ( label.contains( QStringLiteral( "name" ) ) )
+    if ( configurationMap.contains( QStringLiteral( "label" ) ) )
     {
-        m_name = new Calamares::Locale::TranslatedString( label, QStringLiteral( "name" ) );
-    }
-    else
-    {
-        // Fallback to direct key
-        auto nameVal = Calamares::getString( configurationMap, QStringLiteral( "name" ) );
-        if ( nameVal.isValid() )
+        auto label = configurationMap.value( QStringLiteral( "label" ) ).toMap();
+        if ( label.contains( QStringLiteral( "name" ) ) )
         {
-            m_name = new Calamares::Locale::TranslatedString(
-                Calamares::Locale::TranslatedString::Yes, nameVal.toString() );
+            m_name = new Calamares::Locale::TranslatedString( label, QStringLiteral( "name" ) );
         }
+    }
+    else if ( configurationMap.contains( QStringLiteral( "name" ) ) )
+    {
+        m_name = new Calamares::Locale::TranslatedString(
+            configurationMap.value( QStringLiteral( "name" ) ).toString() );
     }
 }
 
