@@ -48,16 +48,24 @@ if [ "${INSTALL_MODE}" = "offline" ] && [ -f "${IMAGE_ARCHIVE}" ]; then
     rm -f "$IMAGE_TAR"
     rmdir "$SKOPEO_TMP"
 
+    # Bind mount OCI dir to a host path (captures original dentry), then
+    # overlay the target path so bootc's require_empty_rootdir passes.
+    mkdir -p /mnt/oci-image
+    mount --bind "$OCI_DIR" /mnt/oci-image
+    mount --bind "$EMPTY_OVERLAY" "$OCI_DIR"
+
     # Install directly from OCI layout — skip containers-storage entirely.
     # This avoids the storage overlay driver unpacking all layers to
     # overlay-layers/ (which exceeded the 30 GiB partition).
     bootc install to-filesystem \
-        --source-imgref "oci:${OCI_DIR}:latest" \
+        --source-imgref "oci:/mnt/oci-image:latest" \
         --skip-fetch-check \
         --bootloader grub \
         --target-imgref "${IMAGE_NAME}" \
         "${ROOT}"
 
+    umount "$OCI_DIR"
+    umount /mnt/oci-image
     rm -rf "$OCI_DIR"
 elif [ "${INSTALL_MODE}" = "online" ]; then
     if [ -f "${IMAGE_REF_FILE}" ]; then
