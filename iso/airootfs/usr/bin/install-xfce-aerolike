@@ -18,17 +18,22 @@ mkdir -p "${ROOT}/var/lib/containers-staging" /var/lib/containers/storage
 mount --bind "${ROOT}/var/lib/containers-staging" /var/lib/containers/storage
 mount --bind "$EMPTY_OVERLAY" "${ROOT}/var/lib/containers-staging"
 
-# ---- Temp space (target disk) ----
-# skopeo and bootc need temp space for archive extraction.
-# Bind-mount ${ROOT}/tmp to a host path FIRST (captures original dentry),
-# then overlay ${ROOT}/tmp for bootc's empty-root check.
+# ---- Skopeo temp dir (target disk) ----
+# containers/image hardcodes /var/tmp for big temp files, ignoring $TMPDIR.
+# Bind mount a staging dir on the target ext4 over /var/tmp so skopeo's
+# archive decompression has enough space.
+SKOPEO_TMP="${ROOT}/.skopeo-tmp"
+mkdir -p "$SKOPEO_TMP"
+mount --bind "$SKOPEO_TMP" /var/tmp
+
+# ---- Bootc temp dir (target disk) ----
+# bootc (Rust) reads $TMPDIR via std::env::temp_dir.
+# Create a host-accessible path, then overlay it so bootc's require_empty_rootdir
+# sees an empty dir.
 mkdir -p "${ROOT}/tmp" /mnt/target-tmp
 mount --bind "${ROOT}/tmp" /mnt/target-tmp
 mount --bind "$EMPTY_OVERLAY" "${ROOT}/tmp"
-TEMP_DIR=/mnt/target-tmp
-
-# ---- Redirect temp files to target (skopeo uses $TMPDIR, bootc uses $TMPDIR) ----
-export TMPDIR="$TEMP_DIR"
+export TMPDIR=/mnt/target-tmp
 
 # ---- Storage config (kernel overlay, no mount_program) ----
 STORAGE_CONF="/tmp/bootc-storage.conf"
@@ -62,6 +67,11 @@ elif [ "${INSTALL_MODE}" = "online" ]; then
     echo "Installing in ONLINE mode..."
     skopeo copy "docker://${IMAGE_NAME}" "containers-storage:${IMAGE_NAME}"
 fi
+
+# ---- Restore /var/tmp (remove bind mount to target) ----
+# After skopeo finishes, unmount the /var/tmp bind mount and remove the staging dir.
+umount /var/tmp
+rm -rf "$SKOPEO_TMP"
 
 echo "Running bootc install to-filesystem..."
 bootc install to-filesystem \
