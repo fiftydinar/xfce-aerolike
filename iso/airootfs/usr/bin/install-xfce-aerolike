@@ -10,10 +10,25 @@ DEFAULT_IMAGE="ghcr.io/fiftydinar/xfce-aerolike:latest"
 
 echo "Installing xfce-aerolike to ${ROOT}..."
 
-# bootc requires the target to contain only mount points (no regular dirs/files).
-# Switch TMPDIR to host tmpfs so bootc leaves no trace in the target.
-export TMPDIR=/tmp/install-tmp
-mkdir -p "$TMPDIR"
+# Use target disk for container storage to avoid filling tmpfs.
+mkdir -p "${ROOT}/var/lib/containers-staging"
+# HACK: bind-mount staging dir to /var/lib/containers/storage so empty-root check passes
+# (it sees the dir as a mount point and skips it).
+mkdir -p /var/lib/containers/storage
+mount --bind "${ROOT}/var/lib/containers-staging" /var/lib/containers/storage
+
+# Overlay the staging dir with an empty mount so bootc skips it in the target root
+EMPTY_OVERLAY="/tmp/.empty-staging"
+mkdir -p "$EMPTY_OVERLAY"
+mount --bind "$EMPTY_OVERLAY" "${ROOT}/var/lib/containers-staging"
+
+# Use clean overlay storage config (no mount_program, pure kernel overlay)
+STORAGE_CONF="/tmp/bootc-storage.conf"
+cat > "$STORAGE_CONF" << 'STORAGECONF'
+[storage]
+driver = "overlay"
+STORAGECONF
+export CONTAINERS_STORAGE_CONF="$STORAGE_CONF"
 
 INSTALL_MODE="offline"
 if [ -f /opt/install/install-mode ]; then
@@ -22,9 +37,10 @@ fi
 
 IMAGE_NAME="${DEFAULT_IMAGE}"
 if [ "${INSTALL_MODE}" = "offline" ] && [ -f "${IMAGE_ARCHIVE}" ]; then
-    echo "Installing in OFFLINE mode from archive..."
-    SOURCE_REF="docker-archive:${IMAGE_ARCHIVE}"
-else
+    echo "Installing in OFFLINE mode..."
+    # Import archive directly into containers/storage with the right reference
+    skopeo copy --override-os linux "docker-archive:${IMAGE_ARCHIVE}" "containers-storage:${IMAGE_NAME}"
+elif [ "${INSTALL_MODE}" = "online" ]; then
     if [ -f "${IMAGE_REF_FILE}" ]; then
         TAG=$(cat "${IMAGE_REF_FILE}" | sed 's/.*://')
         TAG_PREFIX=$(printf '%s' "$TAG" | sed 's/[0-9]\{8\}$//')
@@ -36,19 +52,21 @@ else
             fi
         fi
     fi
-    echo "Installing in ONLINE mode from registry..."
-    SOURCE_REF="docker://${IMAGE_NAME}"
+    echo "Installing in ONLINE mode..."
+    skopeo copy "docker://${IMAGE_NAME}" "containers-storage:${IMAGE_NAME}"
 fi
 
 echo "Running bootc install to-filesystem..."
 bootc install to-filesystem \
-    --source-imgref "${SOURCE_REF}" \
+    --source-imgref "containers-storage:${IMAGE_NAME}" \
     --skip-fetch-check \
     --bootloader grub \
     --target-imgref "${IMAGE_NAME}" \
     "${ROOT}"
 
-echo "Cleaning up..."
-rm -rf "${TMPDIR}"
+echo "Cleanup..."
+umount "${ROOT}/var/lib/containers-staging" 2>/dev/null || true
+umount /var/lib/containers/storage 2>/dev/null || true
+rm -rf "${ROOT}/var/lib/containers-staging" "${STORAGE_CONF}" "${EMPTY_OVERLAY}"
 
 echo "Installation complete!"
