@@ -63,6 +63,11 @@ STORAGECONF
 # Also fix newuidmap setuid (needed for podman on Arch)
 chmod u+s /usr/bin/newuidmap /usr/bin/newgidmap 2>/dev/null || true
 
+# bootc requires the target to contain only mount points (no regular directories).
+# /tmp was created as an empty dir on the target filesystem; remove it so bootc
+# doesn't reject it.
+rm -rf "${ROOT}/tmp"
+
 echo "Running bootc install to-filesystem using image ${IMAGE_NAME}..."
 podman run --rm --privileged --pid=host --ipc=host \
     -e CONTAINERS_STORAGE_CONF=/etc/containers/storage.conf \
