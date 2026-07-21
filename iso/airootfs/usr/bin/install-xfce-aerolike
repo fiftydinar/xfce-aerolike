@@ -89,6 +89,8 @@ podman run --rm --privileged --pid=host --ipc=host \
     -v /usr/lib/libfuse3.so.4:/usr/lib/libfuse3.so.4:ro \
     "${IMAGE_NAME}" \
     bootc install to-filesystem \
+        --source-imgref "${IMAGE_NAME}" \
+        --skip-fetch-check \
         --bootloader grub \
         --target-imgref "${IMAGE_NAME}" \
         /target
