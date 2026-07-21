@@ -12,13 +12,11 @@ echo "Installing xfce-aerolike to ${ROOT}..."
 
 # Use storage on the target disk (real filesystem) to avoid filling up
 # the live ISO's small tmpfs with container image layers.
-# Bind-mount it to the default podman storage path so that bootc's
-# imageid_to_digest (which runs podman inspect in the host mount namespace
-# via /proc/1/ns/mnt) finds the image at the expected location.
+# Bind-mount it to the default podman storage path.
 mkdir -p "${ROOT}/var/lib/containers-staging" /var/lib/containers/storage
 mount --bind "${ROOT}/var/lib/containers-staging" /var/lib/containers/storage
 
-# Use target disk for podman's temporary unpacking (avoids filling live ISO's small tmpfs)
+# Use target disk for podman's temporary unpacking
 export TMPDIR="${ROOT}/tmp"
 mkdir -p "$TMPDIR"
 
@@ -28,27 +26,12 @@ if [ -f /opt/install/install-mode ]; then
 fi
 
 IMAGE_NAME="${DEFAULT_IMAGE}"
-
-# Create shared storage.conf ahead of time so both host podman (load/pull)
-# and bootc container use the same fuse-overlayfs driver. Otherwise bootc
-# can't find the pre-loaded image (driver mismatch).
-STORAGE_CONF="/tmp/bootc-storage.conf"
-cat > "$STORAGE_CONF" << 'STORAGECONF'
-[storage]
-driver = "overlay"
-
-[storage.options]
-mount_program = "/usr/bin/fuse-overlayfs"
-STORAGECONF
-export CONTAINERS_STORAGE_CONF="$STORAGE_CONF"
-
 if [ "${INSTALL_MODE}" = "offline" ] && [ -f "${IMAGE_ARCHIVE}" ]; then
     echo "Installing in OFFLINE mode (loading image from ${IMAGE_ARCHIVE})..."
     zstd -d -c "${IMAGE_ARCHIVE}" | podman load
     if [ -f "${IMAGE_REF_FILE}" ]; then
         IMAGE_NAME=$(cat "${IMAGE_REF_FILE}")
     fi
-    SOURCE_REF="docker-archive:${IMAGE_ARCHIVE}"
 else
     if [ -f "${IMAGE_REF_FILE}" ]; then
         TAG=$(cat "${IMAGE_REF_FILE}" | sed 's/.*://')
@@ -63,50 +46,30 @@ else
     fi
     echo "Installing in ONLINE mode, pulling ${IMAGE_NAME}..."
     podman pull "${IMAGE_NAME}"
-    SOURCE_REF="docker://${IMAGE_NAME}"
 fi
 
 # bootc requires the target to contain only mount points.
 # Overlay the staging dir with an empty bind mount so bootc skips it.
-# The image data is still accessible via /var/lib/containers/storage
-# (which is bind-mounted into the bootc container below).
 EMPTY_OVERLAY="/tmp/.empty-staging"
 mkdir -p "$EMPTY_OVERLAY"
 mount --bind "$EMPTY_OVERLAY" "${ROOT}/var/lib/containers-staging"
 
-# bootc requires the target to contain only mount points (no regular directories).
 # Switch TMPDIR to host tmpfs and clean up target's tmp dir so bootc passes verification.
 export TMPDIR=/tmp/install-tmp
 mkdir -p "$TMPDIR"
 rm -rf "${ROOT}/tmp"
 
-# Use containers-storage: transport so bootc looks in local storage,
-# not a remote registry. The image was loaded above into the same
-# fuse-overlayfs storage that bootc uses.
-echo "Running bootc install to-filesystem using ${SOURCE_REF}..."
-podman run --rm --privileged --pid=host --ipc=host \
-    -e CONTAINERS_STORAGE_CONF=/etc/containers/storage.conf \
-    -v /dev:/dev \
-    -v /dev/fuse:/dev/fuse \
-    -v "${ROOT}:/target" \
-    -v "$STORAGE_CONF:/etc/containers/storage.conf" \
-    -v /usr/bin/fuse-overlayfs:/usr/bin/fuse-overlayfs:ro \
-    -v /usr/bin/fusermount3:/usr/bin/fusermount3:ro \
-    -v /usr/lib/libfuse3.so.4:/usr/lib/libfuse3.so.4:ro \
-    -v /opt/install:/opt/install:ro \
-    "${IMAGE_NAME}" \
-    bootc install to-filesystem \
-        --source-imgref "${SOURCE_REF}" \
-        --skip-fetch-check \
-        --bootloader grub \
-        --target-imgref "${IMAGE_NAME}" \
-        /target
+echo "Running bootc install to-filesystem..."
+bootc install to-filesystem \
+    --bootloader grub \
+    --target-imgref "${IMAGE_NAME}" \
+    "${ROOT}"
 
 echo "Unmounting host storage and overlay bind mounts..."
 umount "${ROOT}/var/lib/containers-staging" 2>/dev/null || true
 umount /var/lib/containers/storage 2>/dev/null || true
 
 echo "Cleaning up staging storage..."
-rm -rf "${ROOT}/var/lib/containers-staging" "${TMPDIR}" "${STORAGE_CONF}" "${EMPTY_OVERLAY}"
+rm -rf "${ROOT}/var/lib/containers-staging" "${TMPDIR}" "${EMPTY_OVERLAY}"
 
 echo "Installation complete!"
