@@ -19,11 +19,13 @@ mount --bind "${ROOT}/var/lib/containers-staging" /var/lib/containers/storage
 mount --bind "$EMPTY_OVERLAY" "${ROOT}/var/lib/containers-staging"
 
 # ---- Temp space (target disk) ----
-# skopeo extracts archives to /var/tmp — route it to the target filesystem.
-mkdir -p "${ROOT}/tmp"
-umount /var/tmp 2>/dev/null || true
-mount --bind "${ROOT}/tmp" /var/tmp
+# skopeo and bootc need temp space for archive extraction.
+# Bind-mount ${ROOT}/tmp to a host path FIRST (captures original dentry),
+# then overlay ${ROOT}/tmp for bootc's empty-root check.
+mkdir -p "${ROOT}/tmp" /mnt/target-tmp
+mount --bind "${ROOT}/tmp" /mnt/target-tmp
 mount --bind "$EMPTY_OVERLAY" "${ROOT}/tmp"
+TEMP_DIR=/mnt/target-tmp
 
 # ---- Storage config (kernel overlay, no mount_program) ----
 STORAGE_CONF="/tmp/bootc-storage.conf"
@@ -41,7 +43,7 @@ fi
 IMAGE_NAME="${DEFAULT_IMAGE}"
 if [ "${INSTALL_MODE}" = "offline" ] && [ -f "${IMAGE_ARCHIVE}" ]; then
     echo "Installing in OFFLINE mode..."
-    skopeo copy --override-os linux "docker-archive:${IMAGE_ARCHIVE}" "containers-storage:${IMAGE_NAME}"
+    skopeo copy --tmpdir "$TEMP_DIR" --override-os linux "docker-archive:${IMAGE_ARCHIVE}" "containers-storage:${IMAGE_NAME}"
 elif [ "${INSTALL_MODE}" = "online" ]; then
     if [ -f "${IMAGE_REF_FILE}" ]; then
         TAG=$(cat "${IMAGE_REF_FILE}" | sed 's/.*://')
@@ -55,11 +57,11 @@ elif [ "${INSTALL_MODE}" = "online" ]; then
         fi
     fi
     echo "Installing in ONLINE mode..."
-    skopeo copy "docker://${IMAGE_NAME}" "containers-storage:${IMAGE_NAME}"
+    skopeo copy --tmpdir "$TEMP_DIR" "docker://${IMAGE_NAME}" "containers-storage:${IMAGE_NAME}"
 fi
 
 echo "Running bootc install to-filesystem..."
-bootc install to-filesystem \
+TMPDIR="$TEMP_DIR" bootc install to-filesystem \
     --source-imgref "containers-storage:${IMAGE_NAME}" \
     --skip-fetch-check \
     --bootloader grub \
@@ -70,7 +72,7 @@ echo "Cleanup..."
 umount "${ROOT}/var/lib/containers-staging" 2>/dev/null || true
 umount /var/lib/containers/storage 2>/dev/null || true
 umount "${ROOT}/tmp" 2>/dev/null || true
-umount /var/tmp 2>/dev/null || true
+umount /mnt/target-tmp 2>/dev/null || true
 rm -rf "${ROOT}/var/lib/containers-staging" "${ROOT}/tmp" "${STORAGE_CONF}" "${EMPTY_OVERLAY}"
 
 echo "Installation complete!"
