@@ -18,18 +18,17 @@ mkdir -p "${ROOT}/var/lib/containers-staging" /var/lib/containers/storage
 mount --bind "${ROOT}/var/lib/containers-staging" /var/lib/containers/storage
 mount --bind "$EMPTY_OVERLAY" "${ROOT}/var/lib/containers-staging"
 
-# ---- Skopeo temp dir (target disk) ----
+# ---- Skopeo & bootc temp dir (target disk) ----
 # containers/image hardcodes /var/tmp for big temp files, ignoring $TMPDIR.
-# Bind mount a staging dir on the target ext4 over /var/tmp so skopeo's
-# archive decompression has enough space.
+# Also the overlay storage driver needs room for layer unpacking.
+# Use a dedicated staging dir on the target for all temp needs.
 SKOPEO_TMP="${ROOT}/.skopeo-tmp"
 mkdir -p "$SKOPEO_TMP"
-mount --bind "$SKOPEO_TMP" /var/tmp
 
 # ---- Bootc temp dir (target disk) ----
 # bootc (Rust) reads $TMPDIR via std::env::temp_dir.
-# Create a host-accessible path, then overlay it so bootc's require_empty_rootdir
-# sees an empty dir.
+# Create a host-accessible path, then overlay the target path so
+# bootc's require_empty_rootdir sees an empty dir.
 mkdir -p "${ROOT}/tmp" /mnt/target-tmp
 mount --bind "${ROOT}/tmp" /mnt/target-tmp
 mount --bind "$EMPTY_OVERLAY" "${ROOT}/tmp"
@@ -51,7 +50,23 @@ fi
 IMAGE_NAME="${DEFAULT_IMAGE}"
 if [ "${INSTALL_MODE}" = "offline" ] && [ -f "${IMAGE_ARCHIVE}" ]; then
     echo "Installing in OFFLINE mode..."
-    skopeo copy "docker-archive:${IMAGE_ARCHIVE}" "containers-storage:${IMAGE_NAME}"
+
+    # Decompress the archive to a regular file FIRST.  This avoids the
+    # containers/image library creating a second temp copy in /var/tmp by
+    # reading the uncompressed file in-place (newReader(path, false) —
+    # no NewReaderFromStream / CreateBigFileTemp call).
+    IMAGE_TAR="${SKOPEO_TMP}/image.tar"
+    zstd -d "$IMAGE_ARCHIVE" -o "$IMAGE_TAR"
+
+    # Redirect /var/tmp so containers/image can write its temp files
+    # (used during layer unpacking in the storage driver).
+    mount --bind "$SKOPEO_TMP" /var/tmp
+
+    skopeo copy "docker-archive:${IMAGE_TAR}" "containers-storage:${IMAGE_NAME}"
+
+    # Clean up: remove the decompressed tar to free space for bootc.
+    umount /var/tmp
+    rm -f "$IMAGE_TAR"
 elif [ "${INSTALL_MODE}" = "online" ]; then
     if [ -f "${IMAGE_REF_FILE}" ]; then
         TAG=$(cat "${IMAGE_REF_FILE}" | sed 's/.*://')
@@ -68,9 +83,6 @@ elif [ "${INSTALL_MODE}" = "online" ]; then
     skopeo copy "docker://${IMAGE_NAME}" "containers-storage:${IMAGE_NAME}"
 fi
 
-# ---- Restore /var/tmp (remove bind mount to target) ----
-# After skopeo finishes, unmount the /var/tmp bind mount and remove the staging dir.
-umount /var/tmp
 rm -rf "$SKOPEO_TMP"
 
 echo "Running bootc install to-filesystem..."
