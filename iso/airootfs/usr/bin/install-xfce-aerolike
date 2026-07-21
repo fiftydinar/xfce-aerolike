@@ -52,17 +52,20 @@ mkdir -p "${ROOT}/etc/containers"
 cat > "${ROOT}/etc/containers/storage.conf" << 'STORAGECONF'
 [storage]
 driver = "overlay"
+
 [storage.options]
 mount_program = "/usr/bin/fuse-overlayfs"
 STORAGECONF
 
 echo "Running bootc install to-filesystem using image ${IMAGE_NAME}..."
 podman --root "$PODMAN_ROOT" run --rm --privileged --pid=host --ipc=host \
+    -e CONTAINERS_STORAGE_CONF=/etc/containers/storage.conf \
     -v /dev:/dev \
     -v /dev/fuse:/dev/fuse \
     -v "${ROOT}:/target" \
     -v "${ROOT}/etc/containers/storage.conf:/etc/containers/storage.conf" \
     -v /usr/bin/fuse-overlayfs:/usr/bin/fuse-overlayfs:ro \
+    -v /usr/bin/fusermount3:/usr/bin/fusermount3:ro \
     "${IMAGE_NAME}" \
     bootc install to-filesystem \
         --bootloader grub \
