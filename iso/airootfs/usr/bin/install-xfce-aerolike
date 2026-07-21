@@ -61,6 +61,8 @@ rm -rf "${ROOT}/tmp"
 
 echo "Running bootc install to-filesystem..."
 bootc install to-filesystem \
+    --source-imgref "containers-storage:${IMAGE_NAME}" \
+    --skip-fetch-check \
     --bootloader grub \
     --target-imgref "${IMAGE_NAME}" \
     "${ROOT}"
