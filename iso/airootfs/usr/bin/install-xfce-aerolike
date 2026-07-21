@@ -78,7 +78,11 @@ export TMPDIR=/tmp/install-tmp
 mkdir -p "$TMPDIR"
 rm -rf "${ROOT}/tmp"
 
-echo "Running bootc install to-filesystem using image ${IMAGE_NAME}..."
+# Use containers-storage: transport so bootc looks in local storage,
+# not a remote registry. The image was loaded above into the same
+# fuse-overlayfs storage that bootc uses.
+LOCAL_REF="containers-storage:${IMAGE_NAME}"
+echo "Running bootc install to-filesystem using local image ${IMAGE_NAME}..."
 podman run --rm --privileged --pid=host --ipc=host \
     -e CONTAINERS_STORAGE_CONF=/etc/containers/storage.conf \
     -v /dev:/dev \
@@ -91,7 +95,7 @@ podman run --rm --privileged --pid=host --ipc=host \
     -v /usr/lib/libfuse3.so.4:/usr/lib/libfuse3.so.4:ro \
     "${IMAGE_NAME}" \
     bootc install to-filesystem \
-        --source-imgref "${IMAGE_NAME}" \
+        --source-imgref "${LOCAL_REF}" \
         --skip-fetch-check \
         --bootloader grub \
         --target-imgref "${IMAGE_NAME}" \
