@@ -14,17 +14,16 @@ EMPTY_OVERLAY="/tmp/.empty-overlay"
 mkdir -p "$EMPTY_OVERLAY"
 
 # ---- Container storage (target disk) ----
-# Write image to target via bind mount; overlay hides it from bootc's empty-root check.
 mkdir -p "${ROOT}/var/lib/containers-staging" /var/lib/containers/storage
 mount --bind "${ROOT}/var/lib/containers-staging" /var/lib/containers/storage
 mount --bind "$EMPTY_OVERLAY" "${ROOT}/var/lib/containers-staging"
 
 # ---- Temp space (target disk) ----
-# skopeo/bootc extract archives to /var/tmp; route it to the target filesystem.
-mkdir -p "${ROOT}/var/tmp" /mnt/var-tmp
-mount --bind "${ROOT}/var/tmp" /mnt/var-tmp
-mount --bind /mnt/var-tmp /var/tmp
-mount --bind "$EMPTY_OVERLAY" "${ROOT}/var/tmp"
+# skopeo extracts archives to /var/tmp — route it to the target filesystem.
+mkdir -p "${ROOT}/tmp"
+umount /var/tmp 2>/dev/null || true
+mount --bind "${ROOT}/tmp" /var/tmp
+mount --bind "$EMPTY_OVERLAY" "${ROOT}/tmp"
 
 # ---- Storage config (kernel overlay, no mount_program) ----
 STORAGE_CONF="/tmp/bootc-storage.conf"
@@ -70,9 +69,8 @@ bootc install to-filesystem \
 echo "Cleanup..."
 umount "${ROOT}/var/lib/containers-staging" 2>/dev/null || true
 umount /var/lib/containers/storage 2>/dev/null || true
-umount "${ROOT}/var/tmp" 2>/dev/null || true
-umount /mnt/var-tmp 2>/dev/null || true
+umount "${ROOT}/tmp" 2>/dev/null || true
 umount /var/tmp 2>/dev/null || true
-rm -rf "${ROOT}/var/lib/containers-staging" "${ROOT}/var/tmp" /mnt/var-tmp "${STORAGE_CONF}" "${EMPTY_OVERLAY}"
+rm -rf "${ROOT}/var/lib/containers-staging" "${ROOT}/tmp" "${STORAGE_CONF}" "${EMPTY_OVERLAY}"
 
 echo "Installation complete!"
