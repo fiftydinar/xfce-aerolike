@@ -446,6 +446,8 @@ fi
 chroot "${AIROOTFS}" pacman -S --needed --noconfirm yaml-cpp kpmcore polkit-qt6 python
 echo "[build-iso] Calamares dependencies installed"
 
+
+
 # Unmount chroot filesystems before mkarchiso processes the rootfs
 umount -l "${AIROOTFS}/dev" 2>/dev/null || true
 umount "${AIROOTFS}/sys" 2>/dev/null || true

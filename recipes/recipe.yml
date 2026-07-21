@@ -209,6 +209,23 @@ modules:
   - type: script
     snippets:
       - |
+        # Auto-detect timezone at boot via IP geolocation
+        cat > /etc/systemd/system/auto-timezone.service << 'EOF'
+        [Unit]
+        Description=Auto-detect timezone from IP geolocation
+        After=network-online.target
+        Wants=network-online.target
+
+        [Service]
+        Type=oneshot
+        ExecStart=/bin/sh -c 'TZ=$(curl -sf https://ipapi.co/timezone 2>/dev/null || curl -sf https://ipinfo.io/timezone 2>/dev/null); [ -n "$TZ" ] && timedatectl set-timezone "$TZ" || true'
+        RemainAfterExit=yes
+
+        [Install]
+        WantedBy=multi-user.target
+        EOF
+        systemctl enable auto-timezone.service
+      - |
         dracut --force "$(find /usr/lib/modules -maxdepth 1 -type d | grep -v "\.img$" | tail -n 1)"/initramfs.img
       - |
         LC_ALL=C pacman -Qi | awk '/^Name/ {p=$3} /^Installed Size/ {s=$4; u=$5; if(u=="B") s/=1048576; else if(u=="KiB") s/=1024; else if(u=="GiB") s*=1024; t+=s; printf "%015.2f\t%-35s %.2f MiB\n", s, p, s} END {printf "%015.2f\t%s\n", 999999999.98, "────────────────────────────────────────────────"; printf "%015.2f\t%-35s %.2f MiB\n", 999999999.99, "TOTAL:", t}' | sort -n | cut -f2-
