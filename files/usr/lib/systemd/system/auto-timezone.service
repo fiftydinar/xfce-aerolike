@@ -1,0 +1,12 @@
+[Unit]
+Description=Auto-detect timezone from IP geolocation
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'TZ=$(curl -sf https://ipapi.co/timezone 2>/dev/null || curl -sf https://ipinfo.io/timezone 2>/dev/null); [ -n "$TZ" ] && timedatectl set-timezone "$TZ" || true'
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
