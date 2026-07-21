@@ -48,6 +48,7 @@ if [ "${INSTALL_MODE}" = "offline" ] && [ -f "${IMAGE_ARCHIVE}" ]; then
     if [ -f "${IMAGE_REF_FILE}" ]; then
         IMAGE_NAME=$(cat "${IMAGE_REF_FILE}")
     fi
+    SOURCE_REF="docker-archive:${IMAGE_ARCHIVE}"
 else
     if [ -f "${IMAGE_REF_FILE}" ]; then
         TAG=$(cat "${IMAGE_REF_FILE}" | sed 's/.*://')
@@ -62,6 +63,7 @@ else
     fi
     echo "Installing in ONLINE mode, pulling ${IMAGE_NAME}..."
     podman pull "${IMAGE_NAME}"
+    SOURCE_REF="docker://${IMAGE_NAME}"
 fi
 
 # bootc requires the target to contain only mount points.
@@ -81,21 +83,20 @@ rm -rf "${ROOT}/tmp"
 # Use containers-storage: transport so bootc looks in local storage,
 # not a remote registry. The image was loaded above into the same
 # fuse-overlayfs storage that bootc uses.
-LOCAL_REF="containers-storage:${IMAGE_NAME}"
-echo "Running bootc install to-filesystem using local image ${IMAGE_NAME}..."
+echo "Running bootc install to-filesystem using ${SOURCE_REF}..."
 podman run --rm --privileged --pid=host --ipc=host \
     -e CONTAINERS_STORAGE_CONF=/etc/containers/storage.conf \
     -v /dev:/dev \
     -v /dev/fuse:/dev/fuse \
     -v "${ROOT}:/target" \
-    -v /var/lib/containers/storage:/var/lib/containers/storage:rslave \
     -v "$STORAGE_CONF:/etc/containers/storage.conf" \
     -v /usr/bin/fuse-overlayfs:/usr/bin/fuse-overlayfs:ro \
     -v /usr/bin/fusermount3:/usr/bin/fusermount3:ro \
     -v /usr/lib/libfuse3.so.4:/usr/lib/libfuse3.so.4:ro \
+    -v /opt/install:/opt/install:ro \
     "${IMAGE_NAME}" \
     bootc install to-filesystem \
-        --source-imgref "${LOCAL_REF}" \
+        --source-imgref "${SOURCE_REF}" \
         --skip-fetch-check \
         --bootloader grub \
         --target-imgref "${IMAGE_NAME}" \
