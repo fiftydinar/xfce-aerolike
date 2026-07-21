@@ -13,11 +13,6 @@ echo "Installing xfce-aerolike to ${ROOT}..."
 EMPTY_OVERLAY="/tmp/.empty-overlay"
 mkdir -p "$EMPTY_OVERLAY"
 
-# ---- Container storage (target disk) ----
-mkdir -p "${ROOT}/var/lib/containers-staging" /var/lib/containers/storage
-mount --bind "${ROOT}/var/lib/containers-staging" /var/lib/containers/storage
-mount --bind "$EMPTY_OVERLAY" "${ROOT}/var/lib/containers-staging"
-
 # ---- Bootc temp dir (target disk) ----
 # bootc (Rust) reads $TMPDIR via std::env::temp_dir.
 # Create a host-accessible path, then overlay the target path so
@@ -26,14 +21,6 @@ mkdir -p "${ROOT}/tmp" /mnt/target-tmp
 mount --bind "${ROOT}/tmp" /mnt/target-tmp
 mount --bind "$EMPTY_OVERLAY" "${ROOT}/tmp"
 export TMPDIR=/mnt/target-tmp
-
-# ---- Storage config (kernel overlay, no mount_program) ----
-STORAGE_CONF="/tmp/bootc-storage.conf"
-cat > "$STORAGE_CONF" << 'STORAGECONF'
-[storage]
-driver = "overlay"
-STORAGECONF
-export CONTAINERS_STORAGE_CONF="$STORAGE_CONF"
 
 INSTALL_MODE="offline"
 if [ -f /opt/install/install-mode ]; then
@@ -44,11 +31,6 @@ IMAGE_NAME="${DEFAULT_IMAGE}"
 if [ "${INSTALL_MODE}" = "offline" ] && [ -f "${IMAGE_ARCHIVE}" ]; then
     echo "Installing in OFFLINE mode..."
 
-    # ---- Phase 1: archive -> OCI layout ----
-    # Decompress archive to a regular file first (avoids containers/image's
-    # double temp-copy that would consume +7 GiB).
-    # Then copy to an OCI directory layout on the target, which stores
-    # blobs as compressed files (minimal space).
     SKOPEO_TMP="${ROOT}/.skopeo-tmp"
     IMAGE_TAR="${SKOPEO_TMP}/image.tar"
     OCI_DIR="${ROOT}/.oci-image"
@@ -59,19 +41,22 @@ if [ "${INSTALL_MODE}" = "offline" ] && [ -f "${IMAGE_ARCHIVE}" ]; then
     # Redirect /var/tmp so containers/image's temp ops land on the target
     mount --bind "$SKOPEO_TMP" /var/tmp
 
+    # Copy to OCI layout (blobs stay compressed, no overlay unpacking)
     skopeo copy "docker-archive:${IMAGE_TAR}" "oci:${OCI_DIR}:latest"
 
-    # Phase 1 cleanup: free the decompressed tar (+7 GiB) before starting
-    # storage import. Keep the OCI layout (~3 GiB compressed blobs).
     umount /var/tmp
     rm -f "$IMAGE_TAR"
     rmdir "$SKOPEO_TMP"
 
-    # ---- Phase 2: OCI layout -> containers-storage ----
-    # No large temp files needed; reads compressed blobs from OCI layout,
-    # writes them to storage.  Storage unpacking grows to full rootfs size,
-    # but peak usage is OCI blobs + storage (~3 + rootfs) which fits in 30 GiB.
-    skopeo copy "oci:${OCI_DIR}:latest" "containers-storage:${IMAGE_NAME}"
+    # Install directly from OCI layout — skip containers-storage entirely.
+    # This avoids the storage overlay driver unpacking all layers to
+    # overlay-layers/ (which exceeded the 30 GiB partition).
+    bootc install to-filesystem \
+        --source-imgref "oci:${OCI_DIR}:latest" \
+        --skip-fetch-check \
+        --bootloader grub \
+        --target-imgref "${IMAGE_NAME}" \
+        "${ROOT}"
 
     rm -rf "$OCI_DIR"
 elif [ "${INSTALL_MODE}" = "online" ]; then
@@ -87,22 +72,17 @@ elif [ "${INSTALL_MODE}" = "online" ]; then
         fi
     fi
     echo "Installing in ONLINE mode..."
-    skopeo copy "docker://${IMAGE_NAME}" "containers-storage:${IMAGE_NAME}"
+    bootc install to-filesystem \
+        --source-imgref "docker://${IMAGE_NAME}" \
+        --skip-fetch-check \
+        --bootloader grub \
+        --target-imgref "${IMAGE_NAME}" \
+        "${ROOT}"
 fi
 
-echo "Running bootc install to-filesystem..."
-bootc install to-filesystem \
-    --source-imgref "containers-storage:${IMAGE_NAME}" \
-    --skip-fetch-check \
-    --bootloader grub \
-    --target-imgref "${IMAGE_NAME}" \
-    "${ROOT}"
-
 echo "Cleanup..."
-umount "${ROOT}/var/lib/containers-staging" 2>/dev/null || true
-umount /var/lib/containers/storage 2>/dev/null || true
 umount "${ROOT}/tmp" 2>/dev/null || true
 umount /mnt/target-tmp 2>/dev/null || true
-rm -rf "${ROOT}/var/lib/containers-staging" "${ROOT}/tmp" "${STORAGE_CONF}" "${EMPTY_OVERLAY}"
+rm -rf "${ROOT}/tmp" "${STORAGE_CONF:-}" "${EMPTY_OVERLAY}"
 
 echo "Installation complete!"
