@@ -10,19 +10,23 @@ DEFAULT_IMAGE="ghcr.io/fiftydinar/xfce-aerolike:latest"
 
 echo "Installing xfce-aerolike to ${ROOT}..."
 
-# Use target disk for container storage to avoid filling tmpfs.
-mkdir -p "${ROOT}/var/lib/containers-staging"
-# HACK: bind-mount staging dir to /var/lib/containers/storage so empty-root check passes
-# (it sees the dir as a mount point and skips it).
-mkdir -p /var/lib/containers/storage
-mount --bind "${ROOT}/var/lib/containers-staging" /var/lib/containers/storage
-
-# Overlay the staging dir with an empty mount so bootc skips it in the target root
-EMPTY_OVERLAY="/tmp/.empty-staging"
+EMPTY_OVERLAY="/tmp/.empty-overlay"
 mkdir -p "$EMPTY_OVERLAY"
+
+# ---- Container storage (target disk) ----
+# Write image to target via bind mount; overlay hides it from bootc's empty-root check.
+mkdir -p "${ROOT}/var/lib/containers-staging" /var/lib/containers/storage
+mount --bind "${ROOT}/var/lib/containers-staging" /var/lib/containers/storage
 mount --bind "$EMPTY_OVERLAY" "${ROOT}/var/lib/containers-staging"
 
-# Use clean overlay storage config (no mount_program, pure kernel overlay)
+# ---- Temp space (target disk) ----
+# skopeo/bootc extract archives to /var/tmp; route it to the target filesystem.
+mkdir -p "${ROOT}/var/tmp" /mnt/var-tmp
+mount --bind "${ROOT}/var/tmp" /mnt/var-tmp
+mount --bind /mnt/var-tmp /var/tmp
+mount --bind "$EMPTY_OVERLAY" "${ROOT}/var/tmp"
+
+# ---- Storage config (kernel overlay, no mount_program) ----
 STORAGE_CONF="/tmp/bootc-storage.conf"
 cat > "$STORAGE_CONF" << 'STORAGECONF'
 [storage]
@@ -38,7 +42,6 @@ fi
 IMAGE_NAME="${DEFAULT_IMAGE}"
 if [ "${INSTALL_MODE}" = "offline" ] && [ -f "${IMAGE_ARCHIVE}" ]; then
     echo "Installing in OFFLINE mode..."
-    # Import archive directly into containers/storage with the right reference
     skopeo copy --override-os linux "docker-archive:${IMAGE_ARCHIVE}" "containers-storage:${IMAGE_NAME}"
 elif [ "${INSTALL_MODE}" = "online" ]; then
     if [ -f "${IMAGE_REF_FILE}" ]; then
@@ -67,6 +70,9 @@ bootc install to-filesystem \
 echo "Cleanup..."
 umount "${ROOT}/var/lib/containers-staging" 2>/dev/null || true
 umount /var/lib/containers/storage 2>/dev/null || true
-rm -rf "${ROOT}/var/lib/containers-staging" "${STORAGE_CONF}" "${EMPTY_OVERLAY}"
+umount "${ROOT}/var/tmp" 2>/dev/null || true
+umount /mnt/var-tmp 2>/dev/null || true
+umount /var/tmp 2>/dev/null || true
+rm -rf "${ROOT}/var/lib/containers-staging" "${ROOT}/var/tmp" /mnt/var-tmp "${STORAGE_CONF}" "${EMPTY_OVERLAY}"
 
 echo "Installation complete!"
