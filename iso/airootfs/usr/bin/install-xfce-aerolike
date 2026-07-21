@@ -26,6 +26,16 @@ if [ -f /opt/install/install-mode ]; then
 fi
 
 IMAGE_NAME="${DEFAULT_IMAGE}"
+# Use clean storage config with kernel overlay (no mount_program).
+# The live ISO's /etc/containers/storage.conf has mount_program=fuse-overlayfs
+# which conflicts with our kernel-overlay-loaded image.
+STORAGE_CONF="/tmp/bootc-storage.conf"
+cat > "$STORAGE_CONF" << 'STORAGECONF'
+[storage]
+driver = "overlay"
+STORAGECONF
+export CONTAINERS_STORAGE_CONF="$STORAGE_CONF"
+
 if [ "${INSTALL_MODE}" = "offline" ] && [ -f "${IMAGE_ARCHIVE}" ]; then
     echo "Installing in OFFLINE mode (loading image from ${IMAGE_ARCHIVE})..."
     zstd -d -c "${IMAGE_ARCHIVE}" | podman load
