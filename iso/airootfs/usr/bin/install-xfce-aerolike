@@ -19,6 +19,7 @@ mkdir -p "${ROOT}/var/lib/containers-staging" /var/lib/containers/storage
 mount --bind "${ROOT}/var/lib/containers-staging" /var/lib/containers/storage
 STORAGE_ROOT="/var/lib/containers/storage"
 
+# Use target disk for podman's temporary unpacking (avoids filling live ISO's small tmpfs)
 export TMPDIR="${ROOT}/tmp"
 mkdir -p "$TMPDIR"
 
@@ -64,8 +65,9 @@ STORAGECONF
 chmod u+s /usr/bin/newuidmap /usr/bin/newgidmap 2>/dev/null || true
 
 # bootc requires the target to contain only mount points (no regular directories).
-# /tmp was created as an empty dir on the target filesystem; remove it so bootc
-# doesn't reject it.
+# Switch TMPDIR to host tmpfs and clean up target's tmp dir so bootc passes verification.
+export TMPDIR=/tmp/install-tmp
+mkdir -p "$TMPDIR"
 rm -rf "${ROOT}/tmp"
 
 echo "Running bootc install to-filesystem using image ${IMAGE_NAME}..."
