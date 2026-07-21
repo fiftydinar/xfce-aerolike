@@ -61,8 +61,6 @@ driver = "overlay"
 [storage.options]
 mount_program = "/usr/bin/fuse-overlayfs"
 STORAGECONF
-# Also fix newuidmap setuid (needed for podman on Arch)
-chmod u+s /usr/bin/newuidmap /usr/bin/newgidmap 2>/dev/null || true
 
 # bootc requires the target to contain only mount points (no regular directories).
 # Switch TMPDIR to host tmpfs and clean up target's tmp dir so bootc passes verification.
