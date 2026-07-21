@@ -18,13 +18,6 @@ mkdir -p "${ROOT}/var/lib/containers-staging" /var/lib/containers/storage
 mount --bind "${ROOT}/var/lib/containers-staging" /var/lib/containers/storage
 mount --bind "$EMPTY_OVERLAY" "${ROOT}/var/lib/containers-staging"
 
-# ---- Skopeo & bootc temp dir (target disk) ----
-# containers/image hardcodes /var/tmp for big temp files, ignoring $TMPDIR.
-# Also the overlay storage driver needs room for layer unpacking.
-# Use a dedicated staging dir on the target for all temp needs.
-SKOPEO_TMP="${ROOT}/.skopeo-tmp"
-mkdir -p "$SKOPEO_TMP"
-
 # ---- Bootc temp dir (target disk) ----
 # bootc (Rust) reads $TMPDIR via std::env::temp_dir.
 # Create a host-accessible path, then overlay the target path so
@@ -51,22 +44,36 @@ IMAGE_NAME="${DEFAULT_IMAGE}"
 if [ "${INSTALL_MODE}" = "offline" ] && [ -f "${IMAGE_ARCHIVE}" ]; then
     echo "Installing in OFFLINE mode..."
 
-    # Decompress the archive to a regular file FIRST.  This avoids the
-    # containers/image library creating a second temp copy in /var/tmp by
-    # reading the uncompressed file in-place (newReader(path, false) —
-    # no NewReaderFromStream / CreateBigFileTemp call).
+    # ---- Phase 1: archive -> OCI layout ----
+    # Decompress archive to a regular file first (avoids containers/image's
+    # double temp-copy that would consume +7 GiB).
+    # Then copy to an OCI directory layout on the target, which stores
+    # blobs as compressed files (minimal space).
+    SKOPEO_TMP="${ROOT}/.skopeo-tmp"
     IMAGE_TAR="${SKOPEO_TMP}/image.tar"
+    OCI_DIR="${ROOT}/.oci-image"
+    mkdir -p "$SKOPEO_TMP" "$OCI_DIR"
+
     zstd -d "$IMAGE_ARCHIVE" -o "$IMAGE_TAR"
 
-    # Redirect /var/tmp so containers/image can write its temp files
-    # (used during layer unpacking in the storage driver).
+    # Redirect /var/tmp so containers/image's temp ops land on the target
     mount --bind "$SKOPEO_TMP" /var/tmp
 
-    skopeo copy "docker-archive:${IMAGE_TAR}" "containers-storage:${IMAGE_NAME}"
+    skopeo copy "docker-archive:${IMAGE_TAR}" "oci:${OCI_DIR}:latest"
 
-    # Clean up: remove the decompressed tar to free space for bootc.
+    # Phase 1 cleanup: free the decompressed tar (+7 GiB) before starting
+    # storage import. Keep the OCI layout (~3 GiB compressed blobs).
     umount /var/tmp
     rm -f "$IMAGE_TAR"
+    rmdir "$SKOPEO_TMP"
+
+    # ---- Phase 2: OCI layout -> containers-storage ----
+    # No large temp files needed; reads compressed blobs from OCI layout,
+    # writes them to storage.  Storage unpacking grows to full rootfs size,
+    # but peak usage is OCI blobs + storage (~3 + rootfs) which fits in 30 GiB.
+    skopeo copy "oci:${OCI_DIR}:latest" "containers-storage:${IMAGE_NAME}"
+
+    rm -rf "$OCI_DIR"
 elif [ "${INSTALL_MODE}" = "online" ]; then
     if [ -f "${IMAGE_REF_FILE}" ]; then
         TAG=$(cat "${IMAGE_REF_FILE}" | sed 's/.*://')
@@ -82,8 +89,6 @@ elif [ "${INSTALL_MODE}" = "online" ]; then
     echo "Installing in ONLINE mode..."
     skopeo copy "docker://${IMAGE_NAME}" "containers-storage:${IMAGE_NAME}"
 fi
-
-rm -rf "$SKOPEO_TMP"
 
 echo "Running bootc install to-filesystem..."
 bootc install to-filesystem \
