@@ -46,12 +46,14 @@ else
 fi
 
 # Configure podman storage inside bootc container to use fuse-overlayfs
-# (avoids 'overlay is not supported over overlayfs' error when
-# running bootc inside a container that's already on overlayfs)
+# and point graphroot to the podman storage on the target disk.
+# ${ROOT} is bind-mounted to /target, so ${PODMAN_ROOT} is at
+# /target/var/lib/containers-staging inside the container.
 mkdir -p "${ROOT}/etc/containers"
 cat > "${ROOT}/etc/containers/storage.conf" << 'STORAGECONF'
 [storage]
 driver = "overlay"
+graphroot = "/target/var/lib/containers-staging"
 
 [storage.options]
 mount_program = "/usr/bin/fuse-overlayfs"
@@ -65,7 +67,6 @@ podman --root "$PODMAN_ROOT" run --rm --privileged --pid=host --ipc=host \
     -v /dev:/dev \
     -v /dev/fuse:/dev/fuse \
     -v "${ROOT}:/target" \
-    -v "${PODMAN_ROOT}:/var/lib/containers/storage" \
     -v "${ROOT}/etc/containers/storage.conf:/etc/containers/storage.conf" \
     -v /usr/bin/fuse-overlayfs:/usr/bin/fuse-overlayfs:ro \
     -v /usr/bin/fusermount3:/usr/bin/fusermount3:ro \
