@@ -40,17 +40,19 @@ if [ "${INSTALL_MODE}" = "offline" ] && [ -f "${IMAGE_ARCHIVE}" ]; then
     # Redirect /var/tmp so containers/image's temp ops land on the target
     mount --bind "$SKOPEO_TMP" /var/tmp
 
-    # Bind-mount the decompressed archive to a host path (captures original
-    # dentry), then overlay the target path with /dev/null so bootc's
-    # require_empty_rootdir sees a mount point (skipped) instead of a file.
+    # Bind-mount the decompressed archive to a host path.  This holds a
+    # reference to the inode, keeping the content alive even after we delete
+    # the original path from the target root (required for require_empty_rootdir).
     mkdir -p /mnt/image-staging
     mount --bind "$IMAGE_TAR" /mnt/image-staging/image.tar
-    mount --bind /dev/null "$IMAGE_TAR"
 
     umount /var/tmp
+    rm -f "$IMAGE_TAR"
     rmdir "$SKOPEO_TMP"
 
-    # bootc reads docker-archive directly — no OCI intermediate, no tmpfs.
+    # bootc reads the archive from the host path (outside target root).
+    # The archive is uncompressed, so docker-archive transport reads it
+    # in-place (newReader(path, false)) — no temp file needed.
     bootc install to-filesystem \
         --source-imgref "docker-archive:/mnt/image-staging/image.tar:latest" \
         --generic-image \
@@ -59,10 +61,9 @@ if [ "${INSTALL_MODE}" = "offline" ] && [ -f "${IMAGE_ARCHIVE}" ]; then
         --target-imgref "${IMAGE_NAME}" \
         "${ROOT}"
 
-    # Cleanup mounts
+    # Cleanup
     umount /mnt/image-staging/image.tar 2>/dev/null || true
-    umount "$IMAGE_TAR" 2>/dev/null || true
-    rm -rf /mnt/image-staging "$IMAGE_TAR"
+    rm -rf /mnt/image-staging
 elif [ "${INSTALL_MODE}" = "online" ]; then
     if [ -f "${IMAGE_REF_FILE}" ]; then
         TAG=$(cat "${IMAGE_REF_FILE}" | sed 's/.*://')
