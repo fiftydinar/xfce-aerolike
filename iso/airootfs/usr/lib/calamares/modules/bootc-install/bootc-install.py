@@ -3,7 +3,6 @@ import libcalamares
 import subprocess
 import os
 import json
-import threading
 import re
 
 _status = "Preparing..."
@@ -13,40 +12,6 @@ def pretty_name():
 
 def pretty_status_message():
     return _status
-
-def _read_progress(r_fd, total_phase_start, total_phase_end):
-    global _status
-    try:
-        with os.fdopen(r_fd, "r") as f:
-            while True:
-                line = f.readline()
-                if not line:
-                    break
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    event = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                evtype = event.get("type")
-                if evtype == "ProgressBytes":
-                    task = event.get("task", "")
-                    bytes_val = event.get("bytes", 0)
-                    total = event.get("bytesTotal", 0)
-                    desc = event.get("description", task)
-                    _status = desc
-                    if total > 0:
-                        phase_progress = bytes_val / total
-                        overall = total_phase_start + (total_phase_end - total_phase_start) * min(phase_progress, 1.0)
-                        libcalamares.job.setprogress(overall)
-                elif evtype == "SubTaskStep":
-                    desc = event.get("description", "")
-                    completed = event.get("completed", False)
-                    if not completed:
-                        _status = desc
-    except Exception as e:
-        libcalamares.utils.debug(f"Progress reader error: {e}")
 
 def _stream_output(proc, phase_start, phase_end, prefix=""):
     """Read stdout line by line and update progress/status."""
@@ -81,28 +46,9 @@ def _stream_output(proc, phase_start, phase_end, prefix=""):
 
 def _run_bootc(base_args, root, progress_start, progress_end):
     global _status
-    help_out = subprocess.run(["bootc", "install", "--help"], capture_output=True, text=True).stdout
-    has_progress = "--progress-fd" in help_out
-
     bootc_args = base_args + ["--generic-image", "--skip-fetch-check", "--bootloader", "grub", root]
-
-    if has_progress:
-        r_fd, w_fd = os.pipe()
-        thread = threading.Thread(
-            target=_read_progress, args=(r_fd, progress_start, progress_end), daemon=True
-        )
-        thread.start()
-        proc = subprocess.Popen(
-            bootc_args + ["--progress-fd", str(w_fd)],
-            pass_fds=(w_fd,), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
-        )
-        os.close(w_fd)
-        stdout, stderr = proc.communicate()
-        thread.join(timeout=5)
-    else:
-        proc = subprocess.Popen(bootc_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        stdout, stderr = proc.communicate()
-
+    proc = subprocess.Popen(bootc_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    stdout, stderr = proc.communicate()
     libcalamares.utils.debug(f"bootc stdout:\n{stdout}")
     libcalamares.utils.debug(f"bootc stderr:\n{stderr}")
     return stdout, stderr, proc.returncode
