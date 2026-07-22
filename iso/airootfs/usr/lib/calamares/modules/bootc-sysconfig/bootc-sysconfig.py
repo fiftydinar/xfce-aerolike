@@ -72,5 +72,21 @@ def run():
 
     libcalamares.job.setprogress(1.0)
     _status = "System settings configured"
+
+    # Auto-login for LightDM
+    _status = "Configuring auto-login..."
+    autologin_user = gs.value("autologinUser")
+    if autologin_user:
+        lightdm_conf = os.path.join(etc, "lightdm", "lightdm.conf")
+        try:
+            os.makedirs(os.path.dirname(lightdm_conf), exist_ok=True)
+            with open(lightdm_conf, "w") as f:
+                f.write("[Seat:*]\n")
+                f.write(f"autologin-user={autologin_user}\n")
+                f.write("autologin-session=xfce\n")
+            libcalamares.utils.debug(f"Set auto-login for {autologin_user}")
+        except OSError as e:
+            libcalamares.utils.warning(f"Failed to set auto-login: {e}")
+
     libcalamares.utils.debug("System settings configured")
     return None
