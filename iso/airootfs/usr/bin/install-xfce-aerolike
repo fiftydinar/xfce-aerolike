@@ -51,24 +51,13 @@ if [ "${INSTALL_MODE}" = "offline" ] && [ -f "${IMAGE_ARCHIVE}" ]; then
     mount --make-private /mnt/oci-staging
     mount --bind "$EMPTY_OVERLAY" "$OCI_DIR"
 
-    if bootc install to-filesystem \
+    bootc install to-filesystem \
         --source-imgref "oci:/mnt/oci-staging:latest" \
         --generic-image \
         --skip-fetch-check \
         --bootloader grub \
         --target-imgref "${IMAGE_NAME}" \
-        "${ROOT}"; then
-        : # success
-    elif [ -d /sys/firmware/efi ]; then
-        echo "Bootupd BIOS component failed on UEFI system — not critical, continuing..."
-        # bootc deployment succeeded but BIOS bootloader component failed.
-        # Install GRUB for EFI directly.
-        grub-install --target=x86_64-efi --efi-directory="${ROOT}/boot/efi" \
-            --bootloader-id=ARCH --boot-directory="${ROOT}/boot" --recheck
-    else
-        # Real failure on BIOS system — re-raise bootc's exit code
-        exit 1
-    fi
+        "${ROOT}"
 
     umount "$OCI_DIR" 2>/dev/null || true
     umount /mnt/oci-staging 2>/dev/null || true
