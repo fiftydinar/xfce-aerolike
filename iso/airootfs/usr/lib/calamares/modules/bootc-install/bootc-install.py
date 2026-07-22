@@ -8,7 +8,7 @@ import re
 _status = "Preparing..."
 
 def pretty_name():
-    return "Install xfce-aerolike system"
+    return _status
 
 def pretty_status_message():
     return _status

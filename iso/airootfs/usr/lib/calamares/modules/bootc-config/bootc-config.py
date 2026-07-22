@@ -6,7 +6,7 @@ import os
 _status = "Configuring..."
 
 def pretty_name():
-    return "Configure installed system"
+    return _status
 
 def pretty_status_message():
     return _status
