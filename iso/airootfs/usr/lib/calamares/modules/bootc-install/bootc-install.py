@@ -80,27 +80,26 @@ def run():
     if mode == "offline" and os.path.exists(archive):
         libcalamares.utils.debug("Offline mode: extracting image...")
 
-        skopeo_tmp = os.path.join(root, ".skopeo-tmp")
-        image_tar = os.path.join(skopeo_tmp, "image.tar")
         oci_dir = os.path.join(root, ".oci-image")
-        os.makedirs(skopeo_tmp, exist_ok=True)
         os.makedirs(oci_dir, exist_ok=True)
 
         libcalamares.job.setprogress(0.15)
 
-        subprocess.run(["zstd", "-d", archive, "-o", image_tar], check=True)
-        subprocess.run(["mount", "--bind", skopeo_tmp, "/var/tmp"], capture_output=True)
+        os.makedirs("/mnt/skopeo-tmp", exist_ok=True)
+        subprocess.run(["mount", "--bind", "/mnt/skopeo-tmp", "/var/tmp"], capture_output=True)
 
         libcalamares.job.setprogress(0.2)
 
-        subprocess.run(
-            ["skopeo", "copy", f"docker-archive:{image_tar}", f"oci:{oci_dir}:latest"],
-            check=True
+        # Stream zstd directly to skopeo — no intermediate tar file
+        zstd_proc = subprocess.Popen(["zstd", "-d", "-c", archive], stdout=subprocess.PIPE)
+        skopeo_proc = subprocess.run(
+            ["skopeo", "copy", "docker-archive:/dev/stdin", f"oci:{oci_dir}:latest"],
+            stdin=zstd_proc.stdout, capture_output=True, text=True
         )
+        zstd_proc.wait()
 
         subprocess.run(["umount", "/var/tmp"], capture_output=True)
-        os.remove(image_tar)
-        os.rmdir(skopeo_tmp)
+        subprocess.run(["rmdir", "/mnt/skopeo-tmp"], capture_output=True)
 
         libcalamares.job.setprogress(0.35)
 

@@ -28,21 +28,15 @@ IMAGE_NAME="${DEFAULT_IMAGE}"
 if [ "${INSTALL_MODE}" = "offline" ] && [ -f "${IMAGE_ARCHIVE}" ]; then
     echo "Installing in OFFLINE mode..."
 
-    SKOPEO_TMP="${ROOT}/.skopeo-tmp"
-    IMAGE_TAR="${SKOPEO_TMP}/image.tar"
     OCI_DIR="${ROOT}/.oci-image"
-    mkdir -p "$SKOPEO_TMP" "$OCI_DIR"
+    mkdir -p "$OCI_DIR"
 
-    zstd -d "$IMAGE_ARCHIVE" -o "$IMAGE_TAR"
-
-    mount --bind "$SKOPEO_TMP" /var/tmp
-
-    # Copy to OCI layout on the target partition (blobs stay compressed)
-    skopeo copy "docker-archive:${IMAGE_TAR}" "oci:${OCI_DIR}:latest"
-
+    # Stream zstd directly to skopeo — no intermediate tar file (saves ~7GB disk + RAM)
+    mkdir -p /mnt/skopeo-tmp
+    mount --bind /mnt/skopeo-tmp /var/tmp
+    zstd -d -c "$IMAGE_ARCHIVE" | skopeo copy "docker-archive:/dev/stdin" "oci:${OCI_DIR}:latest"
     umount /var/tmp
-    rm -f "$IMAGE_TAR"
-    rmdir "$SKOPEO_TMP"
+    rmdir /mnt/skopeo-tmp 2>/dev/null || true
 
     # Bind-mount OCI dir to host path.  Make the mount private so the
     # subsequent overlay (for require_empty_rootdir) doesn't propagate.
