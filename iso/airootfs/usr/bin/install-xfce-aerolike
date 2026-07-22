@@ -14,9 +14,6 @@ EMPTY_OVERLAY="/tmp/.empty-overlay"
 mkdir -p "$EMPTY_OVERLAY"
 
 # ---- Bootc temp dir (target disk) ----
-# bootc (Rust) reads $TMPDIR via std::env::temp_dir.
-# Create a host-accessible path, then overlay the target path so
-# bootc's require_empty_rootdir sees an empty dir.
 mkdir -p "${ROOT}/tmp" /mnt/target-tmp
 mount --bind "${ROOT}/tmp" /mnt/target-tmp
 mount --bind "$EMPTY_OVERLAY" "${ROOT}/tmp"
@@ -33,38 +30,38 @@ if [ "${INSTALL_MODE}" = "offline" ] && [ -f "${IMAGE_ARCHIVE}" ]; then
 
     SKOPEO_TMP="${ROOT}/.skopeo-tmp"
     IMAGE_TAR="${SKOPEO_TMP}/image.tar"
-    mkdir -p "$SKOPEO_TMP"
+    OCI_DIR="${ROOT}/.oci-image"
+    mkdir -p "$SKOPEO_TMP" "$OCI_DIR"
 
     zstd -d "$IMAGE_ARCHIVE" -o "$IMAGE_TAR"
 
-    # Redirect /var/tmp so containers/image's temp ops land on the target
     mount --bind "$SKOPEO_TMP" /var/tmp
 
-    # Bind-mount the decompressed archive to a host path.  This holds a
-    # reference to the inode, keeping the content alive even after we delete
-    # the original path from the target root (required for require_empty_rootdir).
-    mkdir -p /mnt/image-staging
-    touch /mnt/image-staging/image.tar
-    mount --bind "$IMAGE_TAR" /mnt/image-staging/image.tar
+    # Copy to OCI layout on the target partition (blobs stay compressed)
+    skopeo copy "docker-archive:${IMAGE_TAR}" "oci:${OCI_DIR}:latest"
 
     umount /var/tmp
     rm -f "$IMAGE_TAR"
-    rm -rf "$SKOPEO_TMP"
+    rmdir "$SKOPEO_TMP"
 
-    # bootc reads the archive from the host path (outside target root).
-    # The archive is uncompressed, so docker-archive transport reads it
-    # in-place (newReader(path, false)) — no temp file needed.
+    # Bind-mount OCI dir to host path.  Make the mount private so the
+    # subsequent overlay (for require_empty_rootdir) doesn't propagate.
+    mkdir -p /mnt/oci-staging
+    mount --bind "$OCI_DIR" /mnt/oci-staging/oci
+    mount --make-private /mnt/oci-staging/oci
+    mount --bind "$EMPTY_OVERLAY" "$OCI_DIR"
+
     bootc install to-filesystem \
-        --source-imgref "docker-archive:/mnt/image-staging/image.tar:${IMAGE_NAME}" \
+        --source-imgref "oci:/mnt/oci-staging/oci:latest" \
         --generic-image \
         --skip-fetch-check \
         --bootloader grub \
         --target-imgref "${IMAGE_NAME}" \
         "${ROOT}"
 
-    # Cleanup
-    umount /mnt/image-staging/image.tar 2>/dev/null || true
-    rm -rf /mnt/image-staging
+    umount "$OCI_DIR" 2>/dev/null || true
+    umount /mnt/oci-staging/oci 2>/dev/null || true
+    rm -rf "$OCI_DIR" /mnt/oci-staging
 elif [ "${INSTALL_MODE}" = "online" ]; then
     if [ -f "${IMAGE_REF_FILE}" ]; then
         TAG=$(cat "${IMAGE_REF_FILE}" | sed 's/.*://')
