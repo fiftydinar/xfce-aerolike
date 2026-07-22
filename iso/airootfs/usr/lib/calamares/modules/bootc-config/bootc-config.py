@@ -3,10 +3,17 @@ import libcalamares
 import subprocess
 import os
 
+_status = "Configuring..."
+
 def pretty_name():
     return "Configure installed system"
 
+def pretty_status_message():
+    return _status
+
 def run():
+    global _status
+    _status = "Configuring installed system..."
     libcalamares.job.setprogress(0.0)
     gs = libcalamares.globalstorage
     root = gs.value("rootMountPoint")
@@ -16,6 +23,7 @@ def run():
     etc = os.path.join(root, "etc")
 
     # Hostname
+    _status = "Setting hostname..."
     hostname = gs.value("hostname")
     if hostname:
         try:
@@ -28,6 +36,7 @@ def run():
     libcalamares.job.setprogress(0.2)
 
     # Timezone
+    _status = "Setting timezone..."
     region = gs.value("locationRegion")
     zone = gs.value("locationZone")
     if region and zone:
@@ -44,6 +53,7 @@ def run():
     libcalamares.job.setprogress(0.4)
 
     # Keyboard
+    _status = "Setting keyboard layout..."
     layout = gs.value("xkbLayout")
     if layout:
         vconsole = os.path.join(etc, "vconsole.conf")
@@ -57,6 +67,7 @@ def run():
     libcalamares.job.setprogress(0.6)
 
     # User creation
+    _status = "Creating user account..."
     username = gs.value("username")
     password = gs.value("password")
     sudoers_group = gs.value("sudoersGroup")
@@ -95,6 +106,7 @@ def run():
         except Exception as e:
             libcalamares.utils.warning(f"Failed to create user: {e}")
 
+    _status = "Configuration complete"
     libcalamares.job.setprogress(1.0)
     libcalamares.utils.debug("Configuration complete!")
     return None

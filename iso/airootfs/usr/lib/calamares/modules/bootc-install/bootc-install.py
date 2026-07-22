@@ -253,6 +253,6 @@ def run():
                    capture_output=True)
 
     libcalamares.job.setprogress(1.0)
-    _status = "Installation complete!"
-    libcalamares.utils.debug("Installation complete!")
+    _status = "Container image deployed"
+    libcalamares.utils.debug("Container image deployed")
     return None
