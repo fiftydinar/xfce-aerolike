@@ -48,7 +48,7 @@ if [ "${INSTALL_MODE}" = "offline" ] && [ -f "${IMAGE_ARCHIVE}" ]; then
 
     umount /var/tmp
     rm -f "$IMAGE_TAR"
-    rmdir "$SKOPEO_TMP"
+    rm -rf "$SKOPEO_TMP"
 
     # bootc reads the archive from the host path (outside target root).
     # The archive is uncompressed, so docker-archive transport reads it
