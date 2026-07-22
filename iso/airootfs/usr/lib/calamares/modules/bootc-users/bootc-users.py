@@ -32,36 +32,29 @@ def run():
 
     libcalamares.utils.debug(f"Creating user: {username}")
 
-    # Mount required filesystems for chroot
-    for mp, fstype in [("/proc", "proc"), ("/sys", "sysfs"), ("/dev", None)]:
-        target_mp = os.path.join(root, mp.lstrip("/"))
-        os.makedirs(target_mp, exist_ok=True)
-        if fstype:
-            subprocess.run(["mount", "-t", fstype, fstype, target_mp], capture_output=True)
-        else:
-            subprocess.run(["mount", "--bind", mp, target_mp], capture_output=True)
-
-    libcalamares.job.setprogress(0.3)
-
-    # User creation
+    # Use the live ISO's useradd with --root to target the installed system
     _status = "Creating user account..."
     proc = subprocess.run(
-        ["chroot", root, "useradd", "-m", "-G", sudoers_group or "wheel", username],
+        ["useradd", "--root", root, "-m", "-G", sudoers_group or "wheel", username],
         capture_output=True, text=True
     )
     if proc.returncode != 0:
         libcalamares.utils.warning(f"Failed to create user: {proc.stderr}")
+    else:
+        libcalamares.utils.debug(f"User {username} created")
 
     libcalamares.job.setprogress(0.5)
 
-    # User password
+    # Set user password via chpasswd --root
     _status = "Setting password..."
     proc = subprocess.run(
-        ["chroot", root, "sh", "-c", f"echo '{username}:{password}' | chpasswd"],
-        capture_output=True, text=True
+        ["chpasswd", "--root", root],
+        input=f"{username}:{password}\n", capture_output=True, text=True
     )
     if proc.returncode != 0:
         libcalamares.utils.warning(f"Failed to set password: {proc.stderr}")
+    else:
+        libcalamares.utils.debug("Password set")
 
     libcalamares.job.setprogress(0.7)
 
@@ -70,16 +63,13 @@ def run():
     root_password = gs.value("rootPassword")
     if root_password:
         proc = subprocess.run(
-            ["chroot", root, "sh", "-c", f"echo 'root:{root_password}' | chpasswd"],
-            capture_output=True, text=True
+            ["chpasswd", "--root", root],
+            input=f"root:{root_password}\n", capture_output=True, text=True
         )
         if proc.returncode != 0:
             libcalamares.utils.warning(f"Failed to set root password: {proc.stderr}")
-
-    # Unmount
-    _status = "Finalizing..."
-    for mp, _ in [("/proc", None), ("/sys", None), ("/dev", None)]:
-        subprocess.run(["umount", "-l", os.path.join(root, mp.lstrip("/"))], capture_output=True)
+        else:
+            libcalamares.utils.debug("Root password set")
 
     libcalamares.job.setprogress(1.0)
     _status = "User accounts configured"
