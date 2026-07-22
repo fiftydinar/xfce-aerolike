@@ -94,7 +94,7 @@ def run():
 
             proc = subprocess.run(
                 ["chroot", root, "sh", "-c",
-                 f"echo '{username}:{password}' | chpasswd -e"],
+                 f"echo '{username}:{password}' | chpasswd"],
                 capture_output=True, text=True
             )
             if proc.returncode != 0:

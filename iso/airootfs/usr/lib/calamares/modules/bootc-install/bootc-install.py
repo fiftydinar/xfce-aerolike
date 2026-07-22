@@ -215,6 +215,7 @@ def run():
             proc = subprocess.Popen([
                 "bootc", "install", "to-filesystem",
                 "--source-imgref", f"docker://{image_name}",
+                "--generic-image",
                 "--skip-fetch-check",
                 "--progress-fd", str(w_fd),
                 "--bootloader", "grub",
@@ -228,6 +229,7 @@ def run():
             proc = subprocess.run([
                 "bootc", "install", "to-filesystem",
                 "--source-imgref", f"docker://{image_name}",
+                "--generic-image",
                 "--skip-fetch-check",
                 "--bootloader", "grub",
                 "--target-imgref", image_name,
