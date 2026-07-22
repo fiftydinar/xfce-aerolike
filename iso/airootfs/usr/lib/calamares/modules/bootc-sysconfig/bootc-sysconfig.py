@@ -81,6 +81,7 @@ def run():
         try:
             os.makedirs(os.path.dirname(lightdm_conf), exist_ok=True)
             with open(lightdm_conf, "w") as f:
+                f.write("# Auto-login configured by Calamares installer\n")
                 f.write("[Seat:*]\n")
                 f.write(f"autologin-user={autologin_user}\n")
                 f.write("autologin-session=xfce\n")
