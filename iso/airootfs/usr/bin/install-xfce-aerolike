@@ -44,6 +44,7 @@ if [ "${INSTALL_MODE}" = "offline" ] && [ -f "${IMAGE_ARCHIVE}" ]; then
     # reference to the inode, keeping the content alive even after we delete
     # the original path from the target root (required for require_empty_rootdir).
     mkdir -p /mnt/image-staging
+    touch /mnt/image-staging/image.tar
     mount --bind "$IMAGE_TAR" /mnt/image-staging/image.tar
 
     umount /var/tmp
