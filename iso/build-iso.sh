@@ -473,6 +473,14 @@ cp "${PROFILE_DIR}/airootfs/usr/share/applications/install-xfce-aerolike.desktop
    "${AIROOTFS}/home/live/Desktop/install-xfce-aerolike.desktop"
 chmod +x "${AIROOTFS}/home/live/Desktop/install-xfce-aerolike.desktop"
 
+# Enable XFCE presentation mode by default in the live ISO
+# (prevents screen blanking/suspending during live session)
+POWER_XML="${AIROOTFS}/etc/xdg/xfce4/xfconf/xfce-perchannel-xml/xfce4-power-manager.xml"
+if [ -f "$POWER_XML" ]; then
+    sed -i 's|presentation-mode.*value="false"|presentation-mode" type="bool" value="true"|' "$POWER_XML"
+    echo "[build-iso] Enabled XFCE presentation mode in live ISO"
+fi
+
 # Systemd user service: mark installer desktop file as trusted after session is ready
 # (service file shipped via iso/airootfs/usr/lib/systemd/user/trust-installer.service)
 chroot "${AIROOTFS}" systemctl --global enable trust-installer.service 2>/dev/null || {
