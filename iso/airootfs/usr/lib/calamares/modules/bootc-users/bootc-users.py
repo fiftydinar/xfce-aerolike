@@ -6,7 +6,7 @@ import os
 _status = "..."
 
 def pretty_name():
-    return "Create user accounts"
+    return "Creating user accounts"
 
 def pretty_status_message():
     return _status

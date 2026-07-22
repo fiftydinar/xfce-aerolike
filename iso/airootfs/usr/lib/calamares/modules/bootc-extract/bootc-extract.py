@@ -6,7 +6,7 @@ import os
 _status = "Preparing..."
 
 def pretty_name():
-    return "Extract container image"
+    return "Extracting container image"
 
 def pretty_status_message():
     return _status

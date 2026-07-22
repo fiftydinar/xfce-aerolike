@@ -6,7 +6,7 @@ import os
 _status = "Preparing..."
 
 def pretty_name():
-    return "Install system via bootc"
+    return "Installing system via bootc"
 
 def pretty_status_message():
     return _status
@@ -57,6 +57,20 @@ def run():
         return ("bootc install failed", proc.stderr)
 
     libcalamares.job.setprogress(0.85)
+    _status = "Installing EFI fallback bootloader..."
+
+    # bootupd with --generic-image skips --update-firmware, so no NVRAM
+    # boot entry is created.  Install the fallback EFI/BOOT/BOOTX64.EFI
+    # so the firmware finds it without a specific NVRAM entry.
+    esp_arch = os.path.join(root, "boot/efi/EFI/arch")
+    esp_boot = os.path.join(root, "boot/efi/EFI/BOOT")
+    os.makedirs(esp_boot, exist_ok=True)
+    grub_src = os.path.join(esp_arch, "grubx64.efi")
+    grub_dst = os.path.join(esp_boot, "BOOTX64.EFI")
+    if os.path.exists(grub_src):
+        subprocess.run(["cp", grub_src, grub_dst], capture_output=True)
+        libcalamares.utils.debug("Installed EFI/BOOT/BOOTX64.EFI fallback")
+
     _status = "Cleaning up OCI staging..."
 
     subprocess.run(["umount", oci_dir], capture_output=True)
