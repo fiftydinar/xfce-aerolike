@@ -81,19 +81,28 @@ def _stream_output(proc, phase_start, phase_end, prefix=""):
 
 def _run_bootc(base_args, root, progress_start, progress_end):
     global _status
-    r_fd, w_fd = os.pipe()
-    thread = threading.Thread(
-        target=_read_progress, args=(r_fd, progress_start, progress_end), daemon=True
-    )
-    thread.start()
-    proc = subprocess.Popen(
-        base_args + ["--generic-image", "--skip-fetch-check", "--bootloader", "grub",
-                      "--progress-fd", str(w_fd), root],
-        pass_fds=(w_fd,), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
-    )
-    os.close(w_fd)
-    stdout, stderr = proc.communicate()
-    thread.join(timeout=5)
+    help_out = subprocess.run(["bootc", "install", "--help"], capture_output=True, text=True).stdout
+    has_progress = "--progress-fd" in help_out
+
+    bootc_args = base_args + ["--generic-image", "--skip-fetch-check", "--bootloader", "grub", root]
+
+    if has_progress:
+        r_fd, w_fd = os.pipe()
+        thread = threading.Thread(
+            target=_read_progress, args=(r_fd, progress_start, progress_end), daemon=True
+        )
+        thread.start()
+        proc = subprocess.Popen(
+            bootc_args + ["--progress-fd", str(w_fd)],
+            pass_fds=(w_fd,), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+        )
+        os.close(w_fd)
+        stdout, stderr = proc.communicate()
+        thread.join(timeout=5)
+    else:
+        proc = subprocess.Popen(bootc_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        stdout, stderr = proc.communicate()
+
     libcalamares.utils.debug(f"bootc stdout:\n{stdout}")
     libcalamares.utils.debug(f"bootc stderr:\n{stderr}")
     return stdout, stderr, proc.returncode
