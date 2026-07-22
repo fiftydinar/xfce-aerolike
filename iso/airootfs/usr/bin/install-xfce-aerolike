@@ -54,7 +54,7 @@ if [ "${INSTALL_MODE}" = "offline" ] && [ -f "${IMAGE_ARCHIVE}" ]; then
 
     bootc install to-filesystem \
         --source-imgref "oci:/mnt/oci-staging/image:latest" \
-        --skip-fetch-check \
+        --generic-image \
         --bootloader grub \
         --target-imgref "${IMAGE_NAME}" \
         "${ROOT}"
