@@ -4,7 +4,7 @@ import subprocess
 import os
 import json
 import threading
-import select
+import re
 
 _status = "Preparing..."
 
@@ -16,7 +16,6 @@ def pretty_status_message():
 
 def _read_progress(r_fd, total_phase_start, total_phase_end):
     global _status
-    """Read bootc JSON progress events from a pipe fd and update Calamares progress."""
     try:
         with os.fdopen(r_fd, "r") as f:
             while True:
@@ -49,6 +48,66 @@ def _read_progress(r_fd, total_phase_start, total_phase_end):
     except Exception as e:
         libcalamares.utils.debug(f"Progress reader error: {e}")
 
+def _stream_output(proc, phase_start, phase_end, prefix=""):
+    """Read stdout line by line and update progress/status."""
+    global _status
+    blob_re = re.compile(r"^(Copying (blob|config) sha256:[a-f0-9]+)")
+    total_blobs = 0
+    completed_blobs = 0
+    lines = []
+    for line in iter(proc.stdout.readline, ""):
+        line = line.rstrip()
+        lines.append(line)
+        libcalamares.utils.debug(f"{prefix}{line}")
+        m = blob_re.match(line)
+        if m:
+            if "blob" in line:
+                total_blobs += 1
+            _status = line
+        elif line.startswith("Copying config"):
+            _status = "Copying config..."
+        elif line.startswith("Writing manifest"):
+            _status = "Writing manifest..."
+            libcalamares.job.setprogress(phase_start + (phase_end - phase_start) * 0.95)
+        # Count "done" or completed blob lines for progress
+        if "done" in line and "blob" in m.group() if m else False:
+            completed_blobs += 1
+            if total_blobs > 0:
+                libcalamares.job.setprogress(
+                    phase_start + (phase_end - phase_start) * min(completed_blobs / max(total_blobs, 1), 1.0)
+                )
+    proc.wait()
+    return "".join(lines)
+
+def _run_bootc(base_args, root, progress_start, progress_end):
+    """Run bootc with or without --progress-fd, return (stdout, stderr, returncode)."""
+    global _status
+    help_out = subprocess.run(["bootc", "install", "--help"], capture_output=True, text=True).stdout
+    has_progress = "--progress-fd" in help_out
+
+    bootc_args = base_args + ["--generic-image", "--skip-fetch-check", "--bootloader", "grub", root]
+
+    if has_progress:
+        r_fd, w_fd = os.pipe()
+        thread = threading.Thread(
+            target=_read_progress, args=(r_fd, progress_start, progress_end), daemon=True
+        )
+        thread.start()
+        proc = subprocess.Popen(
+            bootc_args + ["--progress-fd", str(w_fd)],
+            pass_fds=(w_fd,), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+        )
+        os.close(w_fd)
+        stdout, stderr = proc.communicate()
+        thread.join(timeout=5)
+    else:
+        proc = subprocess.Popen(bootc_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        stdout, stderr = _stream_output(proc, progress_start, progress_end, "bootc: ")
+
+    libcalamares.utils.debug(f"bootc stdout:\n{stdout}")
+    libcalamares.utils.debug(f"bootc stderr:\n{stderr}")
+    return stdout, stderr, proc.returncode
+
 def run():
     libcalamares.job.setprogress(0.0)
     global _status
@@ -58,8 +117,6 @@ def run():
     root = libcalamares.globalstorage.value("rootMountPoint")
     if not root:
         return ("No root mount point", "GlobalStorage rootMountPoint is not set")
-
-    libcalamares.utils.debug(f"Root: {root}")
 
     archive = "/opt/install/xfce-aerolike.tar.zst"
     ref_file = "/opt/install/image-ref"
@@ -83,17 +140,13 @@ def run():
 
     os.makedirs(os.path.join(root, "tmp"), exist_ok=True)
     os.makedirs("/mnt/target-tmp", exist_ok=True)
-    subprocess.run(["mount", "--bind", os.path.join(root, "tmp"), "/mnt/target-tmp"],
-                   capture_output=True)
-    subprocess.run(["mount", "--bind", empty_overlay, os.path.join(root, "tmp")],
-                   capture_output=True)
+    subprocess.run(["mount", "--bind", os.path.join(root, "tmp"), "/mnt/target-tmp"], capture_output=True)
+    subprocess.run(["mount", "--bind", empty_overlay, os.path.join(root, "tmp")], capture_output=True)
     os.environ["TMPDIR"] = "/mnt/target-tmp"
 
     libcalamares.job.setprogress(0.1)
 
     if mode == "offline" and os.path.exists(archive):
-        libcalamares.utils.debug("Offline mode: extracting image...")
-
         oci_dir = os.path.join(root, ".oci-image")
         os.makedirs(oci_dir, exist_ok=True)
 
@@ -106,16 +159,17 @@ def run():
         libcalamares.job.setprogress(0.2)
         _status = "Extracting container image to OCI layout..."
 
-        # Stream zstd directly to skopeo — no intermediate tar file
+        # Stream zstd -> skopeo with real-time output
         zstd_proc = subprocess.Popen(["zstd", "-d", "-c", archive], stdout=subprocess.PIPE)
-        skopeo_proc = subprocess.run(
+        skopeo_proc = subprocess.Popen(
             ["skopeo", "copy", "docker-archive:/dev/stdin", f"oci:{oci_dir}:latest"],
-            stdin=zstd_proc.stdout, capture_output=True, text=True
+            stdin=zstd_proc.stdout, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
         )
+        _stream_output(skopeo_proc, 0.2, 0.35, "skopeo: ")
         zstd_proc.wait()
 
-        subprocess.run(["umount", "/var/tmp"], capture_output=True)
-        subprocess.run(["rm", "-rf", os.path.join(root, ".skopeo-tmp")], capture_output=True)
+        if skopeo_proc.returncode != 0:
+            return ("skopeo copy failed", "See debug log for details")
 
         libcalamares.job.setprogress(0.35)
         _status = "OCI image ready, mounting..."
@@ -127,54 +181,17 @@ def run():
 
         libcalamares.job.setprogress(0.4)
 
-        # Check if bootc supports --progress-fd
-        progress_check = subprocess.run(
-            ["bootc", "install", "--help"], capture_output=True, text=True
+        stdout, stderr, rc = _run_bootc(
+            ["bootc", "install", "to-filesystem",
+             "--source-imgref", "oci:/mnt/oci-staging:latest",
+             "--target-imgref", image_name,
+             root],
+            0.4, 0.85
         )
-        has_progress_fd = "--progress-fd" in progress_check.stdout
-
-        libcalamares.utils.debug(f"Running bootc install (offline) with image {image_name}")
-        if has_progress_fd:
-            r_fd, w_fd = os.pipe()
-            thread = threading.Thread(
-                target=_read_progress,
-                args=(r_fd, 0.4, 0.85),
-                daemon=True
-            )
-            thread.start()
-            proc = subprocess.Popen([
-                "bootc", "install", "to-filesystem",
-                "--source-imgref", "oci:/mnt/oci-staging:latest",
-                "--generic-image",
-                "--skip-fetch-check",
-                "--progress-fd", str(w_fd),
-                "--bootloader", "grub",
-                "--target-imgref", image_name,
-                root
-            ], pass_fds=(w_fd,), capture_output=True, text=True)
-            os.close(w_fd)
-            stdout, stderr = proc.communicate()
-            thread.join(timeout=5)
-        else:
-            proc = subprocess.run([
-                "bootc", "install", "to-filesystem",
-                "--source-imgref", "oci:/mnt/oci-staging:latest",
-                "--generic-image",
-                "--skip-fetch-check",
-                "--bootloader", "grub",
-                "--target-imgref", image_name,
-                root
-            ], capture_output=True, text=True)
-            stdout, stderr = proc.stdout, proc.stderr
-
-        libcalamares.utils.debug(f"bootc stdout: {stdout}")
-        libcalamares.utils.debug(f"bootc stderr: {stderr}")
-
-        if proc.returncode != 0:
+        if rc != 0:
             return ("bootc install failed", stderr)
 
         libcalamares.job.setprogress(0.85)
-
         subprocess.run(["umount", oci_dir], capture_output=True)
         subprocess.run(["umount", "/mnt/oci-staging"], capture_output=True)
         subprocess.run(["rm", "-rf", oci_dir, "/mnt/oci-staging"], capture_output=True)
@@ -192,55 +209,20 @@ def run():
                     )
                     if result.returncode == 0:
                         tags = json.loads(result.stdout).get("Tags", [])
-                        matching = sorted([t for t in tags if t.startswith(tag_prefix)],
-                                         reverse=True)
+                        matching = sorted([t for t in tags if t.startswith(tag_prefix)], reverse=True)
                         if matching:
                             image_name = f"ghcr.io/fiftydinar/xfce-aerolike:{matching[0]}"
 
         libcalamares.job.setprogress(0.3)
 
-        libcalamares.utils.debug(f"Running bootc install (online) with image {image_name}")
-        progress_check = subprocess.run(
-            ["bootc", "install", "--help"], capture_output=True, text=True
+        stdout, stderr, rc = _run_bootc(
+            ["bootc", "install", "to-filesystem",
+             "--source-imgref", f"docker://{image_name}",
+             "--target-imgref", image_name,
+             root],
+            0.3, 0.85
         )
-        has_progress_fd = "--progress-fd" in progress_check.stdout
-        if has_progress_fd:
-            r_fd, w_fd = os.pipe()
-            thread = threading.Thread(
-                target=_read_progress,
-                args=(r_fd, 0.3, 0.85),
-                daemon=True
-            )
-            thread.start()
-            proc = subprocess.Popen([
-                "bootc", "install", "to-filesystem",
-                "--source-imgref", f"docker://{image_name}",
-                "--generic-image",
-                "--skip-fetch-check",
-                "--progress-fd", str(w_fd),
-                "--bootloader", "grub",
-                "--target-imgref", image_name,
-                root
-            ], pass_fds=(w_fd,), capture_output=True, text=True)
-            os.close(w_fd)
-            stdout, stderr = proc.communicate()
-            thread.join(timeout=5)
-        else:
-            proc = subprocess.run([
-                "bootc", "install", "to-filesystem",
-                "--source-imgref", f"docker://{image_name}",
-                "--generic-image",
-                "--skip-fetch-check",
-                "--bootloader", "grub",
-                "--target-imgref", image_name,
-                root
-            ], capture_output=True, text=True)
-            stdout, stderr = proc.stdout, proc.stderr
-
-        libcalamares.utils.debug(f"bootc stdout: {stdout}")
-        libcalamares.utils.debug(f"bootc stderr: {stderr}")
-
-        if proc.returncode != 0:
+        if rc != 0:
             return ("bootc install failed", stderr)
 
         libcalamares.job.setprogress(0.85)
@@ -251,8 +233,7 @@ def run():
 
     subprocess.run(["umount", os.path.join(root, "tmp")], capture_output=True)
     subprocess.run(["umount", "/mnt/target-tmp"], capture_output=True)
-    subprocess.run(["rm", "-rf", os.path.join(root, "tmp"), empty_overlay],
-                   capture_output=True)
+    subprocess.run(["rm", "-rf", os.path.join(root, "tmp"), empty_overlay], capture_output=True)
 
     libcalamares.job.setprogress(1.0)
     _status = "Container image deployed"
