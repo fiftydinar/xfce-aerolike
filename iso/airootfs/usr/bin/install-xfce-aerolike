@@ -40,27 +40,29 @@ if [ "${INSTALL_MODE}" = "offline" ] && [ -f "${IMAGE_ARCHIVE}" ]; then
     # Redirect /var/tmp so containers/image's temp ops land on the target
     mount --bind "$SKOPEO_TMP" /var/tmp
 
-    # Put OCI layout on a tmpfs so it's directly accessible to bootc
-    # (no bind-mount/overlay tricks needed).  Size matches the compressed
-    # blobs — within the expected ~3 GiB.
-    mkdir -p /mnt/oci-staging
-    mount -t tmpfs -o size=4G tmpfs /mnt/oci-staging
-
-    skopeo copy "docker-archive:${IMAGE_TAR}" "oci:/mnt/oci-staging/image:latest"
+    # Bind-mount the decompressed archive to a host path (captures original
+    # dentry), then overlay the target path with /dev/null so bootc's
+    # require_empty_rootdir sees a mount point (skipped) instead of a file.
+    mkdir -p /mnt/image-staging
+    mount --bind "$IMAGE_TAR" /mnt/image-staging/image.tar
+    mount --bind /dev/null "$IMAGE_TAR"
 
     umount /var/tmp
-    rm -f "$IMAGE_TAR"
     rmdir "$SKOPEO_TMP"
 
+    # bootc reads docker-archive directly — no OCI intermediate, no tmpfs.
     bootc install to-filesystem \
-        --source-imgref "oci:/mnt/oci-staging/image:latest" \
+        --source-imgref "docker-archive:/mnt/image-staging/image.tar:latest" \
         --generic-image \
         --skip-fetch-check \
         --bootloader grub \
         --target-imgref "${IMAGE_NAME}" \
         "${ROOT}"
 
-    umount /mnt/oci-staging
+    # Cleanup mounts
+    umount /mnt/image-staging/image.tar 2>/dev/null || true
+    umount "$IMAGE_TAR" 2>/dev/null || true
+    rm -rf /mnt/image-staging "$IMAGE_TAR"
 elif [ "${INSTALL_MODE}" = "online" ]; then
     if [ -f "${IMAGE_REF_FILE}" ]; then
         TAG=$(cat "${IMAGE_REF_FILE}" | sed 's/.*://')
