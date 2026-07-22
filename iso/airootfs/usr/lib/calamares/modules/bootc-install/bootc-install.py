@@ -174,9 +174,8 @@ def run():
         stdout, stderr, rc = _run_bootc(
             ["bootc", "install", "to-filesystem",
              "--source-imgref", "oci:/mnt/oci-staging:latest",
-             "--target-imgref", image_name,
-             root],
-            0.4, 0.85
+             "--target-imgref", image_name],
+            root, 0.4, 0.85
         )
         if rc != 0:
             return ("bootc install failed", stderr)
@@ -208,9 +207,8 @@ def run():
         stdout, stderr, rc = _run_bootc(
             ["bootc", "install", "to-filesystem",
              "--source-imgref", f"docker://{image_name}",
-             "--target-imgref", image_name,
-             root],
-            0.3, 0.85
+             "--target-imgref", image_name],
+            root, 0.3, 0.85
         )
         if rc != 0:
             return ("bootc install failed", stderr)
