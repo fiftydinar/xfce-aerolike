@@ -106,6 +106,22 @@ def run():
         except Exception as e:
             libcalamares.utils.warning(f"Failed to create user: {e}")
 
+    libcalamares.job.setprogress(0.9)
+
+    # Root password (doesn't need chroot bind mounts — just modifies /etc/shadow)
+    _status = "Setting root password..."
+    root_password = gs.value("rootPassword")
+    if root_password:
+        proc = subprocess.run(
+            ["chroot", root, "sh", "-c",
+             f"echo 'root:{root_password}' | chpasswd"],
+            capture_output=True, text=True
+        )
+        if proc.returncode != 0:
+            libcalamares.utils.warning(f"Failed to set root password: {proc.stderr}")
+        else:
+            libcalamares.utils.debug("Root password set")
+
     _status = "Configuration complete"
     libcalamares.job.setprogress(1.0)
     libcalamares.utils.debug("Configuration complete!")
