@@ -6,10 +6,16 @@ import json
 import threading
 import select
 
+_status = "Preparing..."
+
 def pretty_name():
     return "Install xfce-aerolike system"
 
+def pretty_status_message():
+    return _status
+
 def _read_progress(r_fd, total_phase_start, total_phase_end):
+    global _status
     """Read bootc JSON progress events from a pipe fd and update Calamares progress."""
     try:
         with os.fdopen(r_fd, "r") as f:
@@ -30,16 +36,23 @@ def _read_progress(r_fd, total_phase_start, total_phase_end):
                     bytes_val = event.get("bytes", 0)
                     total = event.get("bytesTotal", 0)
                     desc = event.get("description", task)
-                    # Map the progress within the phase
+                    _status = desc
                     if total > 0:
                         phase_progress = bytes_val / total
                         overall = total_phase_start + (total_phase_end - total_phase_start) * min(phase_progress, 1.0)
                         libcalamares.job.setprogress(overall)
+                elif evtype == "SubTaskStep":
+                    desc = event.get("description", "")
+                    completed = event.get("completed", False)
+                    if not completed:
+                        _status = desc
     except Exception as e:
         libcalamares.utils.debug(f"Progress reader error: {e}")
 
 def run():
     libcalamares.job.setprogress(0.0)
+    global _status
+    _status = "Starting installation..."
     libcalamares.utils.debug("Starting install-xfce-aerolike...")
 
     root = libcalamares.globalstorage.value("rootMountPoint")
@@ -66,6 +79,7 @@ def run():
     os.makedirs(empty_overlay, exist_ok=True)
 
     libcalamares.job.setprogress(0.05)
+    _status = "Preparing temporary storage..."
 
     os.makedirs(os.path.join(root, "tmp"), exist_ok=True)
     os.makedirs("/mnt/target-tmp", exist_ok=True)
@@ -84,11 +98,13 @@ def run():
         os.makedirs(oci_dir, exist_ok=True)
 
         libcalamares.job.setprogress(0.15)
+        _status = "Mounting temporary storage..."
 
         os.makedirs("/mnt/skopeo-tmp", exist_ok=True)
         subprocess.run(["mount", "--bind", "/mnt/skopeo-tmp", "/var/tmp"], capture_output=True)
 
         libcalamares.job.setprogress(0.2)
+        _status = "Extracting container image to OCI layout..."
 
         # Stream zstd directly to skopeo — no intermediate tar file
         zstd_proc = subprocess.Popen(["zstd", "-d", "-c", archive], stdout=subprocess.PIPE)
@@ -102,6 +118,7 @@ def run():
         subprocess.run(["rmdir", "/mnt/skopeo-tmp"], capture_output=True)
 
         libcalamares.job.setprogress(0.35)
+        _status = "OCI image ready, mounting..."
 
         os.makedirs("/mnt/oci-staging", exist_ok=True)
         subprocess.run(["mount", "--bind", oci_dir, "/mnt/oci-staging"], capture_output=True)
@@ -225,8 +242,10 @@ def run():
             return ("bootc install failed", stderr)
 
         libcalamares.job.setprogress(0.85)
+        _status = "Bootc install complete, cleaning up..."
 
     libcalamares.job.setprogress(0.9)
+    _status = "Final cleanup..."
 
     subprocess.run(["umount", os.path.join(root, "tmp")], capture_output=True)
     subprocess.run(["umount", "/mnt/target-tmp"], capture_output=True)
@@ -234,5 +253,6 @@ def run():
                    capture_output=True)
 
     libcalamares.job.setprogress(1.0)
+    _status = "Installation complete!"
     libcalamares.utils.debug("Installation complete!")
     return None
