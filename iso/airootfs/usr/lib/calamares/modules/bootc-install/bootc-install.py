@@ -100,8 +100,8 @@ def run():
         libcalamares.job.setprogress(0.15)
         _status = "Mounting temporary storage..."
 
-        os.makedirs("/mnt/skopeo-tmp", exist_ok=True)
-        subprocess.run(["mount", "--bind", "/mnt/skopeo-tmp", "/var/tmp"], capture_output=True)
+        os.makedirs(os.path.join(root, ".skopeo-tmp"), exist_ok=True)
+        subprocess.run(["mount", "--bind", os.path.join(root, ".skopeo-tmp"), "/var/tmp"], capture_output=True)
 
         libcalamares.job.setprogress(0.2)
         _status = "Extracting container image to OCI layout..."
@@ -115,7 +115,7 @@ def run():
         zstd_proc.wait()
 
         subprocess.run(["umount", "/var/tmp"], capture_output=True)
-        subprocess.run(["rmdir", "/mnt/skopeo-tmp"], capture_output=True)
+        subprocess.run(["rm", "-rf", os.path.join(root, ".skopeo-tmp")], capture_output=True)
 
         libcalamares.job.setprogress(0.35)
         _status = "OCI image ready, mounting..."
