@@ -1,0 +1,5 @@
+---
+name: bootc-users
+type: job
+interface: python
+script: bootc-users.py

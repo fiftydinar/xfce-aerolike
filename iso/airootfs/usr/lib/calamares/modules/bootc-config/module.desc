@@ -1,5 +1,0 @@
----
-name: bootc-config
-type: job
-interface: python
-script: bootc-config.py

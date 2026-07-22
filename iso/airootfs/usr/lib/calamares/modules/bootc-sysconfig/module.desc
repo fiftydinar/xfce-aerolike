@@ -1,0 +1,5 @@
+---
+name: bootc-sysconfig
+type: job
+interface: python
+script: bootc-sysconfig.py

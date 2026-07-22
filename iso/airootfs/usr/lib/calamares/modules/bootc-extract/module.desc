@@ -1,0 +1,5 @@
+---
+name: bootc-extract
+type: job
+interface: python
+script: bootc-extract.py

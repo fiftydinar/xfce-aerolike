@@ -1,0 +1,5 @@
+---
+name: bootc-deploy
+type: job
+interface: python
+script: bootc-deploy.py

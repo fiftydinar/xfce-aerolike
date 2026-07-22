@@ -1,5 +1,0 @@
----
-name: bootc-install
-type: job
-interface: python
-script: bootc-install.py
