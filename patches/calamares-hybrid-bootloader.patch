@@ -1,0 +1,12 @@
+diff --git a/src/modules/partition/Config.cpp b/src/modules/partition/Config.cpp
+index e3c9f3b..5ba5160 100644
+--- a/src/modules/partition/Config.cpp
++++ b/src/modules/partition/Config.cpp
+@@ -460,6 +460,7 @@ Config::setConfigurationMap( const QVariantMap& configurationMap )
+     Calamares::GlobalStorage* gs = Calamares::JobQueue::instance()->globalStorage();
+     gs->insert( "armInstall", Calamares::getBool( configurationMap, "armInstall", false ) );
+     fillGSConfigurationEFI( gs, configurationMap );
++    gs->insert( "createHybridBootloaderLayout", Calamares::getBool( configurationMap, "createHybridBootloaderLayout", false ) );
+     fillConfigurationFSTypes( configurationMap );
+ }
+
