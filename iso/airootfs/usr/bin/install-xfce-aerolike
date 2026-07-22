@@ -33,40 +33,33 @@ if [ "${INSTALL_MODE}" = "offline" ] && [ -f "${IMAGE_ARCHIVE}" ]; then
 
     SKOPEO_TMP="${ROOT}/.skopeo-tmp"
     IMAGE_TAR="${SKOPEO_TMP}/image.tar"
-    OCI_DIR="${ROOT}/.oci-image"
-    mkdir -p "$SKOPEO_TMP" "$OCI_DIR"
+    mkdir -p "$SKOPEO_TMP"
 
     zstd -d "$IMAGE_ARCHIVE" -o "$IMAGE_TAR"
 
     # Redirect /var/tmp so containers/image's temp ops land on the target
     mount --bind "$SKOPEO_TMP" /var/tmp
 
-    # Copy to OCI layout (blobs stay compressed, no overlay unpacking)
-    skopeo copy "docker-archive:${IMAGE_TAR}" "oci:${OCI_DIR}:latest"
+    # Put OCI layout on a tmpfs so it's directly accessible to bootc
+    # (no bind-mount/overlay tricks needed).  Size matches the compressed
+    # blobs — within the expected ~3 GiB.
+    mkdir -p /mnt/oci-staging
+    mount -t tmpfs -o size=4G tmpfs /mnt/oci-staging
+
+    skopeo copy "docker-archive:${IMAGE_TAR}" "oci:/mnt/oci-staging/image:latest"
 
     umount /var/tmp
     rm -f "$IMAGE_TAR"
     rmdir "$SKOPEO_TMP"
 
-    # Bind mount OCI dir to a host path (captures original dentry), then
-    # overlay the target path so bootc's require_empty_rootdir passes.
-    mkdir -p /mnt/oci-image
-    mount --bind "$OCI_DIR" /mnt/oci-image
-    mount --bind "$EMPTY_OVERLAY" "$OCI_DIR"
-
-    # Install directly from OCI layout — skip containers-storage entirely.
-    # This avoids the storage overlay driver unpacking all layers to
-    # overlay-layers/ (which exceeded the 30 GiB partition).
     bootc install to-filesystem \
-        --source-imgref "oci:/mnt/oci-image:latest" \
+        --source-imgref "oci:/mnt/oci-staging/image:latest" \
         --skip-fetch-check \
         --bootloader grub \
         --target-imgref "${IMAGE_NAME}" \
         "${ROOT}"
 
-    umount "$OCI_DIR"
-    umount /mnt/oci-image
-    rm -rf "$OCI_DIR"
+    umount /mnt/oci-staging
 elif [ "${INSTALL_MODE}" = "online" ]; then
     if [ -f "${IMAGE_REF_FILE}" ]; then
         TAG=$(cat "${IMAGE_REF_FILE}" | sed 's/.*://')
