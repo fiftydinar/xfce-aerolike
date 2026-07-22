@@ -47,12 +47,12 @@ if [ "${INSTALL_MODE}" = "offline" ] && [ -f "${IMAGE_ARCHIVE}" ]; then
     # Bind-mount OCI dir to host path.  Make the mount private so the
     # subsequent overlay (for require_empty_rootdir) doesn't propagate.
     mkdir -p /mnt/oci-staging
-    mount --bind "$OCI_DIR" /mnt/oci-staging/oci
-    mount --make-private /mnt/oci-staging/oci
+    mount --bind "$OCI_DIR" /mnt/oci-staging
+    mount --make-private /mnt/oci-staging
     mount --bind "$EMPTY_OVERLAY" "$OCI_DIR"
 
     bootc install to-filesystem \
-        --source-imgref "oci:/mnt/oci-staging/oci:latest" \
+        --source-imgref "oci:/mnt/oci-staging:latest" \
         --generic-image \
         --skip-fetch-check \
         --bootloader grub \
@@ -60,7 +60,7 @@ if [ "${INSTALL_MODE}" = "offline" ] && [ -f "${IMAGE_ARCHIVE}" ]; then
         "${ROOT}"
 
     umount "$OCI_DIR" 2>/dev/null || true
-    umount /mnt/oci-staging/oci 2>/dev/null || true
+    umount /mnt/oci-staging 2>/dev/null || true
     rm -rf "$OCI_DIR" /mnt/oci-staging
 elif [ "${INSTALL_MODE}" = "online" ]; then
     if [ -f "${IMAGE_REF_FILE}" ]; then
