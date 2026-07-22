@@ -96,28 +96,29 @@ def run():
         os.makedirs(oci_dir, exist_ok=True)
 
         libcalamares.job.setprogress(0.15)
-        _status = "Mounting temporary storage..."
+        _status = "Decompressing archive..."
 
-        os.makedirs(os.path.join(root, ".skopeo-tmp"), exist_ok=True)
-        subprocess.run(["mount", "--bind", os.path.join(root, ".skopeo-tmp"), "/var/tmp"], capture_output=True)
+        skopeo_tmp = os.path.join(root, ".skopeo-tmp")
+        image_tar = os.path.join(skopeo_tmp, "image.tar")
+        os.makedirs(skopeo_tmp, exist_ok=True)
+        subprocess.run(["zstd", "-d", archive, "-o", image_tar], capture_output=True, check=True)
 
         libcalamares.job.setprogress(0.2)
-        _status = "Extracting container image to OCI layout..."
+        _status = "Converting to OCI layout..."
 
-        # Stream zstd -> skopeo with real-time output
-        zstd_proc = subprocess.Popen(["zstd", "-d", "-c", archive], stdout=subprocess.PIPE)
         skopeo_proc = subprocess.Popen(
-            ["skopeo", "copy", "docker-archive:/dev/stdin", f"oci:{oci_dir}:latest"],
-            stdin=zstd_proc.stdout, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
+            ["skopeo", "copy", f"docker-archive:{image_tar}", f"oci:{oci_dir}:latest"],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
         )
         _stream_output(skopeo_proc, 0.2, 0.35, "skopeo: ")
-        zstd_proc.wait()
-
         if skopeo_proc.returncode != 0:
             return ("skopeo copy failed", "See debug log for details")
 
         libcalamares.job.setprogress(0.35)
         _status = "OCI image ready, mounting..."
+
+        subprocess.run(["rm", "-f", image_tar], capture_output=True)
+        subprocess.run(["rm", "-rf", skopeo_tmp], capture_output=True, check=True)
 
         os.makedirs("/mnt/oci-staging", exist_ok=True)
         subprocess.run(["mount", "--bind", oci_dir, "/mnt/oci-staging"], capture_output=True)
