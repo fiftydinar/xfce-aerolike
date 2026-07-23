@@ -126,8 +126,6 @@ jobs:
             prepare: |
               BCACHEFS_TAG=$(git ls-remote --tags --refs https://evilpiepirate.org/git/bcachefs-tools.git | grep -o 'v[0-9.]*$' | sort -V | tail -1)
               BCACHEFS_VER=${BCACHEFS_TAG#v}
-              echo "BCACHEFS_TAG=$BCACHEFS_TAG" >> $GITHUB_ENV
-              echo "BCACHEFS_VER=$BCACHEFS_VER" >> $GITHUB_ENV
               # Switch source from GitHub to evilpiepirate (matches kernel module source)
               sed -i "s|^source=.*|source=(\"git+https://evilpiepirate.org/git/bcachefs-tools.git#tag=${BCACHEFS_TAG}\")|" PKGBUILD
               sed -i "s/^pkgver=.*/pkgver=$BCACHEFS_VER/" PKGBUILD
