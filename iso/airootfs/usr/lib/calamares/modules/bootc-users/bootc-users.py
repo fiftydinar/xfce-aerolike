@@ -74,6 +74,9 @@ def run():
         else:
             libcalamares.utils.debug("Root password set")
 
+    # Remount root ro (composefs integrity)
+    subprocess.run(["mount", "-o", "remount,ro", root], capture_output=True)
+
     libcalamares.job.setprogress(1.0)
     _status = "User accounts configured"
     libcalamares.utils.debug("User accounts configured")

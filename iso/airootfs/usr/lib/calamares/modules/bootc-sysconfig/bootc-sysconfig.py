@@ -76,6 +76,9 @@ def run():
     libcalamares.job.setprogress(1.0)
     _status = "System settings configured"
 
+    # Remount root ro (composefs integrity)
+    subprocess.run(["mount", "-o", "remount,ro", root], capture_output=True)
+
     # Auto-login for LightDM (drop-in with alphanumeric priority)
     _status = "Configuring auto-login..."
     autologin_user = gs.value("autologinUser")
