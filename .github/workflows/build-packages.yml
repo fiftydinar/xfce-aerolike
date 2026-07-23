@@ -121,61 +121,25 @@ jobs:
 
           - name: bcachefs-tools
             enabled: true
-            repo: https://evilpiepirate.org/git/bcachefs-tools.git
+            repo: https://gitlab.archlinux.org/archlinux/packaging/packages/bcachefs-tools.git
             skippgpcheck: true
             prepare: |
               BCACHEFS_TAG=$(git ls-remote --tags --refs https://evilpiepirate.org/git/bcachefs-tools.git | grep -o 'v[0-9.]*$' | sort -V | tail -1)
               BCACHEFS_VER=${BCACHEFS_TAG#v}
               echo "BCACHEFS_TAG=$BCACHEFS_TAG" >> $GITHUB_ENV
               echo "BCACHEFS_VER=$BCACHEFS_VER" >> $GITHUB_ENV
-              cat > PKGBUILD << 'PKGEOF'
-              pkgname=bcachefs-tools
-              pkgver=
-              pkgrel=1
-              pkgdesc='BCacheFS filesystem utilities'
-              arch=('x86_64')
-              url='https://bcachefs.org/'
-              license=('GPL-2.0-only')
-              depends=(
-                  fuse3
-                  glibc
-                  keyutils libkeyutils.so
-                  libaio libaio.so
-                  libsodium libsodium.so
-                  libunwind libunwind.so
-                  liburcu
-                  lz4
-                  systemd-libs libudev.so
-                  udev
-                  util-linux-libs libblkid.so libuuid.so
-                  zlib libz.so
-                  zstd libzstd.so
-              )
-              makedepends=(${depends[@]} git make pkgconf)
-              options=(!lto)
-              source=("git+https://evilpiepirate.org/git/bcachefs-tools.git#tag=${BCACHEFS_TAG}")
-              sha256sums=('SKIP')
-
-              build() {
-                  cd ${pkgname}
-                  export CFLAGS="${CFLAGS/_FORTIFY_SOURCE=3/_FORTIFY_SOURCE=2}"
-                  export CXXFLAGS="${CXXFLAGS/_FORTIFY_SOURCE=3/_FORTIFY_SOURCE=2}"
-                  make LIBEXECDIR=/usr/lib DESTDIR="${pkgdir}" ROOT_SBINDIR="/usr/bin"
-              }
-
-              package() {
-                  depends+=("bash")
-                  cd ${pkgname}
-                  export CFLAGS="${CFLAGS/_FORTIFY_SOURCE=3/_FORTIFY_SOURCE=2}"
-                  export CXXFLAGS="${CXXFLAGS/_FORTIFY_SOURCE=3/_FORTIFY_SOURCE=2}"
-                  make PREFIX="/usr" LIBEXECDIR=/usr/lib DESTDIR="${pkgdir}" \
-                      ROOT_SBINDIR="/usr/bin" INITRAMFS_DIR="/usr/lib/initcpio/" install
-                  rm -rf "${pkgdir}"/usr/lib/initcpio/*
-                  install -dm755 "${pkgdir}"/usr/lib/initcpio/{hooks,install}
-              }
-              PKGEOF
-              sed -i "s/^pkgver=\$/pkgver=$BCACHEFS_VER/" PKGBUILD
-              sed -i "s|\${BCACHEFS_TAG}|$BCACHEFS_TAG|" PKGBUILD
+              # Switch source from GitHub to evilpiepirate (matches kernel module source)
+              sed -i "s|^source=.*|source=(\"git+https://evilpiepirate.org/git/bcachefs-tools.git#tag=${BCACHEFS_TAG}\")|" PKGBUILD
+              sed -i "s/^pkgver=.*/pkgver=$BCACHEFS_VER/" PKGBUILD
+              sed -i '/^b2sums=/d' PKGBUILD
+              sed -i '/sha256sums/d' PKGBUILD
+              echo "sha256sums=('SKIP')" >> PKGBUILD
+              # Remove dkms subpackage — kernel module is built separately
+              sed -i "/^package_bcachefs-dkms/,/^}/d" PKGBUILD
+              sed -i "s|^pkgname=(.*)|pkgname=('bcachefs-tools')|" PKGBUILD
+              sed -i '/^pkgrel=/s/=.*/=1/' PKGBUILD
+              # Drop valgrind/rust deps to speed up build
+              sed -i '/valgrind/d; /rust-bindgen/d; /^  rust$/d' PKGBUILD
 
 
     container:
