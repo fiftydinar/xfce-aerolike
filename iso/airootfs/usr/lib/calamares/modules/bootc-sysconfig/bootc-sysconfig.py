@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import libcalamares
 import os
+import subprocess
 
 _status = "..."
 
