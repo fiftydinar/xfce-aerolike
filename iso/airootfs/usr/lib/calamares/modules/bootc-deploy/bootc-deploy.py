@@ -103,7 +103,7 @@ def run():
 
     import glob
 
-    # Read BLS entries from target root and generate manual menuentry blocks
+    # Read BLS entries from target root and generate manual menuentry blocks as fallback
     bls_dir = os.path.join(root, "boot/loader/entries")
     menu_entries = []
     if os.path.isdir(bls_dir):
@@ -135,16 +135,18 @@ def run():
 search --file /boot/grub/grub.cfg --set boot1 --no-floppy
 if [ -n "$boot1" ]; then
   set root=$boot1
-  {bls_entries}
   set prefix=($boot1)/boot/grub
   configfile $prefix/grub.cfg
+  blscfg --path /boot/loader/entries --enable-fallback
+  {bls_entries}
 else
   search --file /grub/grub.cfg --set boot0 --no-floppy
   if [ -n "$boot0" ]; then
     set root=$boot0
-    {bls_entries}
     set prefix=($boot0)/grub
     configfile $prefix/grub.cfg
+    blscfg --enable-fallback
+    {bls_entries}
   fi
 fi
 boot
