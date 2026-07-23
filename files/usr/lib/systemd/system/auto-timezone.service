@@ -5,7 +5,7 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/auto-timezone.sh
+ExecStart=/usr/bin/auto-timezone
 RemainAfterExit=yes
 
 [Install]

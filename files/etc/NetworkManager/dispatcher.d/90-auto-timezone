@@ -2,6 +2,6 @@
 # NetworkManager dispatcher script to detect timezone on non-VPN connections
 # Only runs when a real (non-VPN) connection comes up.
 
-if [ "$2" = "up" ] && [ "$NM_CONNECTION_TYPE" != "vpn" ]; then
-    /usr/bin/auto-timezone.sh &
+if [ "$2" = "up" ] && [ "$NM_CONNECTION_TYPE" != "vpn" ] && [ "$NM_CONNECTION_TYPE" != "wireguard" ]; then
+    /usr/bin/auto-timezone &
 fi
