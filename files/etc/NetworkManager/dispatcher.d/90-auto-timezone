@@ -3,6 +3,5 @@
 # Only runs when a real (non-VPN) connection comes up.
 
 if [ "$2" = "up" ] && [ "$NM_CONNECTION_TYPE" != "vpn" ] && [ "$NM_CONNECTION_TYPE" != "wireguard" ]; then
-    [ -f /tmp/.auto-tz-done ] && exit 0
-    /usr/bin/auto-timezone && touch /tmp/.auto-tz-done &
+    /usr/bin/auto-timezone &
 fi
