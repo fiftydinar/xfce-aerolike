@@ -105,7 +105,7 @@ def run():
 # Try non-bcachefs layout first (combined root, entries in /boot/loader/entries/)
 search --file /boot/grub/grub.cfg --set boot1 --no-floppy
 if [ -n "$boot1" ]; then
-  set root=($boot1)
+  set root=$boot1
   blscfg --path /boot/loader/entries
   set prefix=($boot1)/boot/grub
   configfile $prefix/grub.cfg
@@ -113,7 +113,7 @@ else
   # Try bcachefs layout (separate /boot, entries in /loader/entries/)
   search --file /grub/grub.cfg --set boot0 --no-floppy
   if [ -n "$boot0" ]; then
-    set root=($boot0)
+    set root=$boot0
     blscfg
     set prefix=($boot0)/grub
     configfile $prefix/grub.cfg
