@@ -1,0 +1,12 @@
+diff --git a/src/modules/partition/Config.cpp b/src/modules/partition/Config.cpp
+index b2f8878..b23c207 100644
+--- a/src/modules/partition/Config.cpp
++++ b/src/modules/partition/Config.cpp
+@@ -459,6 +459,7 @@ Config::setConfigurationMap( const QVariantMap& configurationMap )
+     Calamares::GlobalStorage* gs = Calamares::JobQueue::instance()->globalStorage();
+     gs->insert( "armInstall", Calamares::getBool( configurationMap, "armInstall", false ) );
+     fillGSConfigurationEFI( gs, configurationMap );
++    gs->insert( "enableLuksAutomatedPartitioning", Calamares::getBool( configurationMap, "enableLuksAutomatedPartitioning", false ) );
+     fillConfigurationFSTypes( configurationMap );
+ }
+ 

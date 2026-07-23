@@ -40,6 +40,7 @@ jobs:
           git apply "$GITHUB_WORKSPACE/patches/calamares-bcachefs.patch"
           git apply "$GITHUB_WORKSPACE/patches/calamares-bcachefs-boot-part.patch"
           git apply "$GITHUB_WORKSPACE/patches/calamares-hybrid-bootloader.patch"
+          git apply "$GITHUB_WORKSPACE/patches/calamares-disable-luks.patch"
           cp -r "$GITHUB_WORKSPACE/patches/calamares-installmode" src/modules/installmode
           mkdir build && cd build
           cmake .. -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release \
