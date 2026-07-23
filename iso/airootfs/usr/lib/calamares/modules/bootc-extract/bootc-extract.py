@@ -20,6 +20,18 @@ def run():
     if not root:
         return ("No root mount point", "GlobalStorage rootMountPoint is not set")
 
+    # Check install mode
+    mode = "offline"
+    if os.path.exists("/opt/install/install-mode"):
+        with open("/opt/install/install-mode") as f:
+            mode = f.read().strip()
+
+    # Online mode: no archive to extract, skip this module entirely
+    if mode != "offline":
+        libcalamares.utils.debug("Online mode: skipping archive extraction")
+        libcalamares.job.setprogress(1.0)
+        return None
+
     archive = "/opt/install/xfce-aerolike.tar.zst"
     if not os.path.exists(archive):
         return ("Archive not found", f"{archive} missing")

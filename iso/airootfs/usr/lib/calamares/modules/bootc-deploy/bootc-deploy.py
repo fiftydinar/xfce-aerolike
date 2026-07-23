@@ -28,27 +28,61 @@ def run():
         with open(ref_file) as f:
             image_name = f.read().strip()
 
-    empty_overlay = "/tmp/.empty-overlay"
-    oci_dir = os.path.join(root, ".oci-image")
-    os.makedirs(empty_overlay, exist_ok=True)
+    # Check install mode
+    mode = "offline"
+    if os.path.exists("/opt/install/install-mode"):
+        with open("/opt/install/install-mode") as f:
+            mode = f.read().strip()
 
-    libcalamares.job.setprogress(0.1)
-    _status = "Mounting OCI staging..."
+    if mode == "online":
+        libcalamares.utils.debug("Online mode: resolving latest image...")
+        _status = "Resolving latest image..."
+        if os.path.exists(ref_file):
+            with open(ref_file) as f:
+                tag = f.read().strip().split(":")[-1]
+                tag_prefix = tag.rstrip("0123456789")
+                if tag_prefix:
+                    import json
+                    result = subprocess.run(
+                        ["skopeo", "list-tags", "docker://ghcr.io/fiftydinar/xfce-aerolike"],
+                        capture_output=True, text=True
+                    )
+                    if result.returncode == 0:
+                        tags = json.loads(result.stdout).get("Tags", [])
+                        matching = sorted([t for t in tags if t.startswith(tag_prefix)], reverse=True)
+                        if matching:
+                            image_name = f"ghcr.io/fiftydinar/xfce-aerolike:{matching[0]}"
 
-    os.makedirs("/mnt/oci-staging", exist_ok=True)
-    subprocess.run(["mount", "--bind", oci_dir, "/mnt/oci-staging"], capture_output=True)
-    subprocess.run(["mount", "--make-private", "/mnt/oci-staging"], capture_output=True)
-    subprocess.run(["mount", "--bind", empty_overlay, oci_dir], capture_output=True)
+        libcalamares.job.setprogress(0.2)
+        _status = "Pulling and installing from registry..."
+        proc = subprocess.run([
+            "bootc", "install", "to-filesystem",
+            "--source-imgref", f"docker://{image_name}",
+            "--skip-fetch-check", "--bootloader", "grub",
+            "--target-imgref", image_name, root
+        ], capture_output=True, text=True)
+    else:
+        empty_overlay = "/tmp/.empty-overlay"
+        oci_dir = os.path.join(root, ".oci-image")
+        os.makedirs(empty_overlay, exist_ok=True)
 
-    libcalamares.job.setprogress(0.2)
+        libcalamares.job.setprogress(0.1)
+        _status = "Mounting OCI staging..."
 
-    _status = "Running bootc install..."
-    proc = subprocess.run([
-        "bootc", "install", "to-filesystem",
-        "--source-imgref", "oci:/mnt/oci-staging:latest",
-        "--generic-image", "--skip-fetch-check", "--bootloader", "grub",
-        "--target-imgref", image_name, root
-    ], capture_output=True, text=True)
+        os.makedirs("/mnt/oci-staging", exist_ok=True)
+        subprocess.run(["mount", "--bind", oci_dir, "/mnt/oci-staging"], capture_output=True)
+        subprocess.run(["mount", "--make-private", "/mnt/oci-staging"], capture_output=True)
+        subprocess.run(["mount", "--bind", empty_overlay, oci_dir], capture_output=True)
+
+        libcalamares.job.setprogress(0.2)
+
+        _status = "Running bootc install..."
+        proc = subprocess.run([
+            "bootc", "install", "to-filesystem",
+            "--source-imgref", "oci:/mnt/oci-staging:latest",
+            "--generic-image", "--skip-fetch-check", "--bootloader", "grub",
+            "--target-imgref", image_name, root
+        ], capture_output=True, text=True)
 
     libcalamares.utils.debug(f"bootc stdout:\n{proc.stdout}")
     libcalamares.utils.debug(f"bootc stderr:\n{proc.stderr}")
