@@ -32,10 +32,9 @@ def run():
 
     libcalamares.utils.debug(f"Creating user: {username}")
 
-    # Remount root rw and remove immutable flags (bootc composefs)
+    # Remount root rw and remove immutable flag (bootc composefs may set +i on /)
     subprocess.run(["mount", "-o", "remount,rw", root], capture_output=True)
-    for f in ["etc/passwd", "etc/shadow", "etc/group", "etc/gshadow"]:
-        subprocess.run(["chattr", "-i", os.path.join(root, f)], capture_output=True)
+    subprocess.run(["chattr", "-i", root], capture_output=True)
 
     # Use the live ISO's useradd with --root to target the installed system
     _status = "Creating user account..."

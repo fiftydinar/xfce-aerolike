@@ -22,10 +22,9 @@ def run():
 
     etc = os.path.join(root, "etc")
 
-    # Remount root rw and remove immutable flags (bootc composefs)
+    # Remount root rw and remove immutable flag (bootc composefs may set +i on /)
     subprocess.run(["mount", "-o", "remount,rw", root], capture_output=True)
-    for f in ["etc/hostname", "etc/localtime", "etc/vconsole.conf", "etc/lightdm/lightdm.conf.d/90-calamares-autologin.conf"]:
-        subprocess.run(["chattr", "-i", os.path.join(root, f)], capture_output=True)
+    subprocess.run(["chattr", "-i", root], capture_output=True)
 
     # Hostname
     _status = "Setting hostname..."
