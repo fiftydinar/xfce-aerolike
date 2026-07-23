@@ -23,8 +23,9 @@ jobs:
               # Install git for cloning bcachefs-tools
               pacman -S --noconfirm --needed git
 
-              # Clone bcachefs-tools for the kernel module source
-              git clone --depth 1 https://evilpiepirate.org/git/bcachefs-tools.git /tmp/bcachefs-tools
+              # Clone bcachefs-tools for the kernel module source (latest release tag)
+              BCACHEFS_TAG=$(git ls-remote --tags --refs https://evilpiepirate.org/git/bcachefs-tools.git | grep -o 'v[0-9.]*$' | sort -V | tail -1)
+              git clone --depth 1 --branch "$BCACHEFS_TAG" https://evilpiepirate.org/git/bcachefs-tools.git /tmp/bcachefs-tools
 
               # Copy kernel module source into kernel tree
               rm -rf "$SRCDIR/fs/bcachefs"
