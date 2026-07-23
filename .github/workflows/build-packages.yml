@@ -379,8 +379,15 @@ jobs:
             done
           done
           tar -czf xfce-aerolike-packages.tar.gz packages/
-      - name: Delete old packages release
-        run: gh release delete packages --yes --cleanup-tag 2>/dev/null || true
+      - name: Delete old packages release and its assets
+        run: |
+          # Delete all existing assets from the packages release first
+          ASSETS=$(gh api "repos/${{ github.repository }}/releases/tags/packages" --jq '.assets[]?.id' 2>/dev/null || true)
+          for id in $ASSETS; do
+            gh api -X DELETE "repos/${{ github.repository }}/releases/assets/$id" 2>/dev/null || true
+          done
+          # Delete the release and tag entirely
+          gh release delete packages --yes --cleanup-tag 2>/dev/null || true
         env:
           GITHUB_TOKEN: ${{ github.token }}
       - name: Create GitHub release
