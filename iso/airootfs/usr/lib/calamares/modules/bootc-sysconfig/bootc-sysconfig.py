@@ -22,6 +22,9 @@ def run():
 
     etc = os.path.join(root, "etc")
 
+    # Remount root rw (bootc composefs makes it read-only after deployment)
+    subprocess.run(["mount", "-o", "remount,rw", root], capture_output=True)
+
     # Hostname
     _status = "Setting hostname..."
     hostname = gs.value("hostname")

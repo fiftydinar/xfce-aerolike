@@ -32,6 +32,9 @@ def run():
 
     libcalamares.utils.debug(f"Creating user: {username}")
 
+    # Remount root rw (bootc composefs makes it read-only after deployment)
+    subprocess.run(["mount", "-o", "remount,rw", root], capture_output=True)
+
     # Use the live ISO's useradd with --root to target the installed system
     _status = "Creating user account..."
     proc = subprocess.run(
