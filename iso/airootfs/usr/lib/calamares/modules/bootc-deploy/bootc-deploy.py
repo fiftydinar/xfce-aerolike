@@ -2,6 +2,7 @@
 import libcalamares
 import subprocess
 import os
+import json
 
 _status = "Preparing..."
 
@@ -42,7 +43,6 @@ def run():
                 tag = f.read().strip().split(":")[-1]
                 tag_prefix = tag.rstrip("0123456789")
                 if tag_prefix:
-                    import json
                     result = subprocess.run(
                         ["skopeo", "list-tags", "docker://ghcr.io/fiftydinar/xfce-aerolike"],
                         capture_output=True, text=True
