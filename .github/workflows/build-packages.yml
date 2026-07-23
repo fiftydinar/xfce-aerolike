@@ -124,29 +124,31 @@ jobs:
             repo: https://evilpiepirate.org/git/bcachefs-tools.git
             skippgpcheck: true
             prepare: |
-              cat > PKGBUILD << 'PKGEOF'
-              pkgname=bcachefs-tools
-              pkgver=$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || echo "1.38.8")
-              pkgrel=1
-              pkgdesc="Userspace tools for bcachefs"
-              arch=('x86_64')
-              url="https://evilpiepirate.org/git/bcachefs-tools.git"
-              license=('GPL2')
-              depends=('glibc' 'libcurl.so' 'libuuid.so' 'keyutils' 'libsodium' 'zlib' 'zstd')
-              makedepends=('git' 'make' 'pkgconf')
-              source=("$pkgname::git+https://evilpiepirate.org/git/bcachefs-tools.git")
-              sha256sums=('SKIP')
-
-              build() {
-                  cd "$srcdir/$pkgname"
-                  make -j$(nproc) DESTDIR="$pkgdir" V=1
-              }
-
-              package() {
-                  cd "$srcdir/$pkgname"
-                  make DESTDIR="$pkgdir" install
-              }
-              PKGEOF
+              BCACHEFS_TAG=$(git ls-remote --tags --refs https://evilpiepirate.org/git/bcachefs-tools.git | grep -o 'v[0-9.]*$' | sort -V | tail -1)
+              BCACHEFS_VER=${BCACHEFS_TAG#v}
+              echo "BCACHEFS_TAG=$BCACHEFS_TAG" >> $GITHUB_ENV
+              echo "BCACHEFS_VER=$BCACHEFS_VER" >> $GITHUB_ENV
+              echo "pkgname=bcachefs-tools" > PKGBUILD
+              echo "pkgver=$BCACHEFS_VER" >> PKGBUILD
+              echo "pkgrel=1" >> PKGBUILD
+              echo 'pkgdesc="Userspace tools for bcachefs"' >> PKGBUILD
+              echo "arch=('x86_64')" >> PKGBUILD
+              echo 'url="https://evilpiepirate.org/git/bcachefs-tools.git"' >> PKGBUILD
+              echo "license=('GPL2')" >> PKGBUILD
+              echo "depends=('glibc' 'libcurl.so' 'libuuid.so' 'keyutils' 'libsodium' 'zlib' 'zstd')" >> PKGBUILD
+              echo "makedepends=('git' 'make' 'pkgconf')" >> PKGBUILD
+              echo 'source=("$pkgname::git+https://evilpiepirate.org/git/bcachefs-tools.git")' >> PKGBUILD
+              echo "sha256sums=('SKIP')" >> PKGBUILD
+              echo '' >> PKGBUILD
+              echo 'build() {' >> PKGBUILD
+              echo '  cd "$srcdir/$pkgname"' >> PKGBUILD
+              echo '  make -j$(nproc) V=1' >> PKGBUILD
+              echo '}' >> PKGBUILD
+              echo '' >> PKGBUILD
+              echo 'package() {' >> PKGBUILD
+              echo '  cd "$srcdir/$pkgname"' >> PKGBUILD
+              echo '  make DESTDIR="$pkgdir" install' >> PKGBUILD
+              echo '}' >> PKGBUILD
 
     container:
       image: docker.io/archlinux:latest
