@@ -36,6 +36,9 @@ def run():
     subprocess.run(["mount", "-o", "remount,rw", root], capture_output=True)
     subprocess.run(["chattr", "-i", root], capture_output=True)
 
+    # Create wheel group (may not exist in bootc image)
+    subprocess.run(["groupadd", "--root", root, "-f", "wheel"], capture_output=True)
+
     # Use the live ISO's useradd with --root to target the installed system
     _status = "Creating user account..."
     proc = subprocess.run(
@@ -49,16 +52,31 @@ def run():
 
     libcalamares.job.setprogress(0.5)
 
-    # Set user password via chpasswd --root
+    # Set user password via direct shadow write (avoids PAM issues in composefs chroot)
     _status = "Setting password..."
-    proc = subprocess.run(
-        ["chpasswd", "--root", root],
-        input=f"{username}:{password}\n", capture_output=True, text=True
+    passwd_proc = subprocess.run(
+        ["openssl", "passwd", "-6", "-stdin"],
+        input=password, capture_output=True, text=True
     )
-    if proc.returncode != 0:
-        libcalamares.utils.warning(f"Failed to set password: {proc.stderr}")
-    else:
+    if passwd_proc.returncode == 0:
+        hashed = passwd_proc.stdout.strip()
+        subprocess.run(
+            ["chroot", root, "sh", "-c",
+             f"usermod -p '{hashed}' {username}"],
+            capture_output=True
+        )
         libcalamares.utils.debug("Password set")
+    else:
+        libcalamares.utils.warning(f"Failed to hash password: {passwd_proc.stderr}")
+        # Fallback to chpasswd if openssl not available
+        proc = subprocess.run(
+            ["chpasswd", "--root", root],
+            input=f"{username}:{password}\n", capture_output=True, text=True
+        )
+        if proc.returncode != 0:
+            libcalamares.utils.warning(f"Failed to set password: {proc.stderr}")
+        else:
+            libcalamares.utils.debug("Password set")
 
     libcalamares.job.setprogress(0.7)
 
@@ -66,13 +84,17 @@ def run():
     _status = "Setting root password..."
     root_password = gs.value("rootPassword")
     if root_password:
-        proc = subprocess.run(
-            ["chpasswd", "--root", root],
-            input=f"root:{root_password}\n", capture_output=True, text=True
+        passwd_proc = subprocess.run(
+            ["openssl", "passwd", "-6", "-stdin"],
+            input=root_password, capture_output=True, text=True
         )
-        if proc.returncode != 0:
-            libcalamares.utils.warning(f"Failed to set root password: {proc.stderr}")
-        else:
+        if passwd_proc.returncode == 0:
+            hashed = passwd_proc.stdout.strip()
+            subprocess.run(
+                ["chroot", root, "sh", "-c",
+                 f"usermod -p '{hashed}' root"],
+                capture_output=True
+            )
             libcalamares.utils.debug("Root password set")
 
     # Remount root ro (composefs integrity)
