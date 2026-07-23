@@ -119,6 +119,35 @@ jobs:
             enabled: false
             repo: https://aur.archlinux.org/yserver-git.git
 
+          - name: bcachefs-tools
+            enabled: true
+            repo: https://evilpiepirate.org/git/bcachefs-tools.git
+            skippgpcheck: true
+            prepare: |
+              cat > PKGBUILD << 'PKGEOF'
+              pkgname=bcachefs-tools
+              pkgver=$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || echo "1.38.8")
+              pkgrel=1
+              pkgdesc="Userspace tools for bcachefs"
+              arch=('x86_64')
+              url="https://evilpiepirate.org/git/bcachefs-tools.git"
+              license=('GPL2')
+              depends=('glibc' 'libcurl.so' 'libuuid.so' 'keyutils' 'libsodium' 'zlib' 'zstd')
+              makedepends=('git' 'make' 'pkgconf')
+              source=("$pkgname::git+https://evilpiepirate.org/git/bcachefs-tools.git")
+              sha256sums=('SKIP')
+
+              build() {
+                  cd "$srcdir/$pkgname"
+                  make -j$(nproc) DESTDIR="$pkgdir" V=1
+              }
+
+              package() {
+                  cd "$srcdir/$pkgname"
+                  make DESTDIR="$pkgdir" install
+              }
+              PKGEOF
+
     container:
       image: docker.io/archlinux:latest
       options: --cap-add=SYS_ADMIN --tmpfs /build:size=14G,exec
