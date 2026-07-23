@@ -138,12 +138,8 @@ chroot "${AIROOTFS}" systemctl mask bootc-fetch-apply-updates.timer 2>/dev/null 
 echo "[build-iso] Masked bootc auto-update timer"
 
 # Install dracut + our custom archiso module for live ISO boot
-echo "[build-iso] Installing dracut inside chroot..."
-# Fix dracut's lib hang on finding root device due to dash's hex escape
-sed -i 's/echo "\$hook"/printf '\''%s\\n'\'' "$hook"/g' \
-    "${AIROOTFS}/usr/lib/dracut/modules.d/80base/dracut-lib.sh" 2>/dev/null || true
-echo "[build-iso] Fixed dracut-lib.sh dash hex escape bug"
-chroot "${AIROOTFS}" pacman -S --needed --noconfirm dracut fuse-overlayfs jq
+echo "[build-iso] Installing fuse-overlayfs inside chroot..."
+chroot "${AIROOTFS}" pacman -S --needed --noconfirm fuse-overlayfs
 
 # bcachefs wrapper: KPMCore's findExternal("bcachefs") calls bcachefs with no
 # args and expects exit 0, but bcachefs exits 1 (usage). Make it exit 0.
