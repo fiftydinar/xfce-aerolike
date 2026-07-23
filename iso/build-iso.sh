@@ -138,13 +138,12 @@ chroot "${AIROOTFS}" systemctl mask bootc-fetch-apply-updates.timer 2>/dev/null 
 echo "[build-iso] Masked bootc auto-update timer"
 
 # Install dracut + our custom archiso module for live ISO boot
-# Also install bcachefs-tools for bcachefs support in Calamares partitioner
-echo "[build-iso] Installing dracut, bcachefs-tools inside chroot..."
+echo "[build-iso] Installing dracut inside chroot..."
 # Fix dracut's lib hang on finding root device due to dash's hex escape
 sed -i 's/echo "\$hook"/printf '\''%s\\n'\'' "$hook"/g' \
     "${AIROOTFS}/usr/lib/dracut/modules.d/80base/dracut-lib.sh" 2>/dev/null || true
 echo "[build-iso] Fixed dracut-lib.sh dash hex escape bug"
-chroot "${AIROOTFS}" pacman -S --needed --noconfirm dracut bcachefs-tools fuse-overlayfs jq
+chroot "${AIROOTFS}" pacman -S --needed --noconfirm dracut fuse-overlayfs jq
 
 # bcachefs wrapper: KPMCore's findExternal("bcachefs") calls bcachefs with no
 # args and expects exit 0, but bcachefs exits 1 (usage). Make it exit 0.
@@ -481,13 +480,6 @@ if [ -f "$POWER_XML" ]; then
     echo "[build-iso] Enabled XFCE presentation mode in live ISO"
 fi
 
-# Systemd user service: mark installer desktop file as trusted after session is ready
-# (service file shipped via iso/airootfs/usr/lib/systemd/user/trust-installer.service)
-chroot "${AIROOTFS}" systemctl --global enable trust-installer.service 2>/dev/null || {
-    mkdir -p "${AIROOTFS}/etc/systemd/user/graphical-session.target.wants"
-    ln -sf "/usr/lib/systemd/user/trust-installer.service" \
-       "${AIROOTFS}/etc/systemd/user/graphical-session.target.wants/trust-installer.service"
-}
 
 # Remove upstream Calamares desktop file (we ship our own)
 rm -f "${AIROOTFS}/usr/share/applications/calamares.desktop" 2>/dev/null || true
