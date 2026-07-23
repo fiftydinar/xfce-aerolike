@@ -199,7 +199,6 @@ modules:
   - type: systemd
     system:
       enabled:
-        - auto-timezone.service
         - bootc-fetch-apply-updates.timer
         - memory-tweaks-aerolike.service
         - dirty-centisecs-aerolike.service
