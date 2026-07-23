@@ -73,14 +73,15 @@ def run():
     libcalamares.job.setprogress(1.0)
     _status = "System settings configured"
 
-    # Auto-login for LightDM
+    # Auto-login for LightDM (drop-in with alphanumeric priority)
     _status = "Configuring auto-login..."
     autologin_user = gs.value("autologinUser")
     if autologin_user:
-        lightdm_conf = os.path.join(etc, "lightdm", "lightdm.conf")
+        dropin_dir = os.path.join(etc, "lightdm", "lightdm.conf.d")
+        dropin = os.path.join(dropin_dir, "90-calamares-autologin.conf")
         try:
-            os.makedirs(os.path.dirname(lightdm_conf), exist_ok=True)
-            with open(lightdm_conf, "w") as f:
+            os.makedirs(dropin_dir, exist_ok=True)
+            with open(dropin, "w") as f:
                 f.write("# Auto-login configured by Calamares installer\n")
                 f.write("[Seat:*]\n")
                 f.write(f"autologin-user={autologin_user}\n")
