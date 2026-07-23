@@ -138,8 +138,8 @@ jobs:
               sed -i "/^package_bcachefs-dkms/,/^}/d" PKGBUILD
               sed -i "s|^pkgname=(.*)|pkgname=('bcachefs-tools')|" PKGBUILD
               sed -i '/^pkgrel=/s/=.*/=1/' PKGBUILD
-              # Drop valgrind/rust deps to speed up build
-              sed -i '/valgrind/d; /rust-bindgen/d; /^  rust$/d' PKGBUILD
+              # Drop valgrind to speed up build
+              sed -i '/valgrind/d' PKGBUILD
 
 
     container:
