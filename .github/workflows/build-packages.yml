@@ -128,27 +128,55 @@ jobs:
               BCACHEFS_VER=${BCACHEFS_TAG#v}
               echo "BCACHEFS_TAG=$BCACHEFS_TAG" >> $GITHUB_ENV
               echo "BCACHEFS_VER=$BCACHEFS_VER" >> $GITHUB_ENV
-              echo "pkgname=bcachefs-tools" > PKGBUILD
-              echo "pkgver=$BCACHEFS_VER" >> PKGBUILD
-              echo "pkgrel=1" >> PKGBUILD
-              echo 'pkgdesc="Userspace tools for bcachefs"' >> PKGBUILD
-              echo "arch=('x86_64')" >> PKGBUILD
-              echo 'url="https://evilpiepirate.org/git/bcachefs-tools.git"' >> PKGBUILD
-              echo "license=('GPL2')" >> PKGBUILD
-              echo "depends=('glibc' 'libcurl.so' 'libuuid.so' 'keyutils' 'libsodium' 'zlib' 'zstd')" >> PKGBUILD
-              echo "makedepends=('git' 'make' 'pkgconf')" >> PKGBUILD
-              echo 'source=("$pkgname::git+https://evilpiepirate.org/git/bcachefs-tools.git")' >> PKGBUILD
-              echo "sha256sums=('SKIP')" >> PKGBUILD
-              echo '' >> PKGBUILD
-              echo 'build() {' >> PKGBUILD
-              echo '  cd "$srcdir/$pkgname"' >> PKGBUILD
-              echo '  make -j$(nproc) V=1' >> PKGBUILD
-              echo '}' >> PKGBUILD
-              echo '' >> PKGBUILD
-              echo 'package() {' >> PKGBUILD
-              echo '  cd "$srcdir/$pkgname"' >> PKGBUILD
-              echo '  make DESTDIR="$pkgdir" install' >> PKGBUILD
-              echo '}' >> PKGBUILD
+              cat > PKGBUILD << 'PKGEOF'
+              pkgname=bcachefs-tools
+              pkgver=
+              pkgrel=1
+              pkgdesc='BCacheFS filesystem utilities'
+              arch=('x86_64')
+              url='https://bcachefs.org/'
+              license=('GPL-2.0-only')
+              depends=(
+                  fuse3
+                  glibc
+                  keyutils libkeyutils.so
+                  libaio libaio.so
+                  libsodium libsodium.so
+                  libunwind libunwind.so
+                  liburcu
+                  lz4
+                  systemd-libs libudev.so
+                  udev
+                  util-linux-libs libblkid.so libuuid.so
+                  zlib libz.so
+                  zstd libzstd.so
+              )
+              makedepends=(${depends[@]} git make pkgconf)
+              options=(!lto)
+              source=("git+https://evilpiepirate.org/git/bcachefs-tools.git#tag=${BCACHEFS_TAG}")
+              sha256sums=('SKIP')
+
+              build() {
+                  cd ${pkgname}
+                  export CFLAGS="${CFLAGS/_FORTIFY_SOURCE=3/_FORTIFY_SOURCE=2}"
+                  export CXXFLAGS="${CXXFLAGS/_FORTIFY_SOURCE=3/_FORTIFY_SOURCE=2}"
+                  make LIBEXECDIR=/usr/lib DESTDIR="${pkgdir}" ROOT_SBINDIR="/usr/bin"
+              }
+
+              package() {
+                  depends+=("bash")
+                  cd ${pkgname}
+                  export CFLAGS="${CFLAGS/_FORTIFY_SOURCE=3/_FORTIFY_SOURCE=2}"
+                  export CXXFLAGS="${CXXFLAGS/_FORTIFY_SOURCE=3/_FORTIFY_SOURCE=2}"
+                  make PREFIX="/usr" LIBEXECDIR=/usr/lib DESTDIR="${pkgdir}" \
+                      ROOT_SBINDIR="/usr/bin" INITRAMFS_DIR="/usr/lib/initcpio/" install
+                  rm -rf "${pkgdir}"/usr/lib/initcpio/*
+                  install -dm755 "${pkgdir}"/usr/lib/initcpio/{hooks,install}
+              }
+              PKGEOF
+              sed -i "s/^pkgver=\$/pkgver=$BCACHEFS_VER/" PKGBUILD
+              sed -i "s|\${BCACHEFS_TAG}|$BCACHEFS_TAG|" PKGBUILD
+
 
     container:
       image: docker.io/archlinux:latest
