@@ -5,7 +5,7 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=/bin/sh -c 'TZ=$(curl -sf https://ipapi.co/timezone 2>/dev/null || curl -sf https://ipinfo.io/timezone 2>/dev/null); [ -n "$TZ" ] && timedatectl set-timezone "$TZ" || true'
+ExecStart=/usr/bin/auto-timezone.sh
 RemainAfterExit=yes
 
 [Install]
