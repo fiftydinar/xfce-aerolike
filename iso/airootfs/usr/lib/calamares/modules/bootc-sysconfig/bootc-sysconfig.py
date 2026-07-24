@@ -102,6 +102,9 @@ def run():
         os.makedirs(os.path.dirname(greeter_conf), exist_ok=True)
         with open(greeter_conf, "a") as f:
             f.write("\n[greeter]\nhide-users=false\n")
+        libcalamares.utils.debug("Configured greeter to show users")
+    except OSError as e:
+        libcalamares.utils.warning(f"Failed to configure greeter: {e}")
 
     # Create AccountsService entry so user appears in greeter
     username = gs.value("username")
