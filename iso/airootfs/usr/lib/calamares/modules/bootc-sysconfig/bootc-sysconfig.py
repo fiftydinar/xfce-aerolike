@@ -78,12 +78,9 @@ def run():
     libcalamares.job.setprogress(1.0)
     _status = "System settings configured"
 
-    # Remount root ro (composefs integrity)
-    subprocess.run(["mount", "-o", "remount,ro", root], capture_output=True)
-
     # Auto-login for LightDM (drop-in with alphanumeric priority)
     _status = "Configuring auto-login..."
-    autologin_user = gs.value("autologinUser")
+    autologin_user = gs.value("autoLoginUser")
     if autologin_user:
         dropin_dir = os.path.join(etc, "lightdm", "lightdm.conf.d")
         dropin = os.path.join(dropin_dir, "90-calamares-autologin.conf")
@@ -97,6 +94,9 @@ def run():
             libcalamares.utils.debug(f"Set auto-login for {autologin_user}")
         except OSError as e:
             libcalamares.utils.warning(f"Failed to set auto-login: {e}")
+
+    # Remount root ro (composefs integrity)
+    subprocess.run(["mount", "-o", "remount,ro", root], capture_output=True)
 
     libcalamares.utils.debug("System settings configured")
     return None
