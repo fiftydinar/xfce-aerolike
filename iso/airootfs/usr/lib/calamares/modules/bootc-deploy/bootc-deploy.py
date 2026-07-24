@@ -110,7 +110,7 @@ if [ -n "$boot1" ]; then
   set default=0
   . $prefix/grub.cfg
   set root=$boot1
-  set timeout=10
+  set timeout=4
   set timeout_style=menu
 else
   search --file /grub/grub.cfg --set boot0 --no-floppy
@@ -121,7 +121,7 @@ else
     set default=0
     . $prefix/grub.cfg
     set root=$boot0
-    set timeout=10
+    set timeout=4
     set timeout_style=menu
   fi
 fi
@@ -145,7 +145,7 @@ if [ -n "$boot1" ]; then
   set root=$boot1
   set default=0
   blscfg --path /boot/loader/entries --enable-fallback
-  set timeout=10
+  set timeout=4
   set timeout_style=menu
 fi
 """)

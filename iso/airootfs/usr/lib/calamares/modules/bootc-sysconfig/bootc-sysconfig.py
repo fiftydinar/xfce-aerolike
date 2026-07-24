@@ -99,8 +99,21 @@ def run():
     _status = "Configuring greeter..."
     greeter_conf = os.path.join(etc, "lightdm", "lightdm-gtk-greeter.conf")
     try:
+        os.makedirs(os.path.dirname(greeter_conf), exist_ok=True)
         with open(greeter_conf, "a") as f:
             f.write("\n[greeter]\nhide-users=false\n")
+
+    # Create AccountsService entry so user appears in greeter
+    username = gs.value("username")
+    if username:
+        accounts_dir = os.path.join(root, "var/lib/AccountsService/users")
+        try:
+            os.makedirs(accounts_dir, exist_ok=True)
+            with open(os.path.join(accounts_dir, username), "w") as f:
+                f.write(f"[User]\nXSession=xfce\nIcon=\n")
+            libcalamares.utils.debug(f"Created AccountsService entry for {username}")
+        except OSError as e:
+            libcalamares.utils.warning(f"Failed to create AccountsService entry: {e}")
         libcalamares.utils.debug("Configured greeter to show users")
     except OSError as e:
         libcalamares.utils.warning(f"Failed to configure greeter: {e}")
