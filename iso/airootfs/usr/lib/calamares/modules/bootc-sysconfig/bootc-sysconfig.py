@@ -117,9 +117,6 @@ def run():
             libcalamares.utils.debug(f"Created AccountsService entry for {username}")
         except OSError as e:
             libcalamares.utils.warning(f"Failed to create AccountsService entry: {e}")
-        libcalamares.utils.debug("Configured greeter to show users")
-    except OSError as e:
-        libcalamares.utils.warning(f"Failed to configure greeter: {e}")
 
     # Remount root ro (composefs integrity)
     subprocess.run(["mount", "-o", "remount,ro", root], capture_output=True)
