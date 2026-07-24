@@ -106,7 +106,6 @@ search --file /boot/grub/grub.cfg --set boot1 --no-floppy
 if [ -n "$boot1" ]; then
   set root=$boot1
   set prefix=($boot1)/boot/grub
-  blscfg --path /boot/loader/entries --enable-fallback
   set default=0
   . $prefix/grub.cfg
   set root=$boot1
@@ -117,7 +116,6 @@ else
   if [ -n "$boot0" ]; then
     set root=$boot0
     set prefix=($boot0)/grub
-    blscfg --enable-fallback
     set default=0
     . $prefix/grub.cfg
     set root=$boot0
@@ -137,20 +135,15 @@ boot
     if os.path.exists(main_cfg):
         subprocess.run(["mount", "-o", "remount,rw", root], capture_output=True)
         subprocess.run(["chattr", "-i", root], capture_output=True)
-        with open(main_cfg, "a") as f:
-            f.write("""
-# bootc-deploy: fix root and blscfg for BIOS (UEFI handles this in the EFI stub)
-search --file /boot/grub/grub.cfg --set boot1 --no-floppy
-if [ -n "$boot1" ]; then
-  set root=$boot1
-  if [ "$grub_platform" != "efi" ]; then
-    blscfg --path /boot/loader/entries --enable-fallback
-  fi
-  set default=0
-  set timeout=4
-  set timeout_style=menu
-fi
-""")
+        # Replace blscfg in 10_blscfg.cfg section with --path version
+        with open(main_cfg, "r") as f:
+            content = f.read()
+        content = content.replace(
+            "### BEGIN 10_blscfg.cfg ###\nblscfg\n### END 10_blscfg.cfg ###",
+            "### BEGIN 10_blscfg.cfg ###\nblscfg --path /boot/loader/entries --enable-fallback\n### END 10_blscfg.cfg ###"
+        )
+        with open(main_cfg, "w") as f:
+            f.write(content)
         subprocess.run(["mount", "-o", "remount,ro", root], capture_output=True)
         libcalamares.utils.debug(f"Patched {main_cfg}")
     else:
