@@ -100,8 +100,14 @@ def run():
     greeter_conf = os.path.join(etc, "lightdm", "lightdm-gtk-greeter.conf")
     try:
         os.makedirs(os.path.dirname(greeter_conf), exist_ok=True)
-        with open(greeter_conf, "a") as f:
-            f.write("\n[greeter]\nhide-users=false\n")
+        # Replace hide-users if present, otherwise append
+        if not os.path.exists(greeter_conf):
+            with open(greeter_conf, "w") as f:
+                f.write("[greeter]\nhide-users=false\n")
+        else:
+            subprocess.run(["sed", "-i",
+                "s/^hide-users=.*$/hide-users=false/; t; $a hide-users=false",
+                greeter_conf], capture_output=True)
         libcalamares.utils.debug("Configured greeter to show users")
     except OSError as e:
         libcalamares.utils.warning(f"Failed to configure greeter: {e}")
