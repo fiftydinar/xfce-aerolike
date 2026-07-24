@@ -95,6 +95,16 @@ def run():
         except OSError as e:
             libcalamares.utils.warning(f"Failed to set auto-login: {e}")
 
+    # Ensure LightDM shows user list (not just "Other...")
+    _status = "Configuring greeter..."
+    greeter_conf = os.path.join(etc, "lightdm", "lightdm-gtk-greeter.conf")
+    try:
+        with open(greeter_conf, "a") as f:
+            f.write("\n[greeter]\nhide-users=false\n")
+        libcalamares.utils.debug("Configured greeter to show users")
+    except OSError as e:
+        libcalamares.utils.warning(f"Failed to configure greeter: {e}")
+
     # Remount root ro (composefs integrity)
     subprocess.run(["mount", "-o", "remount,ro", root], capture_output=True)
 
