@@ -140,6 +140,7 @@ boot
         with open(main_cfg, "a") as f:
             f.write("""
 # bootc-deploy: fix root and blscfg for BIOS
+if [ "$grub_platform" != "efi" ]; then
 search --file /boot/grub/grub.cfg --set boot1 --no-floppy
 if [ -n "$boot1" ]; then
   set root=$boot1
@@ -147,6 +148,7 @@ if [ -n "$boot1" ]; then
   blscfg --path /boot/loader/entries --enable-fallback
   set timeout=4
   set timeout_style=menu
+fi
 fi
 """)
         subprocess.run(["mount", "-o", "remount,ro", root], capture_output=True)
