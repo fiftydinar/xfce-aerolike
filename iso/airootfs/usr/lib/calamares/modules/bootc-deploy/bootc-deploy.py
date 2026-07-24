@@ -139,11 +139,8 @@ boot
         subprocess.run(["chattr", "-i", root], capture_output=True)
         with open(main_cfg, "r") as f:
             content = f.read()
-        # Replace standalone blscfg with --path version (for BIOS which loads this directly)
-        content = content.replace(
-            "\nblscfg\n",
-            "\nblscfg --path /boot/loader/entries --enable-fallback\n"
-        )
+        # Disable the main config's own blscfg (EFI stub handles it; BIOS has its own below)
+        content = content.replace("\nblscfg\n", "\n# blscfg disabled by bootc-deploy\n")
         # Add fix for BIOS: search boot partition and restore root
         content += """
 # bootc-deploy: fix root for BIOS (grub-static-pre.cfg overwrites it)
