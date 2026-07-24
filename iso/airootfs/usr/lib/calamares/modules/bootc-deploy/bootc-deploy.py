@@ -132,6 +132,25 @@ boot
         f.write(grub_cfg_content)
     libcalamares.utils.debug(f"Installed {grub_cfg_path}")
 
+    # Also fix the main GRUB config (used by BIOS which loads it directly)
+    main_cfg = os.path.join(root, "boot/grub/grub.cfg")
+    if os.path.exists(main_cfg):
+        with open(main_cfg, "a") as f:
+            f.write("""
+# bootc-deploy: fix blscfg path and root for non-bcachefs layout
+search --file /boot/grub/grub.cfg --set boot1 --no-floppy
+if [ -n "$boot1" ]; then
+  set root=$boot1
+  set default=0
+  blscfg --path /boot/loader/entries --enable-fallback
+  set timeout=10
+  set timeout_style=menu
+fi
+""")
+        libcalamares.utils.debug(f"Patched {main_cfg}")
+    else:
+        libcalamares.utils.debug(f"Main config {main_cfg} not found, skipping")
+
     # Install fallback bootloader
     grub_src = os.path.join(esp_arch, "grubx64.efi")
     grub_dst = os.path.join(esp_boot, "BOOTX64.EFI")
