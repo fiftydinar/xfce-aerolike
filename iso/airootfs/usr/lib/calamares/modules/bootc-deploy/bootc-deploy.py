@@ -135,12 +135,12 @@ boot
     if os.path.exists(main_cfg):
         subprocess.run(["mount", "-o", "remount,rw", root], capture_output=True)
         subprocess.run(["chattr", "-i", root], capture_output=True)
-        # Replace blscfg in 10_blscfg.cfg section with --path version
         with open(main_cfg, "r") as f:
             content = f.read()
+        # Replace blscfg with --path version in 10_blscfg.cfg section
         content = content.replace(
-            "### BEGIN 10_blscfg.cfg ###\nblscfg\n### END 10_blscfg.cfg ###",
-            "### BEGIN 10_blscfg.cfg ###\nblscfg --path /boot/loader/entries --enable-fallback\n### END 10_blscfg.cfg ###"
+            "\nblscfg\n",
+            "\nblscfg --path /boot/loader/entries --enable-fallback\n"
         )
         with open(main_cfg, "w") as f:
             f.write(content)
