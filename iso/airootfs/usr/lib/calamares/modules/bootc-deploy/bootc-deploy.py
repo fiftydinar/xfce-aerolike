@@ -135,6 +135,8 @@ boot
     # Also fix the main GRUB config (used by BIOS which loads it directly)
     main_cfg = os.path.join(root, "boot/grub/grub.cfg")
     if os.path.exists(main_cfg):
+        subprocess.run(["mount", "-o", "remount,rw", root], capture_output=True)
+        subprocess.run(["chattr", "-i", root], capture_output=True)
         with open(main_cfg, "a") as f:
             f.write("""
 # bootc-deploy: fix blscfg path and root for non-bcachefs layout
@@ -147,6 +149,7 @@ if [ -n "$boot1" ]; then
   set timeout_style=menu
 fi
 """)
+        subprocess.run(["mount", "-o", "remount,ro", root], capture_output=True)
         libcalamares.utils.debug(f"Patched {main_cfg}")
     else:
         libcalamares.utils.debug(f"Main config {main_cfg} not found, skipping")
