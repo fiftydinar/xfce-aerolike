@@ -137,6 +137,7 @@ if [ -n "$boot1" ]; then
   set root=$boot1
   set prefix=($boot1)/boot/grub
   . $prefix/grub.cfg
+  set root=$boot1
   blscfg --path /boot/loader/entries --enable-fallback
   {bls_entries}
 else
@@ -145,6 +146,7 @@ else
     set root=$boot0
     set prefix=($boot0)/grub
     . $prefix/grub.cfg
+    set root=$boot0
     blscfg --enable-fallback
     {bls_entries}
   fi
