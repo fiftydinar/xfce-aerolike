@@ -2,6 +2,7 @@
 import libcalamares
 import os
 import subprocess
+import glob
 
 _status = "..."
 
@@ -10,6 +11,10 @@ def pretty_name():
 
 def pretty_status_message():
     return _status
+
+def deployment_root(root):
+    dirs = sorted(glob.glob(os.path.join(root, "ostree/deploy/default/deploy/*.0")))
+    return dirs[-1] if dirs else root
 
 def run():
     global _status
@@ -21,11 +26,13 @@ def run():
     if not root:
         return ("No root mount point", "GlobalStorage rootMountPoint is not set")
 
-    etc = os.path.join(root, "etc")
+    deploy = deployment_root(root)
+    etc = os.path.join(deploy, "etc")
 
-    # Remount root rw and remove immutable flag (bootc composefs may set +i on /)
-    subprocess.run(["mount", "-o", "remount,rw", root], capture_output=True)
-    subprocess.run(["chattr", "-i", root], capture_output=True)
+    # Remount both roots rw
+    for path in [root, deploy]:
+        subprocess.run(["mount", "-o", "remount,rw", path], capture_output=True)
+        subprocess.run(["chattr", "-i", path], capture_output=True)
 
     # Hostname
     _status = "Setting hostname..."
@@ -115,7 +122,7 @@ def run():
     # Create AccountsService entry so user appears in greeter
     username = gs.value("username")
     if username:
-        accounts_dir = os.path.join(root, "var/lib/AccountsService/users")
+        accounts_dir = os.path.join(deploy, "var/lib/AccountsService/users")
         try:
             os.makedirs(accounts_dir, exist_ok=True)
             with open(os.path.join(accounts_dir, username), "w") as f:
@@ -124,8 +131,9 @@ def run():
         except OSError as e:
             libcalamares.utils.warning(f"Failed to create AccountsService entry: {e}")
 
-    # Remount root ro (composefs integrity)
-    subprocess.run(["mount", "-o", "remount,ro", root], capture_output=True)
+    # Remount both roots ro
+    for path in [deploy, root]:
+        subprocess.run(["mount", "-o", "remount,ro", path], capture_output=True)
 
     libcalamares.utils.debug("System settings configured")
     return None
