@@ -132,6 +132,26 @@ boot
         f.write(grub_cfg_content)
     libcalamares.utils.debug(f"Installed {grub_cfg_path}")
 
+    # Fix main config for BIOS (no EFI stub, so we patch the config directly)
+    main_cfg = os.path.join(root, "boot/grub/grub.cfg")
+    if os.path.exists(main_cfg):
+        subprocess.run(["mount", "-o", "remount,rw", root], capture_output=True)
+        subprocess.run(["chattr", "-i", root], capture_output=True)
+        with open(main_cfg, "a") as f:
+            f.write("""
+# bootc-deploy: fix root and blscfg for BIOS
+search --file /boot/grub/grub.cfg --set boot1 --no-floppy
+if [ -n "$boot1" ]; then
+  set root=$boot1
+  set default=0
+  blscfg --path /boot/loader/entries --enable-fallback
+  set timeout=4
+  set timeout_style=menu
+fi
+""")
+        subprocess.run(["mount", "-o", "remount,ro", root], capture_output=True)
+        libcalamares.utils.debug(f"Patched {main_cfg} for BIOS")
+
     # Install fallback bootloader
     grub_src = os.path.join(esp_arch, "grubx64.efi")
     grub_dst = os.path.join(esp_boot, "BOOTX64.EFI")
