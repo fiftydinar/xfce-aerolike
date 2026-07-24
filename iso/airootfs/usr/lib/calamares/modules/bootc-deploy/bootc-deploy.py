@@ -137,6 +137,14 @@ boot
     if os.path.exists(main_cfg):
         subprocess.run(["mount", "-o", "remount,rw", root], capture_output=True)
         subprocess.run(["chattr", "-i", root], capture_output=True)
+
+        # Disable 10_blscfg.cfg's blscfg — redundant with EFI stub (UEFI) or our patch (BIOS)
+        with open(main_cfg, "r") as f:
+            content = f.read()
+        content = content.replace("\nblscfg\n", "\n# blscfg disabled by bootc-deploy\n")
+        with open(main_cfg, "w") as f:
+            f.write(content)
+
         with open(main_cfg, "a") as f:
             f.write("""
 # bootc-deploy: fix root and blscfg for BIOS
