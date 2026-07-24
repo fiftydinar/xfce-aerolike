@@ -160,16 +160,17 @@ fi
 
     _status = "Cleaning up OCI staging..."
 
-    subprocess.run(["umount", oci_dir], capture_output=True)
-    subprocess.run(["umount", "/mnt/oci-staging"], capture_output=True)
-    subprocess.run(["rm", "-rf", oci_dir, "/mnt/oci-staging"], capture_output=True)
+    if mode == "offline":
+        subprocess.run(["umount", oci_dir], capture_output=True)
+        subprocess.run(["umount", "/mnt/oci-staging"], capture_output=True)
+        subprocess.run(["rm", "-rf", oci_dir, "/mnt/oci-staging"], capture_output=True)
 
-    libcalamares.job.setprogress(0.95)
-    _status = "Cleaning up temporary mounts..."
+        libcalamares.job.setprogress(0.95)
+        _status = "Cleaning up temporary mounts..."
 
-    subprocess.run(["umount", os.path.join(root, "tmp")], capture_output=True)
-    subprocess.run(["umount", "/mnt/target-tmp"], capture_output=True)
-    subprocess.run(["rm", "-rf", os.path.join(root, "tmp"), empty_overlay], capture_output=True)
+        subprocess.run(["umount", os.path.join(root, "tmp")], capture_output=True)
+        subprocess.run(["umount", "/mnt/target-tmp"], capture_output=True)
+        subprocess.run(["rm", "-rf", os.path.join(root, "tmp"), empty_overlay], capture_output=True)
 
     libcalamares.job.setprogress(1.0)
     _status = "Install complete"
