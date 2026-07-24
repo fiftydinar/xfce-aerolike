@@ -61,6 +61,7 @@ modules:
         - xorg-drivers
         - lightdm
         - lightdm-gtk-greeter
+        - accountsservice
         - pavucontrol
         - network-manager-applet
         - blueman
@@ -104,8 +105,23 @@ modules:
       # Install all optional dependencies for xarchiver
       - "pacman -Syu --needed --noconfirm --asdeps $(expac -Ss '%o' xarchiver)"
       # Install lightdm without xorg-server (only applicable when yserver is in use)
+<<<<<<< HEAD
       #- "pacman -S --assume-installed xorg-server --noconfirm lightdm lightdm-gtk-greeter"
       #- "mkdir -p /etc/lightdm/lightdm.conf.d/ && echo -e '[Seat:*]\nxserver-command=/usr/bin/yserver' > /etc/lightdm/lightdm.conf.d/99-yserver.conf"
+=======
+      - "pacman -S --assume-installed xorg-server --noconfirm lightdm lightdm-gtk-greeter accountsservice"
+      - "mkdir -p /etc/lightdm/lightdm.conf.d/ && echo -e '[Seat:*]\nxserver-command=/usr/bin/yserver' > /etc/lightdm/lightdm.conf.d/99-yserver.conf"
+      # Build and install yserver directly (replaces building in build-packages.yml)
+      - |
+        pacman -S --needed --noconfirm base-devel git
+        sed -i 's|EUID == 0|EUID == 69|g' /usr/bin/makepkg
+        git clone https://aur.archlinux.org/yserver-git.git /tmp/yserver-git
+        cd /tmp/yserver-git
+        makepkg -si --noconfirm --syncdeps --nocheck
+        cd /
+        rm -rf /tmp/yserver-git
+        sed -i 's|EUID == 69|EUID == 0|g' /usr/bin/makepkg
+>>>>>>> a4c745c (fix: install accountsservice for greeter user icons/session/avatar)
       # Symlink dash to sh with pacman hook to persist across bash updates
       - "ln -sfT /usr/bin/dash /usr/bin/sh"
       - |
