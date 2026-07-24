@@ -136,18 +136,16 @@ search --file /boot/grub/grub.cfg --set boot1 --no-floppy
 if [ -n "$boot1" ]; then
   set root=$boot1
   set prefix=($boot1)/boot/grub
-  . $prefix/grub.cfg
-  set root=$boot1
   blscfg --path /boot/loader/entries --enable-fallback
+  . $prefix/grub.cfg
   {bls_entries}
 else
   search --file /grub/grub.cfg --set boot0 --no-floppy
   if [ -n "$boot0" ]; then
     set root=$boot0
     set prefix=($boot0)/grub
-    . $prefix/grub.cfg
-    set root=$boot0
     blscfg --enable-fallback
+    . $prefix/grub.cfg
     {bls_entries}
   fi
 fi
