@@ -61,31 +61,20 @@ def run():
 
     libcalamares.job.setprogress(0.5)
 
-    # Set user password via chpasswd (uses deployment's own PAM and crypt)
+    # Set password using deployment's own passwd binary (avoid PAM/libcrypt cross-system issues)
     _status = "Setting password..."
-    proc = subprocess.run(
-        ["chpasswd", "--root", deploy],
-        input=f"{username}:{password}\n", capture_output=True, text=True
-    )
-    if proc.returncode == 0:
-        libcalamares.utils.debug("Password set")
-    else:
-        libcalamares.utils.warning(f"Failed to set password: {proc.stderr}")
-
-    libcalamares.job.setprogress(0.7)
-
-    # Root password
-    _status = "Setting root password..."
-    root_password = gs.value("rootPassword")
-    if root_password:
+    for user in [username, "root"] if root_password else [username]:
+        pw = root_password if user == "root" else password
         proc = subprocess.run(
-            ["chpasswd", "--root", deploy],
-            input=f"root:{root_password}\n", capture_output=True, text=True
+            ["chroot", deploy, "passwd", user],
+            input=f"{pw}\n{pw}\n", capture_output=True, text=True
         )
         if proc.returncode == 0:
-            libcalamares.utils.debug("Root password set")
+            libcalamares.utils.debug(f"Password set for {user}")
         else:
-            libcalamares.utils.warning(f"Failed to set root password: {proc.stderr}")
+            libcalamares.utils.warning(f"Failed to set password for {user}: {proc.stderr}")
+
+    libcalamares.job.setprogress(0.7)
 
     # Remount ro
     for path in [deploy, root]:
