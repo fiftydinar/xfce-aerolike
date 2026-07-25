@@ -59,6 +59,7 @@ def run():
             "bootc", "install", "to-filesystem",
             "--source-imgref", f"docker://{image_name}",
             "--skip-fetch-check", "--bootloader", "grub",
+            "--enforce-container-sigpolicy",
             "--target-imgref", image_name, root
         ], capture_output=True, text=True)
     else:
@@ -81,6 +82,7 @@ def run():
             "bootc", "install", "to-filesystem",
             "--source-imgref", "oci:/mnt/oci-staging:latest",
             "--generic-image", "--skip-fetch-check", "--bootloader", "grub",
+            "--enforce-container-sigpolicy",
             "--target-imgref", image_name, root
         ], capture_output=True, text=True)
 
