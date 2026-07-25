@@ -72,7 +72,9 @@ def run():
     # Keyboard
     _status = "Setting keyboard layout..."
     layout = gs.value("keyboardLayout")
+    variant = gs.value("keyboardVariant") or ""
     if layout:
+        # Console keymap
         vconsole = os.path.join(etc, "vconsole.conf")
         try:
             os.makedirs(etc, exist_ok=True)
@@ -81,6 +83,23 @@ def run():
             libcalamares.utils.debug(f"Set keyboard: {layout}")
         except OSError as e:
             libcalamares.utils.warning(f"Failed to set keyboard: {e}")
+
+        # X11 keyboard config (for desktop environment)
+        xorg_dir = os.path.join(etc, "X11", "xorg.conf.d")
+        xorg_conf = os.path.join(xorg_dir, "00-keyboard.conf")
+        try:
+            os.makedirs(xorg_dir, exist_ok=True)
+            variant_line = f'\tOption "XkbVariant" "{variant}"\n' if variant else ""
+            with open(xorg_conf, "w") as f:
+                f.write('Section "InputClass"\n'
+                        '\tIdentifier "system-keyboard"\n'
+                        '\tMatchIsKeyboard "on"\n'
+                        f'\tOption "XkbLayout" "{layout}"\n'
+                        f'{variant_line}'
+                        'EndSection\n')
+            libcalamares.utils.debug(f"Set X11 keyboard: {layout}")
+        except OSError as e:
+            libcalamares.utils.warning(f"Failed to set X11 keyboard: {e}")
 
     libcalamares.job.setprogress(1.0)
     _status = "System settings configured"
