@@ -71,7 +71,7 @@ def run():
 
     # Keyboard
     _status = "Setting keyboard layout..."
-    layout = gs.value("xkbLayout")
+    layout = gs.value("keyboardLayout")
     if layout:
         vconsole = os.path.join(etc, "vconsole.conf")
         try:
