@@ -71,27 +71,16 @@ def run():
 
     libcalamares.job.setprogress(0.5)
 
-    # Set user password — write hash directly to /etc/shadow
+    # Set user password via chpasswd (uses deployment's own PAM and crypt)
     _status = "Setting password..."
-    hashed = sha512_crypt(password)
-    shadow = os.path.join(deploy, "etc/shadow")
-    if os.path.exists(shadow):
-        stat = os.stat(shadow)
-        with open(shadow, "r") as f:
-            lines = f.readlines()
-        with open(shadow, "w") as f:
-            for line in lines:
-                if line.startswith(f"{username}:"):
-                    parts = line.strip().split(":")
-                    parts[1] = hashed
-                    f.write(":".join(parts) + "\n")
-                else:
-                    f.write(line)
-        os.chmod(shadow, stat.st_mode)
-        os.chown(shadow, stat.st_uid, stat.st_gid, follow_symlinks=False)
+    proc = subprocess.run(
+        ["chpasswd", "--root", deploy],
+        input=f"{username}:{password}\n", capture_output=True, text=True
+    )
+    if proc.returncode == 0:
         libcalamares.utils.debug("Password set")
     else:
-        libcalamares.utils.warning("No shadow file found")
+        libcalamares.utils.warning(f"Failed to set password: {proc.stderr}")
 
     libcalamares.job.setprogress(0.7)
 
@@ -99,20 +88,14 @@ def run():
     _status = "Setting root password..."
     root_password = gs.value("rootPassword")
     if root_password:
-        hashed = sha512_crypt(root_password)
-        shadow = os.path.join(deploy, "etc/shadow")
-        if os.path.exists(shadow):
-            with open(shadow, "r") as f:
-                lines = f.readlines()
-            with open(shadow, "w") as f:
-                for line in lines:
-                    if line.startswith("root:"):
-                        parts = line.strip().split(":")
-                        parts[1] = hashed
-                        f.write(":".join(parts) + "\n")
-                    else:
-                        f.write(line)
+        proc = subprocess.run(
+            ["chpasswd", "--root", deploy],
+            input=f"root:{root_password}\n", capture_output=True, text=True
+        )
+        if proc.returncode == 0:
             libcalamares.utils.debug("Root password set")
+        else:
+            libcalamares.utils.warning(f"Failed to set root password: {proc.stderr}")
 
     # Remount ro
     for path in [deploy, root]:
