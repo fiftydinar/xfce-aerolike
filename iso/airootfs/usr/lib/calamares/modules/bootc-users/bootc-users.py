@@ -63,7 +63,7 @@ def run():
 
     # Set password using deployment's own passwd binary
     _status = "Setting password..."
-    root_password = gs.value("rootPassword")
+    root_password = gs.value("rootPassword") or password
     users = [username, "root"] if root_password else [username]
     for user in users:
         pw = root_password if user == "root" else password
