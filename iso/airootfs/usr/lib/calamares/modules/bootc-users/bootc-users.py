@@ -61,9 +61,12 @@ def run():
 
     libcalamares.job.setprogress(0.5)
 
-    # Set password using deployment's own passwd binary (avoid PAM/libcrypt cross-system issues)
+    # Set password using deployment's own passwd binary
     _status = "Setting password..."
-    for user in [username, "root"] if root_password else [username]:
+    root_password = gs.value("rootPassword")
+    users = [username, "root"] if root_password else [username]
+    for user in users:
+        pw = root_password if user == "root" else password
         pw = root_password if user == "root" else password
         proc = subprocess.run(
             ["chroot", deploy, "passwd", user],
