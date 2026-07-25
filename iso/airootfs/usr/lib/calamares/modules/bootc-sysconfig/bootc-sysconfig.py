@@ -106,7 +106,7 @@ def run():
 
     # Auto-login for LightDM (drop-in with alphanumeric priority)
     _status = "Configuring auto-login..."
-    autologin_user = gs.value("autoLoginUser")
+    autologin_user = gs.value("autoLoginUser") if gs.contains("autoLoginUser") else ""
     if autologin_user:
         dropin_dir = os.path.join(etc, "lightdm", "lightdm.conf.d")
         dropin = os.path.join(dropin_dir, "90-calamares-autologin.conf")
