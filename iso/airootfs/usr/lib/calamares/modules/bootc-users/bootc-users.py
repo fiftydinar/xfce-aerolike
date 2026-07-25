@@ -63,14 +63,10 @@ def run():
 
     # Set password using deployment's own passwd binary
     _status = "Setting password..."
-    root_password = gs.value("rootPassword") or password
-    users = [username, "root"] if root_password else [username]
-    for user in users:
-        pw = root_password if user == "root" else password
-        pw = root_password if user == "root" else password
+    for user in [username, "root"]:
         proc = subprocess.run(
             ["chroot", deploy, "passwd", user],
-            input=f"{pw}\n{pw}\n", capture_output=True, text=True
+            input=f"{password}\n{password}\n", capture_output=True, text=True
         )
         if proc.returncode == 0:
             libcalamares.utils.debug(f"Password set for {user}")
