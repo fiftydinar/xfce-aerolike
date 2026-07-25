@@ -27,6 +27,8 @@ strings:
   errorPopupContinue: "Continue"
   errorPopupInfo: "Information"
 
+  thankyouText: "{{ productName }} has been installed on your computer."
+
 images:
   productIcon: "icon.png"
 
