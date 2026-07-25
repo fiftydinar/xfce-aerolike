@@ -11,6 +11,8 @@ strings:
   shortProductName: xfce-aerolike
   version: "@ISO_VERSION@"
   shortVersion: "@ISO_VERSION@"
+  versionedName: "xfce-aerolike @ISO_VERSION@"
+  shortVersionedName: "xfce-aerolike @ISO_VERSION@"
   bootloaderEntryName: xfce-aerolike
 
   welcomeMessage: Welcome to xfce-aerolike.
