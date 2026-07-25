@@ -142,6 +142,10 @@ mkdir -p "${AIROOTFS}/var/tmp"
 chroot "${AIROOTFS}" systemctl mask bootc-fetch-apply-updates.timer 2>/dev/null || true
 echo "[build-iso] Masked bootc auto-update timer"
 
+# Disable bootloader-update in live environment (should only run on installed system)
+chroot "${AIROOTFS}" systemctl mask bootloader-update.service 2>/dev/null || true
+echo "[build-iso] Masked bootloader-update service"
+
 # Install dracut + our custom archiso module for live ISO boot
 echo "[build-iso] Installing fuse-overlayfs inside chroot..."
 chroot "${AIROOTFS}" pacman -S --needed --noconfirm fuse-overlayfs
