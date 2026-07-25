@@ -3,7 +3,8 @@ import libcalamares
 import subprocess
 import os
 import glob
-import crypt
+import ctypes
+import ctypes.util
 
 _status = "..."
 
@@ -12,6 +13,14 @@ def pretty_name():
 
 def pretty_status_message():
     return _status
+
+def sha512_crypt(password):
+    """Generate SHA-512 crypt hash using system's libcrypt (no Python crypt module needed)."""
+    import os as _os
+    libcrypt = ctypes.CDLL(ctypes.util.find_library("crypt"))
+    libcrypt.crypt.restype = ctypes.c_char_p
+    salt = "$6$" + _os.urandom(8).hex()
+    return libcrypt.crypt(password.encode(), salt.encode()).decode()
 
 def deployment_root(root):
     """Find the active ostree deployment root under the Calamares mount point."""
@@ -64,7 +73,7 @@ def run():
 
     # Set user password — write hash directly to /etc/shadow
     _status = "Setting password..."
-    hashed = crypt.crypt(password, crypt.mksalt(crypt.METHOD_SHA512))
+    hashed = sha512_crypt(password)
     shadow = os.path.join(deploy, "etc/shadow")
     if os.path.exists(shadow):
         stat = os.stat(shadow)
@@ -90,7 +99,7 @@ def run():
     _status = "Setting root password..."
     root_password = gs.value("rootPassword")
     if root_password:
-        hashed = crypt.crypt(root_password, crypt.mksalt(crypt.METHOD_SHA512))
+        hashed = sha512_crypt(root_password)
         shadow = os.path.join(deploy, "etc/shadow")
         if os.path.exists(shadow):
             with open(shadow, "r") as f:
