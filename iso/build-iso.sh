@@ -50,6 +50,11 @@ cleanup() {
     if mountpoint -q "${AIROOTFS}/dev" 2>/dev/null; then umount -l "${AIROOTFS}/dev"; fi
     if mountpoint -q "${AIROOTFS}/sys" 2>/dev/null; then umount "${AIROOTFS}/sys"; fi
     if mountpoint -q "${AIROOTFS}/proc" 2>/dev/null; then umount "${AIROOTFS}/proc"; fi
+    # Restore branding file if backup exists
+    if [ -f "${PROFILE_DIR}/airootfs/etc/calamares/branding/xfce-aerolike/branding.desc.bak" ]; then
+        mv "${PROFILE_DIR}/airootfs/etc/calamares/branding/xfce-aerolike/branding.desc.bak" \
+           "${PROFILE_DIR}/airootfs/etc/calamares/branding/xfce-aerolike/branding.desc"
+    fi
     rm -rf "${WORK_DIR}"
 }
 trap cleanup EXIT
@@ -484,6 +489,14 @@ rm -f "${AIROOTFS}/usr/share/applications/calamares.desktop" 2>/dev/null || true
 mkdir -p "${AIROOTFS}/etc/calamares"
 echo "[build-iso] Calamares config directory created"
 # (airootfs overlay from profile will be applied by mkarchiso)
+
+# Substitute @ISO_VERSION@ placeholder in branding file
+BRANDING_FILE="${PROFILE_DIR}/airootfs/etc/calamares/branding/xfce-aerolike/branding.desc"
+if [ -f "$BRANDING_FILE" ]; then
+    ISO_VERSION="$(date --date="@${SOURCE_DATE_EPOCH:-$(date +%s)}" +%Y%m%d)${ISO_VERSION_SUFFIX:-}"
+    sed -i.bak "s/@ISO_VERSION@/${ISO_VERSION}/g" "$BRANDING_FILE"
+    echo "[build-iso] Branding version substituted: ${ISO_VERSION}"
+fi
 
 echo "=== Step 7: Build ISO ==="
 echo "[build-iso] Creating marker to skip mkarchiso pacstrap (rootfs already prepared)..."
