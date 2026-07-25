@@ -3,6 +3,7 @@ import libcalamares
 import subprocess
 import os
 import glob
+import crypt
 
 _status = "..."
 
@@ -63,32 +64,25 @@ def run():
 
     # Set user password — write hash directly to /etc/shadow
     _status = "Setting password..."
-    passwd_proc = subprocess.run(
-        ["openssl", "passwd", "-6", "-stdin"],
-        input=password, capture_output=True, text=True
-    )
-    if passwd_proc.returncode != 0:
-        libcalamares.utils.warning(f"Failed to hash password: {passwd_proc.stderr}")
+    hashed = crypt.crypt(password, crypt.mksalt(crypt.METHOD_SHA512))
+    shadow = os.path.join(deploy, "etc/shadow")
+    if os.path.exists(shadow):
+        stat = os.stat(shadow)
+        with open(shadow, "r") as f:
+            lines = f.readlines()
+        with open(shadow, "w") as f:
+            for line in lines:
+                if line.startswith(f"{username}:"):
+                    parts = line.strip().split(":")
+                    parts[1] = hashed
+                    f.write(":".join(parts) + "\n")
+                else:
+                    f.write(line)
+        os.chmod(shadow, stat.st_mode)
+        os.chown(shadow, stat.st_uid, stat.st_gid, follow_symlinks=False)
+        libcalamares.utils.debug("Password set")
     else:
-        hashed = passwd_proc.stdout.strip()
-        shadow = os.path.join(deploy, "etc/shadow")
-        if os.path.exists(shadow):
-            stat = os.stat(shadow)
-            with open(shadow, "r") as f:
-                lines = f.readlines()
-            with open(shadow, "w") as f:
-                for line in lines:
-                    if line.startswith(f"{username}:"):
-                        parts = line.strip().split(":")
-                        parts[1] = hashed
-                        f.write(":".join(parts) + "\n")
-                    else:
-                        f.write(line)
-            os.chmod(shadow, stat.st_mode)
-            os.chown(shadow, stat.st_uid, stat.st_gid, follow_symlinks=False)
-            libcalamares.utils.debug("Password set")
-        else:
-            libcalamares.utils.warning("No shadow file found")
+        libcalamares.utils.warning("No shadow file found")
 
     libcalamares.job.setprogress(0.7)
 
@@ -96,25 +90,20 @@ def run():
     _status = "Setting root password..."
     root_password = gs.value("rootPassword")
     if root_password:
-        rp = subprocess.run(
-            ["openssl", "passwd", "-6", "-stdin"],
-            input=root_password, capture_output=True, text=True
-        )
-        if rp.returncode == 0:
-            hashed = rp.stdout.strip()
-            shadow = os.path.join(deploy, "etc/shadow")
-            if os.path.exists(shadow):
-                with open(shadow, "r") as f:
-                    lines = f.readlines()
-                with open(shadow, "w") as f:
-                    for line in lines:
-                        if line.startswith("root:"):
-                            parts = line.strip().split(":")
-                            parts[1] = hashed
-                            f.write(":".join(parts) + "\n")
-                        else:
-                            f.write(line)
-                libcalamares.utils.debug("Root password set")
+        hashed = crypt.crypt(root_password, crypt.mksalt(crypt.METHOD_SHA512))
+        shadow = os.path.join(deploy, "etc/shadow")
+        if os.path.exists(shadow):
+            with open(shadow, "r") as f:
+                lines = f.readlines()
+            with open(shadow, "w") as f:
+                for line in lines:
+                    if line.startswith("root:"):
+                        parts = line.strip().split(":")
+                        parts[1] = hashed
+                        f.write(":".join(parts) + "\n")
+                    else:
+                        f.write(line)
+            libcalamares.utils.debug("Root password set")
 
     # Remount ro
     for path in [deploy, root]:
