@@ -52,7 +52,11 @@ def run():
     # Create wheel group (may not exist in bootc image)
     subprocess.run(["chroot", deploy, "groupadd", "-f", "wheel"], capture_output=True)
 
-    # Create user using deployment's own useradd (chroot follows home -> var/home symlink)
+    # Ensure /var/home exists (home -> var/home symlink; /var/home may not exist in the deployment yet)
+    var_home = os.path.join(deploy, "var", "home")
+    os.makedirs(var_home, exist_ok=True)
+
+    # Create user using deployment's own useradd
     _status = "Creating user account..."
     proc = subprocess.run(
         ["chroot", deploy, "useradd", "-m", "-G", "wheel", username],
@@ -62,6 +66,24 @@ def run():
         libcalamares.utils.warning(f"Failed to create user: {proc.stderr}")
     else:
         libcalamares.utils.debug(f"User {username} created")
+
+    # Verify home directory exists; create explicitly if useradd -m failed to
+    home_path = os.path.join(var_home, username)
+    if not os.path.isdir(home_path):
+        libcalamares.utils.warning(f"Home directory {home_path} not created by useradd, creating explicitly")
+        os.makedirs(home_path, exist_ok=True)
+        uid = gid = 1000
+        passwd_path = os.path.join(deploy, "etc", "passwd")
+        if os.path.exists(passwd_path):
+            with open(passwd_path) as f:
+                for line in f:
+                    parts = line.strip().split(":")
+                    if len(parts) >= 4 and parts[0] == username:
+                        uid = int(parts[2])
+                        gid = int(parts[3])
+                        break
+        os.chown(home_path, uid, gid)
+        os.chmod(home_path, 0o700)
 
     libcalamares.job.setprogress(0.5)
 
