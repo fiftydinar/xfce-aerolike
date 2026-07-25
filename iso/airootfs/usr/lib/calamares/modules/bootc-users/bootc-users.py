@@ -73,6 +73,7 @@ def run():
         hashed = passwd_proc.stdout.strip()
         shadow = os.path.join(deploy, "etc/shadow")
         if os.path.exists(shadow):
+            stat = os.stat(shadow)
             with open(shadow, "r") as f:
                 lines = f.readlines()
             with open(shadow, "w") as f:
@@ -83,6 +84,8 @@ def run():
                         f.write(":".join(parts) + "\n")
                     else:
                         f.write(line)
+            os.chmod(shadow, stat.st_mode)
+            os.chown(shadow, stat.st_uid, stat.st_gid, follow_symlinks=False)
             libcalamares.utils.debug("Password set")
         else:
             libcalamares.utils.warning("No shadow file found")
