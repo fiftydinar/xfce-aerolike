@@ -50,12 +50,12 @@ def run():
         subprocess.run(["chattr", "-i", path], capture_output=True)
 
     # Create wheel group (may not exist in bootc image)
-    subprocess.run(["groupadd", "--root", deploy, "-f", "wheel"], capture_output=True)
+    subprocess.run(["chroot", deploy, "groupadd", "-f", "wheel"], capture_output=True)
 
-    # Create user in deployment
+    # Create user using deployment's own useradd (chroot follows home -> var/home symlink)
     _status = "Creating user account..."
     proc = subprocess.run(
-        ["useradd", "--root", deploy, "-m", "-G", "wheel", username],
+        ["chroot", deploy, "useradd", "-m", "-G", "wheel", username],
         capture_output=True, text=True
     )
     if proc.returncode != 0:
