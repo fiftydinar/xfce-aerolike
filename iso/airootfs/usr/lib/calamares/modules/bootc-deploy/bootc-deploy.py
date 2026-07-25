@@ -104,7 +104,7 @@ def run():
         proc = run_bootc([
             "bootc", "install", "to-filesystem",
             "--source-imgref", f"docker://{image_name}",
-            "--skip-fetch-check", "--bootloader", "grub",
+            "--generic-image", "--skip-fetch-check", "--bootloader", "grub",
             "--enforce-container-sigpolicy",
             "--target-imgref", image_name, root
         ], 0.2, 0.85)
