@@ -3,8 +3,6 @@ import libcalamares
 import subprocess
 import os
 import glob
-import ctypes
-import ctypes.util
 
 _status = "..."
 
@@ -13,14 +11,6 @@ def pretty_name():
 
 def pretty_status_message():
     return _status
-
-def sha512_crypt(password):
-    """Generate SHA-512 crypt hash using system's libcrypt (no Python crypt module needed)."""
-    import os as _os
-    libcrypt = ctypes.CDLL(ctypes.util.find_library("crypt"))
-    libcrypt.crypt.restype = ctypes.c_char_p
-    salt = "$6$" + _os.urandom(8).hex()
-    return libcrypt.crypt(password.encode(), salt.encode()).decode()
 
 def deployment_root(root):
     """Find the active ostree deployment root under the Calamares mount point."""
