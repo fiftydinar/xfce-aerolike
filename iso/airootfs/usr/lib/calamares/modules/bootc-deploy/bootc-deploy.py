@@ -4,6 +4,7 @@ import subprocess
 import os
 import json
 import re
+import pty
 
 _status = "Preparing..."
 
@@ -14,37 +15,49 @@ def pretty_status_message():
     return _status
 
 def run_bootc(cmd, start_progress, end_progress):
-    """Run bootc install with streaming stderr to Calamares log and progress updates."""
+    """Run bootc install with streaming output via PTY (forces line-buffered TTY output)."""
     global _status
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    for line in proc.stderr:
-        line = line.rstrip("\n")
-        libcalamares.utils.debug(f"bootc: {line}")
-        _status = line
+    master_fd, slave_fd = pty.openpty()
+    proc = subprocess.Popen(cmd, stdout=slave_fd, stderr=slave_fd, close_fds=True)
+    os.close(slave_fd)
 
-        # Try to parse progress: "layers already present: X; layers needed: Y"
-        m = re.search(r"layers already present:\s*(\d+)\s*;\s*layers needed:\s*(\d+)", line)
-        if m:
-            present, needed = int(m.group(1)), int(m.group(2))
-            total = present + needed
-            if total > 0:
-                frac = present / total
-                libcalamares.job.setprogress(start_progress + (end_progress - start_progress) * frac)
-            continue
+    buf = ""
+    while True:
+        try:
+            data = os.read(master_fd, 4096)
+        except OSError:
+            break
+        if not data:
+            break
+        buf += data.decode("utf-8", errors="replace")
+        while "\n" in buf:
+            line, buf = buf.split("\n", 1)
+            line = line.rstrip("\r")
+            libcalamares.utils.debug(f"bootc: {line}")
+            _status = line
 
-        # "Pulling layer 12/128"
-        m = re.search(r"Pulling layer\s*(\d+)/(\d+)", line)
-        if m:
-            current, total = int(m.group(1)), int(m.group(2))
-            if total > 0:
-                frac = current / total
-                libcalamares.job.setprogress(start_progress + (end_progress - start_progress) * frac)
+            m = re.search(r"layers already present:\s*(\d+)\s*;\s*layers needed:\s*(\d+)", line)
+            if m:
+                present, needed = int(m.group(1)), int(m.group(2))
+                total = present + needed
+                if total > 0:
+                    libcalamares.job.setprogress(
+                        start_progress + (end_progress - start_progress) * (present / total))
+                continue
 
-        # "Deploying" phase
-        if "Deploying" in line or "Bootloader" in line:
-            libcalamares.job.setprogress(start_progress + (end_progress - start_progress) * 0.95)
+            m = re.search(r"Pulling layer\s*(\d+)/(\d+)", line)
+            if m:
+                cur, total = int(m.group(1)), int(m.group(2))
+                if total > 0:
+                    libcalamares.job.setprogress(
+                        start_progress + (end_progress - start_progress) * (cur / total))
+
+            if "Deploying" in line or "Bootloader" in line:
+                libcalamares.job.setprogress(
+                    start_progress + (end_progress - start_progress) * 0.95)
 
     proc.wait()
+    os.close(master_fd)
     return proc
 
 def run():
