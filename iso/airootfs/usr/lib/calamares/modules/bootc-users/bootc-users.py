@@ -60,12 +60,12 @@ def run():
 
     libcalamares.job.setprogress(0.5)
 
-    # Set password using deployment's own passwd binary
+    # Set password using deployment's own chpasswd (reads stdin, unlike passwd which reads /dev/tty)
     _status = "Setting password..."
     for user in [username, "root"]:
         proc = subprocess.run(
-            ["chroot", deploy, "passwd", user],
-            input=f"{password}\n{password}\n", capture_output=True, text=True
+            ["chroot", deploy, "chpasswd"],
+            input=f"{user}:{password}\n", capture_output=True, text=True
         )
         if proc.returncode == 0:
             libcalamares.utils.debug(f"Password set for {user}")
