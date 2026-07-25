@@ -30,7 +30,8 @@ def run():
     deploy = deployment_root(root)
 
     username = gs.value("username")
-    password = gs.value("password")
+    # Password in GS is obscured; unobscure by calling obscure() again (it's its own inverse)
+    password = libcalamares.obscure(gs.value("password")) if gs.contains("password") else gs.value("password")
 
     if not username or not password:
         libcalamares.utils.debug("No user to create, skipping")
