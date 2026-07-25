@@ -12,6 +12,10 @@ def pretty_name():
 def pretty_status_message():
     return _status
 
+def unobscure(s):
+    """Reverse Calamares::String::obscure (bidirectional XOR)."""
+    return "".join(c if ord(c) <= 0x21 else chr(0x1001F - ord(c)) for c in s)
+
 def deployment_root(root):
     """Find the active ostree deployment root under the Calamares mount point."""
     dirs = sorted(glob.glob(os.path.join(root, "ostree/deploy/default/deploy/*.0")))
@@ -30,8 +34,8 @@ def run():
     deploy = deployment_root(root)
 
     username = gs.value("username")
-    # Password in GS is obscured; unobscure by calling obscure() again (it's its own inverse)
-    password = libcalamares.obscure(gs.value("password")) if gs.contains("password") else gs.value("password")
+    # Password in GS is obscured via Calamares::String::obscure(); reverse it
+    password = unobscure(gs.value("password"))
 
     if not username or not password:
         libcalamares.utils.debug("No user to create, skipping")
