@@ -31,7 +31,6 @@ def run():
 
     username = gs.value("username")
     password = gs.value("password")
-    sudoers_group = gs.value("sudoersGroup")
 
     if not username or not password:
         libcalamares.utils.debug("No user to create, skipping")
@@ -51,7 +50,7 @@ def run():
     # Create user in deployment
     _status = "Creating user account..."
     proc = subprocess.run(
-        ["useradd", "--root", deploy, "-m", "-G", sudoers_group or "wheel", username],
+        ["useradd", "--root", deploy, "-m", "-G", "wheel", username],
         capture_output=True, text=True
     )
     if proc.returncode != 0:
