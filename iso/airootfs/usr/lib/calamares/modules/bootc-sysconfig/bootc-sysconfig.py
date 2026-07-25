@@ -139,9 +139,10 @@ def run():
         libcalamares.utils.warning(f"Failed to configure greeter: {e}")
 
     # Create AccountsService entry so user appears in greeter
+    # (writes to persistent ostree var, not deployment's var which is overridden on boot)
     username = gs.value("username")
     if username:
-        accounts_dir = os.path.join(deploy, "var/lib/AccountsService/users")
+        accounts_dir = os.path.join(root, "ostree", "deploy", "default", "var", "lib", "AccountsService", "users")
         try:
             os.makedirs(accounts_dir, exist_ok=True)
             with open(os.path.join(accounts_dir, username), "w") as f:

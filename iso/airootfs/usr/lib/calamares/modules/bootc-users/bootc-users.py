@@ -33,6 +33,11 @@ def run():
 
     deploy = deployment_root(root)
 
+    # Home directories live at the persistent ostree /var on the partition root,
+    # not inside the deployment's var/ (which is overridden by a bind mount on boot).
+    # The persistent var is at /ostree/deploy/default/var/ on the partition.
+    var_home_persist = os.path.join(root, "ostree", "deploy", "default", "var", "home")
+
     username = gs.value("username")
     # Password in GS is obscured via Calamares::String::obscure(); reverse it
     password = unobscure(gs.value("password"))
@@ -52,10 +57,6 @@ def run():
     # Create wheel group (may not exist in bootc image)
     subprocess.run(["chroot", deploy, "groupadd", "-f", "wheel"], capture_output=True)
 
-    # Ensure /var/home exists (home -> var/home symlink; /var/home may not exist in the deployment yet)
-    var_home = os.path.join(deploy, "var", "home")
-    os.makedirs(var_home, exist_ok=True)
-
     # Create user using deployment's own useradd
     _status = "Creating user account..."
     proc = subprocess.run(
@@ -67,23 +68,23 @@ def run():
     else:
         libcalamares.utils.debug(f"User {username} created")
 
-    # Verify home directory exists; create explicitly if useradd -m failed to
-    home_path = os.path.join(var_home, username)
-    if not os.path.isdir(home_path):
-        libcalamares.utils.warning(f"Home directory {home_path} not created by useradd, creating explicitly")
-        os.makedirs(home_path, exist_ok=True)
-        uid = gid = 1000
-        passwd_path = os.path.join(deploy, "etc", "passwd")
-        if os.path.exists(passwd_path):
-            with open(passwd_path) as f:
-                for line in f:
-                    parts = line.strip().split(":")
-                    if len(parts) >= 4 and parts[0] == username:
-                        uid = int(parts[2])
-                        gid = int(parts[3])
-                        break
-        os.chown(home_path, uid, gid)
-        os.chmod(home_path, 0o700)
+    # Create home directory in persistent /var (bootc overrides deployment's /var with a mount on boot)
+    _status = "Creating home directory..."
+    os.makedirs(var_home_persist, exist_ok=True)
+    home_path = os.path.join(var_home_persist, username)
+    os.makedirs(home_path, exist_ok=True)
+    uid = gid = 1000
+    passwd_path = os.path.join(deploy, "etc", "passwd")
+    if os.path.exists(passwd_path):
+        with open(passwd_path) as f:
+            for line in f:
+                parts = line.strip().split(":")
+                if len(parts) >= 4 and parts[0] == username:
+                    uid = int(parts[2])
+                    gid = int(parts[3])
+                    break
+    os.chown(home_path, uid, gid)
+    os.chmod(home_path, 0o700)
 
     libcalamares.job.setprogress(0.5)
 
