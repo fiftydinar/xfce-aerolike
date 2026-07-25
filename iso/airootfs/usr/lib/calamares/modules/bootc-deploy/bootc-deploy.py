@@ -3,6 +3,7 @@ import libcalamares
 import subprocess
 import os
 import json
+import re
 
 _status = "Preparing..."
 
@@ -11,6 +12,40 @@ def pretty_name():
 
 def pretty_status_message():
     return _status
+
+def run_bootc(cmd, start_progress, end_progress):
+    """Run bootc install with streaming stderr to Calamares log and progress updates."""
+    global _status
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    for line in proc.stderr:
+        line = line.rstrip("\n")
+        libcalamares.utils.debug(f"bootc: {line}")
+        _status = line
+
+        # Try to parse progress: "layers already present: X; layers needed: Y"
+        m = re.search(r"layers already present:\s*(\d+)\s*;\s*layers needed:\s*(\d+)", line)
+        if m:
+            present, needed = int(m.group(1)), int(m.group(2))
+            total = present + needed
+            if total > 0:
+                frac = present / total
+                libcalamares.job.setprogress(start_progress + (end_progress - start_progress) * frac)
+            continue
+
+        # "Pulling layer 12/128"
+        m = re.search(r"Pulling layer\s*(\d+)/(\d+)", line)
+        if m:
+            current, total = int(m.group(1)), int(m.group(2))
+            if total > 0:
+                frac = current / total
+                libcalamares.job.setprogress(start_progress + (end_progress - start_progress) * frac)
+
+        # "Deploying" phase
+        if "Deploying" in line or "Bootloader" in line:
+            libcalamares.job.setprogress(start_progress + (end_progress - start_progress) * 0.95)
+
+    proc.wait()
+    return proc
 
 def run():
     global _status
@@ -53,15 +88,13 @@ def run():
                         if matching:
                             image_name = f"ghcr.io/fiftydinar/xfce-aerolike:{matching[0]}"
 
-        libcalamares.job.setprogress(0.2)
-        _status = "Pulling and installing from registry..."
-        proc = subprocess.run([
+        proc = run_bootc([
             "bootc", "install", "to-filesystem",
             "--source-imgref", f"docker://{image_name}",
             "--skip-fetch-check", "--bootloader", "grub",
             "--enforce-container-sigpolicy",
             "--target-imgref", image_name, root
-        ], capture_output=True, text=True)
+        ], 0.2, 0.85)
     else:
         empty_overlay = "/tmp/.empty-overlay"
         oci_dir = os.path.join(root, ".oci-image")
@@ -77,17 +110,13 @@ def run():
 
         libcalamares.job.setprogress(0.2)
 
-        _status = "Running bootc install..."
-        proc = subprocess.run([
+        proc = run_bootc([
             "bootc", "install", "to-filesystem",
             "--source-imgref", "oci:/mnt/oci-staging:latest",
             "--generic-image", "--skip-fetch-check", "--bootloader", "grub",
             "--enforce-container-sigpolicy",
             "--target-imgref", image_name, root
-        ], capture_output=True, text=True)
-
-    libcalamares.utils.debug(f"bootc stdout:\n{proc.stdout}")
-    libcalamares.utils.debug(f"bootc stderr:\n{proc.stderr}")
+        ], 0.2, 0.85)
 
     if proc.returncode != 0:
         return ("bootc install failed", proc.stderr)
