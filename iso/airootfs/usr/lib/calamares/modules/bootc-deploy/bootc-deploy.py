@@ -136,11 +136,16 @@ boot
     main_cfg = os.path.join(root, "boot/grub/grub.cfg")
     if os.path.exists(main_cfg):
         boot_mnt = os.path.join(root, "boot")
-        # Remount both root and /boot (may be a separate partition) rw
+        # Check if /boot is a separate mount (e.g. ext4 /boot with bcachefs root)
+        boot_separate = subprocess.run(
+            ["mountpoint", "-q", boot_mnt], capture_output=True
+        ).returncode == 0
+
         subprocess.run(["mount", "-o", "remount,rw", root], capture_output=True)
-        subprocess.run(["mount", "-o", "remount,rw", boot_mnt], capture_output=True)
         subprocess.run(["chattr", "-i", root], capture_output=True)
-        subprocess.run(["chattr", "-i", boot_mnt], capture_output=True)
+        if boot_separate:
+            subprocess.run(["mount", "-o", "remount,rw", boot_mnt], capture_output=True)
+            subprocess.run(["chattr", "-i", boot_mnt], capture_output=True)
 
         # Disable 10_blscfg.cfg's blscfg — redundant with EFI stub (UEFI) or our patch (BIOS)
         with open(main_cfg, "r") as f:
@@ -163,7 +168,8 @@ if [ -n "$boot1" ]; then
 fi
 fi
 """)
-        subprocess.run(["mount", "-o", "remount,ro", boot_mnt], capture_output=True)
+        if boot_separate:
+            subprocess.run(["mount", "-o", "remount,ro", boot_mnt], capture_output=True)
         subprocess.run(["mount", "-o", "remount,ro", root], capture_output=True)
         libcalamares.utils.debug(f"Patched {main_cfg} for BIOS")
 
