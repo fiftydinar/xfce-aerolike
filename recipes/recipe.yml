@@ -191,6 +191,7 @@ modules:
         - bluetooth.service
         - lightdm.service
         - oomd.service
+        - bootloader-update.service
   - type: files
     files:
       - source: usr
