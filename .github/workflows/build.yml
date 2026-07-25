@@ -1,6 +1,8 @@
 name: bluebuild
 on:
   push:
+    branches:
+      - main
     paths-ignore:
       - "**.md"
       - ".github/workflows/build-packages.yml"
