@@ -457,6 +457,7 @@ chroot "${AIROOTFS}" git clone --depth 1 https://aur.archlinux.org/ckbcomp.git /
 chroot "${AIROOTFS}" sh -c 'cd /tmp/ckbcomp && makepkg -si --noconfirm --nocheck'
 chroot "${AIROOTFS}" rm -rf /tmp/ckbcomp
 chroot "${AIROOTFS}" sed -i 's|EUID == 69|EUID == 0|g' /usr/bin/makepkg
+chroot "${AIROOTFS}" pacman -Rns --noconfirm base-devel git
 echo "[build-iso] ckbcomp installed"
 echo "[build-iso] Calamares dependencies installed"
 
