@@ -447,7 +447,7 @@ else
 fi
 
 # Install Calamares runtime dependencies (not in the base image, ISO-only)
-chroot "${AIROOTFS}" pacman -S --needed --noconfirm yaml-cpp kpmcore polkit-qt6 python
+chroot "${AIROOTFS}" pacman -S --needed --noconfirm yaml-cpp kpmcore polkit-qt6 python ckbcomp
 echo "[build-iso] Calamares dependencies installed"
 
 
