@@ -108,13 +108,26 @@ def run():
         xorg_conf = os.path.join(xorg_dir, "00-keyboard.conf")
         try:
             os.makedirs(xorg_dir, exist_ok=True)
+            model = gs.value("keyboardModel") or ""
+            add_layout = gs.value("keyboardAdditionalLayout") or ""
+            add_variant = gs.value("keyboardAdditionalVariant") or ""
+            switcher = gs.value("keyboardGroupSwitcher") or ""
+            model_line = f'\tOption "XkbModel" "{model}"\n' if model else ""
             variant_line = f'\tOption "XkbVariant" "{variant}"\n' if variant else ""
+            switcher_line = ""
+            if add_layout:
+                layout = f"{layout},{add_layout}"
+                variant_combined = f"{variant},{add_variant}" if add_variant else variant
+                variant_line = f'\tOption "XkbVariant" "{variant_combined}"\n'
+                switcher_line = f'\tOption "XkbOptions" "{switcher}"\n' if switcher else ""
             with open(xorg_conf, "w") as f:
                 f.write('Section "InputClass"\n'
                         '\tIdentifier "system-keyboard"\n'
                         '\tMatchIsKeyboard "on"\n'
+                        f'{model_line}'
                         f'\tOption "XkbLayout" "{layout}"\n'
                         f'{variant_line}'
+                        f'{switcher_line}'
                         'EndSection\n')
             libcalamares.utils.debug(f"Set X11 keyboard: {layout}")
         except OSError as e:
