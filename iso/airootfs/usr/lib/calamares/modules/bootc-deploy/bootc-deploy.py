@@ -137,20 +137,9 @@ def run():
     libcalamares.job.setprogress(0.85)
     _status = "Installing EFI bootloader config..."
 
-    # GRUB configs (EFI stub + BIOS fix) are handled by bootupd via custom
-    # files shipped in the arch-bootc base image (/usr/lib/bootupd/grub2-static/).
+    # GRUB configs (EFI stub + BIOS fix) and fallback BOOTX64.EFI are handled
+    # by bootupd via custom files shipped in the arch-bootc base image.
     # bootupd deploys them during install and on bootloader-update.service runs.
-    esp_arch = os.path.join(root, "boot/efi/EFI/arch")
-    esp_boot = os.path.join(root, "boot/efi/EFI/BOOT")
-    os.makedirs(esp_arch, exist_ok=True)
-    os.makedirs(esp_boot, exist_ok=True)
-
-    # Install fallback bootloader
-    grub_src = os.path.join(esp_arch, "grubx64.efi")
-    grub_dst = os.path.join(esp_boot, "BOOTX64.EFI")
-    if os.path.exists(grub_src):
-        subprocess.run(["cp", grub_src, grub_dst], capture_output=True)
-        libcalamares.utils.debug("Installed EFI/BOOT/BOOTX64.EFI fallback")
 
     _status = "Cleaning up OCI staging..."
 
