@@ -447,7 +447,17 @@ else
 fi
 
 # Install Calamares runtime dependencies (not in the base image, ISO-only)
-chroot "${AIROOTFS}" pacman -S --needed --noconfirm yaml-cpp kpmcore polkit-qt6 python ckbcomp
+chroot "${AIROOTFS}" pacman -S --needed --noconfirm yaml-cpp kpmcore polkit-qt6 python
+
+# Install ckbcomp from AUR for Calamares keyboard preview
+echo "[build-iso] Installing ckbcomp from AUR..."
+chroot "${AIROOTFS}" pacman -S --needed --noconfirm base-devel git
+chroot "${AIROOTFS}" sed -i 's|EUID == 0|EUID == 69|g' /usr/bin/makepkg
+chroot "${AIROOTFS}" git clone --depth 1 https://aur.archlinux.org/ckbcomp.git /tmp/ckbcomp
+chroot "${AIROOTFS}" sh -c 'cd /tmp/ckbcomp && makepkg -si --noconfirm --nocheck'
+chroot "${AIROOTFS}" rm -rf /tmp/ckbcomp
+chroot "${AIROOTFS}" sed -i 's|EUID == 69|EUID == 0|g' /usr/bin/makepkg
+echo "[build-iso] ckbcomp installed"
 echo "[build-iso] Calamares dependencies installed"
 
 
