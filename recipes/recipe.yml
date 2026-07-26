@@ -99,8 +99,6 @@ modules:
         # Other
         - expac
         - dash
-        # f2fs userspace tools
-        - f2fs-tools
         # bcachefs userspace tools built from source in build-packages.yml
   - type: script
     snippets:
