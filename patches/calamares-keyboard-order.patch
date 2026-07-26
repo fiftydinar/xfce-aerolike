@@ -1,28 +1,10 @@
-From: fiftidinar <fiftydinar@proton.me>
-Date: Mon, 27 Jul 2026 00:00:00 +0200
-Subject: [PATCH 2/2] fix: keyboard layout order should put selected layout
- first, not additional (ASCII fallback)
-
-When a non-ASCII layout (e.g. Serbian) is selected with US as the
-additional ASCII fallback, the layout order was `us,rs` — making US
-the primary group. Now the selected layout comes first (`rs,us`), so
-typing starts in the user's chosen layout. The group switcher still
-allows toggling to the fallback.
-
-Also fix the same ordering in writeX11Data for the installed system.
-
----
- src/modules/keyboard/Config.cpp               | 8 ++++----
- src/modules/keyboard/SetKeyboardLayoutJob.cpp | 4 ++--
- 2 files changed, 6 insertions(+), 6 deletions(-)
-
 diff --git a/src/modules/keyboard/Config.cpp b/src/modules/keyboard/Config.cpp
-index 8f0fca5..7a6b3e2 100644
+index a7c8160..ed01e3c 100644
 --- a/src/modules/keyboard/Config.cpp
 +++ b/src/modules/keyboard/Config.cpp
 @@ -245,8 +245,8 @@ applyXkb( const BasicLayoutInfo& settings, AdditionalLayoutInfo& extra )
          }
-
+ 
          basicArguments.append(
 -            xkbmap_layout_args_with_group_switch( { extra.additionalLayout, settings.selectedLayout },
 -                                                  { extra.additionalVariant, settings.selectedVariant },
@@ -30,9 +12,9 @@ index 8f0fca5..7a6b3e2 100644
 +                                                  { settings.selectedVariant, extra.additionalVariant },
                                                    extra.groupSwitcher ) );
          QProcess::execute( "setxkbmap", basicArguments );
-
+ 
 @@ -271,8 +271,8 @@ applyLocale1( const BasicLayoutInfo& settings, AdditionalLayoutInfo& extra )
-
+ 
      if ( !extra.additionalLayout.isEmpty() )
      {
 -        layout = extra.additionalLayout + "," + layout;
@@ -41,14 +23,14 @@ index 8f0fca5..7a6b3e2 100644
 +        variant = variant + "," + extra.additionalVariant;
          option = extra.groupSwitcher;
      }
-
+ 
 diff --git a/src/modules/keyboard/SetKeyboardLayoutJob.cpp b/src/modules/keyboard/SetKeyboardLayoutJob.cpp
-index 8ed2aa8..c93e1fd 100644
+index 81eba13..3131f1b 100644
 --- a/src/modules/keyboard/SetKeyboardLayoutJob.cpp
 +++ b/src/modules/keyboard/SetKeyboardLayoutJob.cpp
 @@ -279,8 +279,8 @@ SetKeyboardLayoutJob::writeX11Data( const QString& keyboardConfPath ) const
-     stream << "        MatchIsKeyboard \"on\"\n";
-
+               "        MatchIsKeyboard \"on\"\n";
+ 
  
 -    const QStringList layouts = removeEmpty( { m_additionalLayoutInfo.additionalLayout, m_layout } );
 -    const QStringList variants = removeEmpty( { m_additionalLayoutInfo.additionalVariant, m_variant } );
@@ -57,5 +39,14 @@ index 8ed2aa8..c93e1fd 100644
      stream << "        Option \"XkbLayout\" \"" << layouts.join( "," ) << "\"\n";
      stream << "        Option \"XkbVariant\" \"" << variants.join( "," ) << "\"\n";
      if ( !m_additionalLayoutInfo.additionalLayout.isEmpty() )
--- 
-2.46.0
+@@ -313,8 +313,8 @@ SetKeyboardLayoutJob::writeDefaultKeyboardData( const QString& defaultKeyboardPa
+     }
+     QTextStream stream( &file );
+ 
+-    const QStringList layouts = removeEmpty( { m_additionalLayoutInfo.additionalLayout, m_layout } );
+-    const QStringList variants = removeEmpty( { m_additionalLayoutInfo.additionalVariant, m_variant } );
++    const QStringList layouts = removeEmpty( { m_layout, m_additionalLayoutInfo.additionalLayout } );
++    const QStringList variants = removeEmpty( { m_variant, m_additionalLayoutInfo.additionalVariant } );
+     stream << "# KEYBOARD CONFIGURATION FILE\n\n"
+               "# Consult the keyboard(5) manual page.\n\n";
+ 
