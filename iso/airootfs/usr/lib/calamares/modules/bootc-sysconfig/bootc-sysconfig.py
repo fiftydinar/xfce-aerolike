@@ -69,6 +69,25 @@ def run():
 
     libcalamares.job.setprogress(0.6)
 
+    # Locale / language
+    _status = "Setting language and locale..."
+    locale_conf = gs.value("localeConf")
+    if locale_conf and isinstance(locale_conf, dict):
+        try:
+            os.makedirs(etc, exist_ok=True)
+            with open(os.path.join(etc, "locale.conf"), "w") as f:
+                for key in ["LANG", "LC_NUMERIC", "LC_TIME", "LC_MONETARY",
+                            "LC_PAPER", "LC_NAME", "LC_ADDRESS",
+                            "LC_TELEPHONE", "LC_MEASUREMENT", "LC_IDENTIFICATION"]:
+                    val = locale_conf.get(key)
+                    if val:
+                        f.write(f"{key}={val}\n")
+            libcalamares.utils.debug(f"Locale written: {locale_conf.get('LANG', '')}")
+        except OSError as e:
+            libcalamares.utils.warning(f"Failed to set locale: {e}")
+    else:
+        libcalamares.utils.debug("No locale configuration in GlobalStorage")
+
     # Keyboard
     _status = "Setting keyboard layout..."
     layout = gs.value("keyboardLayout")

@@ -1,0 +1,76 @@
+diff --git a/src/modules/partition/gui/ChoicePage.cpp b/src/modules/partition/gui/ChoicePage.cpp
+index 382c1a7..65317c2 100644
+--- a/src/modules/partition/gui/ChoicePage.cpp
++++ b/src/modules/partition/gui/ChoicePage.cpp
+@@ -1642,70 +1642,7 @@ ChoicePage::setLastSelectedDeviceIndex( int index )
+ QWidget*
+ ChoicePage::createBootloaderPanel()
+ {
+-    QWidget* panelWidget = new QWidget;
+-
+-    QHBoxLayout* mainLayout = new QHBoxLayout;
+-    panelWidget->setLayout( mainLayout );
+-    mainLayout->setContentsMargins( 0, 0, 0, 0 );
+-    QLabel* widgetLabel = new QLabel( panelWidget );
+-    mainLayout->addWidget( widgetLabel );
+-    widgetLabel->setText( tr( "Bootloader location:", "@label" ) );
+-
+-    QComboBox* comboForBootloader = new QComboBox( panelWidget );
+-    comboForBootloader->setModel( m_core->bootLoaderModel() );
+-
+-    // When the chosen bootloader device changes, we update the choice in the PCM
+-    connect( comboForBootloader,
+-             QOverload< int >::of( &QComboBox::currentIndexChanged ),
+-             this,
+-             [ this ]( int newIndex )
+-             {
+-                 QComboBox* bootloaderCombo = qobject_cast< QComboBox* >( sender() );
+-                 if ( bootloaderCombo )
+-                 {
+-                     QVariant var = bootloaderCombo->itemData( newIndex, BootLoaderModel::BootLoaderPathRole );
+-                     if ( !var.isValid() )
+-                     {
+-                         return;
+-                     }
+-                     m_core->setBootLoaderInstallPath( var.toString() );
+-                 }
+-             } );
+-    m_bootloaderComboBox = comboForBootloader;
+-
+-    connect( m_core->bootLoaderModel(),
+-             &QAbstractItemModel::modelReset,
+-             [ this ]()
+-             {
+-                 if ( !m_bootloaderComboBox.isNull() )
+-                 {
+-                     Calamares::restoreSelectedBootLoader( *m_bootloaderComboBox, m_core->bootLoaderInstallPath() );
+-                 }
+-             } );
+-    connect(
+-        m_core,
+-        &PartitionCoreModule::deviceReverted,
+-        this,
+-        [ this ]( Device* )
+-        {
+-            if ( !m_bootloaderComboBox.isNull() )
+-            {
+-                if ( m_bootloaderComboBox->model() != m_core->bootLoaderModel() )
+-                {
+-                    m_bootloaderComboBox->setModel( m_core->bootLoaderModel() );
+-                }
+-
+-                m_bootloaderComboBox->setCurrentIndex( m_lastSelectedDeviceIndex );
+-            }
+-        },
+-        Qt::QueuedConnection );
+-    // ^ Must be Queued so it's sure to run when the widget is already visible.
+-
+-    mainLayout->addWidget( m_bootloaderComboBox );
+-    widgetLabel->setBuddy( m_bootloaderComboBox );
+-    mainLayout->addStretch();
+-
+-    return panelWidget;
++    return new QWidget;
+ }
+ 
+ bool
