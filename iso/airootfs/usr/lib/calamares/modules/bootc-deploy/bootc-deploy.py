@@ -141,6 +141,44 @@ def run():
     # by bootupd via custom files shipped in the arch-bootc base image.
     # bootupd deploys them during install and on bootloader-update.service runs.
 
+    # Create NVRAM boot entry for UEFI (even with --generic-image, the fallback
+    # BOOTX64.EFI handles the no-NVRAM case, this is just for convenience)
+    esp_dir = os.path.join(root, "boot/efi/EFI/arch")
+    if os.path.isdir(esp_dir) and os.path.exists("/usr/bin/efibootmgr"):
+        # Find ESP device from mount table
+        with open("/proc/mounts") as f:
+            for line in f:
+                parts = line.split()
+                if len(parts) >= 2 and parts[1] == os.path.join(root, "boot/efi"):
+                    esp_dev = parts[0]
+                    # Extract disk and partition (e.g., /dev/vda1 -> /dev/vda, 1)
+                    import re
+                    m = re.match(r"(/dev/[a-z]+)(\d+)$", esp_dev)
+                    if m:
+                        disk, part = m.group(1), m.group(2)
+                        # Remove existing xfce-aerolike entries first
+                        result = subprocess.run(
+                            ["efibootmgr"], capture_output=True, text=True
+                        )
+                        for line in result.stdout.split("\n"):
+                            m2 = re.search(r"Boot(\d+)\*?\s*xfce-aerolike", line)
+                            if m2:
+                                subprocess.run(
+                                    ["efibootmgr", "--delete-bootnum",
+                                     "--bootnum", m2.group(1)],
+                                    capture_output=True
+                                )
+                        proc = subprocess.run(
+                            ["efibootmgr", "--create", "--disk", disk,
+                             "--part", part, "--label", "xfce-aerolike",
+                             "--loader", r"\EFI\arch\shimx64.efi"],
+                            capture_output=True, text=True
+                        )
+                        libcalamares.utils.debug(
+                            f"EFI boot entry created: {proc.stdout.strip()}"
+                        )
+                    break
+
     _status = "Cleaning up OCI staging..."
 
     if mode == "offline":
