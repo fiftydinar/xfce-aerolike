@@ -93,15 +93,17 @@ def run():
     layout = gs.value("keyboardLayout")
     variant = gs.value("keyboardVariant") or ""
     if layout:
-        # Console keymap
+        # Console keymap: always 'us' as safe default. The X11 config below handles
+        # the actual layout with variants and switching; console mappings are too
+        # numerous to maintain and often have different names than X11 layouts.
         vconsole = os.path.join(etc, "vconsole.conf")
         try:
             os.makedirs(etc, exist_ok=True)
             with open(vconsole, "w") as f:
-                f.write(f"KEYMAP={layout}\n")
-            libcalamares.utils.debug(f"Set keyboard: {layout}")
+                f.write("KEYMAP=us\n")
+            libcalamares.utils.debug("Set console keymap: us")
         except OSError as e:
-            libcalamares.utils.warning(f"Failed to set keyboard: {e}")
+            libcalamares.utils.warning(f"Failed to set console keymap: {e}")
 
         # X11 keyboard config (for desktop environment)
         xorg_dir = os.path.join(etc, "X11", "xorg.conf.d")
@@ -117,7 +119,7 @@ def run():
             switcher_line = ""
             if add_layout:
                 layout = f"{layout},{add_layout}"
-                variant_combined = f"{variant},{add_variant}" if add_variant else variant
+                variant_combined = f"{variant},{add_variant}" if add_variant else f"{variant},"
                 variant_line = f'\tOption "XkbVariant" "{variant_combined}"\n'
                 switcher_line = f'\tOption "XkbOptions" "{switcher}"\n' if switcher else ""
             with open(xorg_conf, "w") as f:
