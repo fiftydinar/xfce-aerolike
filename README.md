@@ -37,12 +37,15 @@ Now that we know what's the theming base and other defaults, I'll highlight what
 
 - Image setup in shortly is explained like this:
   - arch-base + dracut + bootc (with composefs) + SystemD + xorg + LightDM + NetworkManager + chronyd + bluez + unbound + avahi + Pipewire + mesa (OpenGL) + vulkan + compiz + emerald + XFCE4 base + XFCE4 goodies like screenshotter and its applet plugins + theming
-- Native **bcachefs** root support — the kernel, initramfs, and GRUB modules are placed on a separate ext4 `/boot` partition since GRUB does not support bcachefs. The live ISO installer handles this automatically.
+- Native **bcachefs** root support
+  - kernel patched with `bcachefs` support
+  - Live-ISO covers support for this natively
+    - the kernel, initramfs, and GRUB modules are placed on a separate ext4 `/boot` partition since GRUB does not support bcachefs.
 - Uses `unbound` as the DNS resolver (recursive, DNSSEC-validating) instead of `systemd-resolved`, paired with `avahi` for mDNS and `NetworkManager` for connection management. Split-DNS for VPNs is handled via a NetworkManager dispatcher script.
 - Uses [facebook's `oomd`](https://github.com/facebookincubator/oomd) for proactive OOM prevention (PSI-based, per-cgroup, kills by memory size/growth) instead of `systemd-oomd`.
 - Has automatic seamless system updates enabled (runs atomic `bootc upgrade` once per day).
 - Uses `compiz` as the compositing window manager and `emerald` as the window decorator.
-- Additional `compiz` defaults that enables blur, snap and grid plugins + blurs taskbar and start menu. Also modified grid plugin to use colors matching the default background. Disabled `sync_to_vblank` (no-op on yserver) and `unredirect_fullscreen_windows` to eliminate alt-tab glitches.
+- Additional `compiz` defaults that enables blur, snap and grid plugins + blurs taskbar and start menu. Also modified grid plugin to use colors matching the default background.
 - Modified XFCE-desktop GTK3 theme to make applets size square-consistent, to make all applets use the Aero button hover and press theme and to make Start menu coloring closer to taskbar.
 - Preconfigured variables, config and scripts for default theming, which includes: LightDM login screen, GTK2, GTK3, GTK4 (including Adwaita), Qt5, Qt6 and XFCE-desktop.
 - Force GTK apps to use server-side window decorations through [gtk-nocsd](https://codeberg.org/MorsMortium/gtk-nocsd)
@@ -56,45 +59,54 @@ Now that we know what's the theming base and other defaults, I'll highlight what
 
 ### Live ISO (Recommended)
 
-Download the latest ISO from the [Releases page](https://github.com/fiftydinar/xfce-aerolike/releases) and write it to a USB drive:
+You can use it to test-out how `xfce-aerolike` works, or to install it to the disk.
 
-```bash
-sudo dd if=xfce-aerolike-*.iso of=/dev/sdX bs=4M status=progress
+To install, download the latest ISO in parts, ISO reasemble script and sha256 from the [Releases page](https://github.com/fiftydinar/xfce-aerolike/releases) and execute the ISO reasemble script, which will output the full ISO.
+```sh
+chmod +x xfce-aerolike-*-x86_64.iso.reassemble.sh && ./xfce-aerolike-*-main-x86_64.iso.reassemble.sh
 ```
+
+Then write it to a USB drive with program like Fedora Media Writer.
 
 1. Boot from the USB
-2. Click the **Install** icon on the desktop
-3. Choose **Online** or **Offline** mode:
+2. Click the **Install xfce-aerolike** icon on the desktop
+3. Choose **Offline** or **Online** mode:
+   - **Offline**: uses the image bundled on the ISO (no internet required, faster install)
    - **Online**: pulls the latest image from the registry during installation
-   - **Offline**: uses the image bundled on the ISO (no internet required)
 4. Follow the Calamares installer steps (partitioning, user creation, etc.)
-5. Reboot and boot the `xfce-aerolike` entry
+5. Install will proceed
+6. When install completes, reboot
 
-### Switching from Vauxite
+### Switching from current bootc-based system
 
-If you already have a bootc-based system (e.g. Fedora Vauxite), you can switch directly:
+If you already have a bootc-based system (e.g. Fedora Vauxite), you can switch directly.
 
-```bash
-sudo bootc switch --enforce-container-sigpolicy ghcr.io/fiftydinar/xfce-aerolike:latest
-sudo reboot
+First to the unsigned image (system will reboot):  
+```sh
+sudo bootc switch --apply ghcr.io/fiftydinar/xfce-aerolike:latest
 ```
 
-Then create a user and set a password:
+Then to the signed image (system will reboot):  
+```sh
+sudo bootc switch --enforce-container-sigpolicy --apply ghcr.io/fiftydinar/xfce-aerolike:latest
+```
 
-```bash
+Then after boot for a clean /home state, create a new user and set a password:  
+```sh
 sudo useradd -m -G wheel <username>
 sudo passwd <username>
+```
+
+Login to the new user and optionally delete the old user:  
+```sh
+sudo userdel -r <username>
 ```
 
 ## Caveats
 
 This image is based on the experimental work of [arch-bootc](https://github.com/fiftydinar/arch-bootc) base image, so some issues might arise.  
 
-- **Bcachefs root requires a separate ext4 `/boot` partition** — GRUB 2.14 does not include `bcachefs.mod`, so kernels, initramfs, and BLS entries must live on an ext4 boot partition. The Calamares installer handles this automatically.
-- Using different initramfs other than `dracut` is unsupported
+- Using different initramfs other than `dracut` is unsupported  
   - Using `mkinitcpio` and others might work with some modifications, but upstream primarily uses `dracut`, which is also used here
 - Secure boot doesn't work and is unsupported  
-  - For unsigned kernel by default
-- ~~Update sizes are big (around 2GB)~~ (update 2026.07.08: There are partial delta updates with `chunkah` now)
-  - ~~This is because `bootc` doesn't have support for more efficient delta updates, so it downloads almost full image. Provided auto-update `bootc` timer won't trigger if the network connection is metered, so you can set that in network settings to disable those updates. Or disable the timer by issuing `systemctl --system disable bootc-fetch-apply-updates.timer` in terminal.~~
-
+  - Live-ISO tooling currently does not cover this
