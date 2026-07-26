@@ -37,6 +37,7 @@ Now that we know what's the theming base and other defaults, I'll highlight what
 
 - Image setup in shortly is explained like this:
   - arch-base + dracut + bootc (with composefs) + SystemD + xorg + LightDM + NetworkManager + chronyd + bluez + unbound + avahi + Pipewire + mesa (OpenGL) + vulkan + compiz + emerald + XFCE4 base + XFCE4 goodies like screenshotter and its applet plugins + theming
+- Native **bcachefs** root support — the kernel, initramfs, and GRUB modules are placed on a separate ext4 `/boot` partition since GRUB does not support bcachefs. The live ISO installer handles this automatically.
 - Uses `unbound` as the DNS resolver (recursive, DNSSEC-validating) instead of `systemd-resolved`, paired with `avahi` for mDNS and `NetworkManager` for connection management. Split-DNS for VPNs is handled via a NetworkManager dispatcher script.
 - Uses [facebook's `oomd`](https://github.com/facebookincubator/oomd) for proactive OOM prevention (PSI-based, per-cgroup, kills by memory size/growth) instead of `systemd-oomd`.
 - Has automatic seamless system updates enabled (runs atomic `bootc upgrade` once per day).
@@ -53,32 +54,47 @@ Now that we know what's the theming base and other defaults, I'll highlight what
 
 ## How to install
 
-1. Download Fedora Vauxite ISO from [this URL](https://github.com/winblues/vauxite) and install it regularly
-2. When you boot to Vauxite, run this command below in terminal to switch to `xfce-aerolike` (requires internet connection):
-  - `sudo bootc switch ghcr.io/fiftydinar/xfce-aerolike:latest`
-3. Reboot the system
-4. Boot the Arch entry
-5. Run this command in terminal, installs the container signatures required for signed image of `xfce-aerolike` (requires internet connection):
-  - `sudo bootc switch --enforce-container-sigpolicy ghcr.io/fiftydinar/xfce-aerolike:latest`
-6. Run these commands to create the new user and set password for it (replace `[new_username]` with what you desire):
-  - `sudo useradd -m -G wheel [new_username] && sudo passwd [new_username]`
-7. Log out
-8. In login screen, select the new user and log in
-9. Run this command in terminal to delete the old user inherited from Fedora Vauxite (replace `[old_username]` with what it is):
-  - `sudo userdel -r [old_username]`
-10. Enjoy!
+### Live ISO (Recommended)
+
+Download the latest ISO from the [Releases page](https://github.com/fiftydinar/xfce-aerolike/releases) and write it to a USB drive:
+
+```bash
+sudo dd if=xfce-aerolike-*.iso of=/dev/sdX bs=4M status=progress
+```
+
+1. Boot from the USB
+2. Click the **Install** icon on the desktop
+3. Choose **Online** or **Offline** mode:
+   - **Online**: pulls the latest image from the registry during installation
+   - **Offline**: uses the image bundled on the ISO (no internet required)
+4. Follow the Calamares installer steps (partitioning, user creation, etc.)
+5. Reboot and boot the `xfce-aerolike` entry
+
+### Switching from Vauxite
+
+If you already have a bootc-based system (e.g. Fedora Vauxite), you can switch directly:
+
+```bash
+sudo bootc switch --enforce-container-sigpolicy ghcr.io/fiftydinar/xfce-aerolike:latest
+sudo reboot
+```
+
+Then create a user and set a password:
+
+```bash
+sudo useradd -m -G wheel <username>
+sudo passwd <username>
+```
 
 ## Caveats
 
 This image is based on the experimental work of [arch-bootc](https://github.com/fiftydinar/arch-bootc) base image, so some issues might arise.  
 
-- GRUB bootloader cannot be updated
-  - It will stay on the same version basically forever, because [bootupd](https://github.com/coreos/bootupd) only works on Fedora and CoreOS based distributions.
-- Installing or using other bootloader is unsupported
-  - For the same reason as 1.
+- **Bcachefs root requires a separate ext4 `/boot` partition** — GRUB 2.14 does not include `bcachefs.mod`, so kernels, initramfs, and BLS entries must live on an ext4 boot partition. The Calamares installer handles this automatically.
 - Using different initramfs other than `dracut` is unsupported
   - Using `mkinitcpio` and others might work with some modifications, but upstream primarily uses `dracut`, which is also used here
 - Secure boot doesn't work and is unsupported  
-  - For the same reason as 1 + unsigned kernel by default  
+  - For unsigned kernel by default
 - ~~Update sizes are big (around 2GB)~~ (update 2026.07.08: There are partial delta updates with `chunkah` now)
   - ~~This is because `bootc` doesn't have support for more efficient delta updates, so it downloads almost full image. Provided auto-update `bootc` timer won't trigger if the network connection is metered, so you can set that in network settings to disable those updates. Or disable the timer by issuing `systemctl --system disable bootc-fetch-apply-updates.timer` in terminal.~~
+
