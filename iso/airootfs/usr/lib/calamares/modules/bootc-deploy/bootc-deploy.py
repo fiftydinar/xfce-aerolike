@@ -144,18 +144,18 @@ def run():
     # Create NVRAM boot entry for UEFI (even with --generic-image, the fallback
     # BOOTX64.EFI handles the no-NVRAM case, this is just for convenience)
     esp_dir = os.path.join(root, "boot/efi/EFI/arch")
-    if os.path.isdir(esp_dir) and os.path.exists("/usr/bin/efibootmgr"):
+    if os.path.isdir(esp_dir):
         # Find ESP device from mount table
         with open("/proc/mounts") as f:
             for line in f:
                 parts = line.split()
                 if len(parts) >= 2 and parts[1] == os.path.join(root, "boot/efi"):
                     esp_dev = parts[0]
-                    # Extract disk and partition (e.g., /dev/vda1 -> /dev/vda, 1)
-                    import re
-                    m = re.match(r"(/dev/[a-z]+)(\d+)$", esp_dev)
+                    # Extract disk and partition (e.g. /dev/vda1 or /dev/nvme0n1p1)
+                    m = re.search(r"(\d+)$", esp_dev)
                     if m:
-                        disk, part = m.group(1), m.group(2)
+                        part = m.group(1)
+                        disk = esp_dev[:m.start()].rstrip("p")
                         # Remove existing xfce-aerolike entries first
                         result = subprocess.run(
                             ["efibootmgr"], capture_output=True, text=True
