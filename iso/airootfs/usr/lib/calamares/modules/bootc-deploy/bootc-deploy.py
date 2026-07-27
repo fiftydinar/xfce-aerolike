@@ -184,6 +184,8 @@ def run():
     # ext4/xfs/bcachefs use the search --file fallback in GRUB config.
     _status = "Setting filesystem label..."
     try:
+        # bootc remounts root ro after install; remount rw for label change
+        subprocess.run(["mount", "-o", "remount,rw", root], capture_output=True)
         label_result = subprocess.run(
             ["btrfs", "filesystem", "label", root, "root"],
             capture_output=True, text=True, timeout=10
