@@ -183,23 +183,19 @@ def run():
     # Needed for btrfs (search --file can't see inside subvolumes);
     # ext4/xfs/bcachefs use the search --file fallback in GRUB config.
     _status = "Setting filesystem label..."
-    root_dev_result = subprocess.run(
-        ["findmnt", "-n", "-o", "SOURCE", "--target", root],
-        capture_output=True, text=True
-    )
-    if root_dev_result.returncode == 0:
-        root_dev = root_dev_result.stdout.strip()
-        fstype_result = subprocess.run(
-            ["lsblk", "-n", "-o", "FSTYPE", root_dev],
-            capture_output=True, text=True
-        )
-        fstype = fstype_result.stdout.strip() if fstype_result.returncode == 0 else ""
-        if fstype == "btrfs":
-            subprocess.run(
-                ["btrfs", "filesystem", "label", root_dev, "root"],
-                capture_output=True
-            )
-            libcalamares.utils.debug(f"Label set to 'root' for btrfs device {root_dev}")
+    with open("/proc/mounts") as f:
+        for line in f:
+            parts = line.split()
+            if len(parts) >= 2 and parts[1] == root.rstrip("/"):
+                root_dev = parts[0].split("[")[0]
+                fstype = parts[2]
+                if fstype == "btrfs":
+                    subprocess.run(
+                        ["btrfs", "filesystem", "label", root_dev, "root"],
+                        capture_output=True
+                    )
+                    libcalamares.utils.debug(f"Label set to 'root' for btrfs device {root_dev}")
+                break
 
     _status = "Cleaning up OCI staging..."
 
