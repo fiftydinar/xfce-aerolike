@@ -143,41 +143,43 @@ def run():
 
     # Create NVRAM boot entry for UEFI (even with --generic-image, the fallback
     # BOOTX64.EFI handles the no-NVRAM case, this is just for convenience)
-    esp_dir = os.path.join(root, "boot/efi/EFI/arch")
-    if os.path.isdir(esp_dir):
-        # Find ESP device from mount table
-        with open("/proc/mounts") as f:
-            for line in f:
-                parts = line.split()
-                if len(parts) >= 2 and parts[1] == os.path.join(root, "boot/efi"):
-                    esp_dev = parts[0]
-                    # Extract disk and partition (e.g. /dev/vda1 or /dev/nvme0n1p1)
-                    m = re.search(r"(\d+)$", esp_dev)
-                    if m:
-                        part = m.group(1)
-                        disk = esp_dev[:m.start()].rstrip("p")
-                        # Remove existing xfce-aerolike entries first
-                        result = subprocess.run(
-                            ["efibootmgr"], capture_output=True, text=True
-                        )
-                        for line in result.stdout.split("\n"):
-                            m2 = re.search(r"Boot(\d+)\*?\s*xfce-aerolike", line)
-                            if m2:
-                                subprocess.run(
-                                    ["efibootmgr", "--delete-bootnum",
-                                     "--bootnum", m2.group(1)],
-                                    capture_output=True
-                                )
-                        proc = subprocess.run(
-                            ["efibootmgr", "--create", "--disk", disk,
-                             "--part", part, "--label", "xfce-aerolike",
-                             "--loader", r"\EFI\arch\shimx64.efi"],
-                            capture_output=True, text=True
-                        )
-                        libcalamares.utils.debug(
-                            f"EFI boot entry created: {proc.stdout.strip()}"
-                        )
-                    break
+    # Only run on UEFI systems — efibootmgr fails on BIOS
+    if not os.path.exists("/sys/firmware/efi"):
+        libcalamares.utils.debug("BIOS system detected, skipping EFI boot entry")
+    else:
+        esp_dir = os.path.join(root, "boot/efi/EFI/arch")
+        if os.path.isdir(esp_dir):
+            # Find ESP device from mount table
+            with open("/proc/mounts") as f:
+                for line in f:
+                    parts = line.split()
+                    if len(parts) >= 2 and parts[1] == os.path.join(root, "boot/efi"):
+                        esp_dev = parts[0]
+                        m = re.search(r"(\d+)$", esp_dev)
+                        if m:
+                            part = m.group(1)
+                            disk = esp_dev[:m.start()].rstrip("p")
+                            result = subprocess.run(
+                                ["efibootmgr"], capture_output=True, text=True
+                            )
+                            for line2 in result.stdout.split("\n"):
+                                m2 = re.search(r"Boot(\d+)\*?\s*xfce-aerolike", line2)
+                                if m2:
+                                    subprocess.run(
+                                        ["efibootmgr", "--delete-bootnum",
+                                         "--bootnum", m2.group(1)],
+                                        capture_output=True
+                                    )
+                            proc = subprocess.run(
+                                ["efibootmgr", "--create", "--disk", disk,
+                                 "--part", part, "--label", "xfce-aerolike",
+                                 "--loader", r"\EFI\arch\shimx64.efi"],
+                                capture_output=True, text=True
+                            )
+                            libcalamares.utils.debug(
+                                f"EFI boot entry created: {proc.stdout.strip()}"
+                            )
+                        break
 
     _status = "Cleaning up OCI staging..."
 
