@@ -193,7 +193,7 @@ cat > "$DRACUT_MODDIR/module-setup.sh" << 'DRACUTEOF'
 #!/bin/sh
 check() { return 255; }
 depends() { echo dm overlayfs img-lib; }
-installkernel() { hostonly='' instmods squashfs erofs loop iso9660 overlay; }
+installkernel() { hostonly='' instmods squashfs erofs loop iso9660 overlay; hostonly='' instmods usb-storage sd_mod ahci nvme xhci-hcd ehci-hcd xhci-pci ehci-pci; }
 install() {
     inst_multiple losetup blkid blockdev mount umount mkdir rmdir rm ln cp truncate mountpoint
     inst_multiple lsblk grep sed sleep readlink realpath find head
@@ -278,6 +278,19 @@ search_device() {
     mkdir -p /archisosearch
     while [ "$rootdelay" -gt 0 ]; do
         for dev in $(lsblk -o PATH -n -l 2>/dev/null); do
+            [ -b "$dev" ] || continue
+            mount -o ro "$dev" /archisosearch 2>/dev/null \
+              || mount -o ro -t iso9660 "$dev" /archisosearch 2>/dev/null \
+              || continue
+            if [ -e "/archisosearch${searchfile}" ]; then
+                echo "$dev" > /run/archiso/archisodevice
+                umount /archisosearch 2>/dev/null; rmdir /archisosearch 2>/dev/null
+                return 0
+            fi
+            umount /archisosearch 2>/dev/null
+        done
+        # Fallback: use blkid to find iso9660 devices directly
+        for dev in $(blkid -o device -t TYPE="iso9660" 2>/dev/null); do
             [ -b "$dev" ] || continue
             mount -o ro "$dev" /archisosearch 2>/dev/null || continue
             if [ -e "/archisosearch${searchfile}" ]; then
