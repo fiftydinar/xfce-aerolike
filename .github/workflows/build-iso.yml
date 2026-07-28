@@ -43,6 +43,7 @@ jobs:
           git apply --recount "$GITHUB_WORKSPACE/patches/calamares-bcachefs-boot-part.patch"
           git apply --recount "$GITHUB_WORKSPACE/patches/calamares-hybrid-bootloader.patch"
           git apply --recount "$GITHUB_WORKSPACE/patches/calamares-keyboard-order.patch"
+          git apply --recount "$GITHUB_WORKSPACE/patches/calamares-nosubvol.patch"
           cp -r "$GITHUB_WORKSPACE/patches/calamares-installmode" src/modules/installmode
           mkdir build && cd build
           cmake .. -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release \
