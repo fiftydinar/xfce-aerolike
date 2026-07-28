@@ -193,7 +193,7 @@ cat > "$DRACUT_MODDIR/module-setup.sh" << 'DRACUTEOF'
 #!/bin/sh
 check() { return 255; }
 depends() { echo dm overlayfs img-lib; }
-installkernel() { hostonly='' instmods squashfs erofs loop iso9660 overlay; hostonly='' instmods usb-storage sd_mod ahci nvme xhci-hcd ehci-hcd xhci-pci ehci-pci; }
+installkernel() { hostonly='' instmods squashfs erofs loop iso9660 overlay; hostonly='' instmods usb-storage sd_mod ahci nvme nvme-core nvme-pci xhci-hcd ehci-hcd xhci-pci ehci-pci; }
 install() {
     inst_multiple losetup blkid blockdev mount umount mkdir rmdir rm ln cp truncate mountpoint
     inst_multiple lsblk grep sed sleep readlink realpath find head
