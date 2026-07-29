@@ -42,14 +42,36 @@ diff -ruN '--exclude=.git' compiz-aur-patched/metadata/core.xml.in compiz-final/
 +		    <value>regex</value>
 +		    <value>resize</value>
 +		    <value>snap</value>
++		    <value>text</value>
 +		    <value>compiztoolbox</value>
-+		    <value>staticswitcher</value>
++		    <value>ring</value>
 +		    <value>wall</value>
 +		    <value>animation</value>
 +		    <value>blur</value>
 +		</default>
- 	    </option>
- 	    <option name="audible_bell" type="bool">
+  	    </option>
+diff -ruN '--exclude=.git' compiz-aur-patched/plugins/ring/ring.xml.in compiz-final/plugins/ring/ring.xml.in
+--- compiz-aur-patched/plugins/ring/ring.xml.in	2026-07-14 21:54:15.559723532 +0200
++++ compiz-final/plugins/ring/ring.xml.in	2026-07-15 00:51:14.907772178 +0200
+@@ -90,7 +90,7 @@
+ 		    <short>Next Window Key</short>
+ 		    <_long>Reveals the ring and selects the next window on the current workspace.</_long>
+ 		    <type>key</type>
+-		    <default>&lt;Super&gt;Tab</default>
++		    <default>&lt;Alt&gt;Tab</default>
+ 		</option>
+ 		<option type="button" name="next_button">
+ 		    <short>Next Window Button</short>
+@@ -103,7 +103,7 @@
+ 		    <short>Previous Window Key</short>
+ 		    <_long>Reveals the ring and selects the previous window on the current workspace.</_long>
+ 		    <type>key</type>
+-		    <default>&lt;Super&gt;&lt;Shift&gt;Tab</default>
++		    <default>&lt;Shift&gt;&lt;Alt&gt;Tab</default>
+ 		</option>
+ 		<option type="button" name="prev_button">
+ 		    <short>Previous Window Button</short>
+  	    <option name="audible_bell" type="bool">
  		<_short>Audible Bell</_short>
 @@ -254,7 +269,7 @@
  			<option name="hsize" type="int">
