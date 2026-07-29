@@ -27,7 +27,7 @@ diff -ruN '--exclude=.git' compiz-aur-patched/compizconfig/libcompizconfig/backe
 diff -ruN '--exclude=.git' compiz-aur-patched/metadata/core.xml.in compiz-final/metadata/core.xml.in
 --- compiz-aur-patched/metadata/core.xml.in	2026-07-14 21:54:15.609724128 +0200
 +++ compiz-final/metadata/core.xml.in	2026-07-15 00:51:14.907772178 +0200
-@@ -8,7 +8,22 @@
+@@ -8,7 +8,23 @@
  		<_short>Active Plugins</_short>
  		<_long>List of currently active plugins</_long>
  		<type>string</type>
