@@ -76,10 +76,12 @@ jobs:
             patch: |
               SRCDIR=$(find "${BUILDDIR:-/build}/src" -maxdepth 1 -type d -name 'compiz*' | head -1)
               [ -n "$SRCDIR" ] || { echo "ERROR: source dir not found"; exit 1; }
-              curl -sLO https://raw.githubusercontent.com/fiftydinar/xfce-aerolike/refs/heads/main/patches/compiz/0001-compiz-defaults.patch
-              cd "$SRCDIR"
-              patch -p1 < /build/0001-compiz-defaults.patch
-              cd /build
+              for p in 0001-compiz-defaults 0002-auto-fullscreen; do
+                curl -sLO "https://raw.githubusercontent.com/fiftydinar/xfce-aerolike/refs/heads/main/patches/compiz/${p}.patch"
+                cd "$SRCDIR"
+                patch -p1 < "/build/${p}.patch"
+                cd /build
+              done
 
           - name: xfce4-docklike-plugin-git
             enabled: true

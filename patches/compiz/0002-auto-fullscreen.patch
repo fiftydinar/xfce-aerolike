@@ -1,0 +1,53 @@
+diff --git a/src/privatewindow.h b/src/privatewindow.h
+index 7509145..46ae163 100644
+--- a/src/privatewindow.h
++++ b/src/privatewindow.h
+@@ -294,6 +294,8 @@ class PrivateWindow :
+ 	bool resize (const CompWindow::Geometry &g);
+ 	bool resize (const XWindowAttributes &attrib);
+ 
++	void autoDetectFullscreen ();
++
+ 	void configure (XConfigureEvent *ce);
+ 
+ 	void configureFrame (XConfigureEvent *ce);
+diff --git a/src/window.cpp b/src/window.cpp
+index 10f0eea..fe01390 100644
+--- a/src/window.cpp
++++ b/src/window.cpp
+@@ -1679,9 +1679,38 @@ PrivateWindow::resize (const CompWindow::Geometry &gm)
+ 	move (gm.x () - priv->geometry.x (),
+ 	      gm.y () - priv->geometry.y (), true);
+ 
++    autoDetectFullscreen ();
++
+     return true;
+ }
+ 
++void
++PrivateWindow::autoDetectFullscreen ()
++{
++    if (priv->attrib.override_redirect || !priv->managed)
++	return;
++
++    if (!(priv->wmType & (CompWindowTypeNormalMask | CompWindowTypeUnknownMask)))
++	return;
++
++    if (priv->state & CompWindowStateFullscreenMask)
++	return;
++
++    CompOutput &fsOutput = screen->fullscreenOutput ();
++
++    if (priv->geometry.x ()     == fsOutput.x ()      &&
++	priv->geometry.y ()     == fsOutput.y ()      &&
++	priv->geometry.width () == fsOutput.width ()  &&
++	priv->geometry.height ()== fsOutput.height ())
++    {
++	window->changeState (priv->state | CompWindowStateFullscreenMask);
++	window->updateAttributes (CompStackingUpdateModeNormal);
++    }
++}
++
+ bool
+ PrivateWindow::resize (const XWindowAttributes &attr)
+ {
