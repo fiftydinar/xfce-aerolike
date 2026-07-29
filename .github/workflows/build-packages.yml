@@ -82,6 +82,7 @@ jobs:
                 patch -p1 < "/build/${p}.patch"
                 cd /build
               done
+              sed -i 's|&lt;Super&gt;Tab|&lt;Alt&gt;Tab|g; s|&lt;Super&gt;&lt;Shift&gt;Tab|&lt;Shift&gt;&lt;Alt&gt;Tab|g' "$SRCDIR/plugins/ring/ring.xml.in"
 
           - name: xfce4-docklike-plugin-git
             enabled: true

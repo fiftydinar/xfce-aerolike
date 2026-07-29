@@ -131,8 +131,6 @@ modules:
         wget --retry-connrefused --tries=10 "$PKGS_URL" -O /tmp/pkgs.tar.gz && tar -xzf /tmp/pkgs.tar.gz -C /tmp/
         pacman -U --noconfirm --ask 4 /tmp/packages/*.pkg.tar.zst
         rm -rf /tmp/packages/ /tmp/pkgs.tar.gz
-      # Set ring switcher to Alt+Tab instead of Super+Tab
-      - "sed -i 's|&lt;Super&gt;Tab|&lt;Alt&gt;Tab|g; s|&lt;Super&gt;&lt;Shift&gt;Tab|&lt;Shift&gt;&lt;Alt&gt;Tab|g' /usr/share/compiz/ring.xml"
       # Generate unbound-control TLS certificates (chown at runtime)
       - "unbound-control-setup"
       # Set compiz to use emerald decorator
