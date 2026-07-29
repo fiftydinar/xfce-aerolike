@@ -79,7 +79,7 @@ jobs:
               for p in 0001-compiz-defaults 0002-auto-fullscreen; do
                 curl -sLO "https://raw.githubusercontent.com/fiftydinar/xfce-aerolike/refs/heads/main/patches/compiz/${p}.patch"
                 cd "$SRCDIR"
-                patch -p1 < "/build/${p}.patch"
+                patch -p1 -F100 < "/build/${p}.patch"
                 cd /build
               done
               sed -i 's|&lt;Super&gt;Tab|&lt;Alt&gt;Tab|g; s|&lt;Super&gt;&lt;Shift&gt;Tab|&lt;Shift&gt;&lt;Alt&gt;Tab|g' "$SRCDIR/plugins/ring/ring.xml.in"
