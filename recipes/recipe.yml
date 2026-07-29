@@ -57,8 +57,6 @@ modules:
         - kvantum
         - qt5ct
         - qt6ct
-        - xorg
-        - xorg-drivers
         - lightdm
         - lightdm-gtk-greeter
         - accountsservice
@@ -106,8 +104,18 @@ modules:
       # Install all optional dependencies for xarchiver
       - "pacman -Syu --needed --noconfirm --asdeps $(expac -Ss '%o' xarchiver)"
       # Install lightdm without xorg-server (only applicable when yserver is in use)
-      #- "pacman -S --assume-installed xorg-server --noconfirm lightdm lightdm-gtk-greeter"
-      #- "mkdir -p /etc/lightdm/lightdm.conf.d/ && echo -e '[Seat:*]\nxserver-command=/usr/bin/yserver' > /etc/lightdm/lightdm.conf.d/99-yserver.conf"
+      - "pacman -S --assume-installed xorg-server --noconfirm lightdm lightdm-gtk-greeter"
+      - "mkdir -p /etc/lightdm/lightdm.conf.d/ && echo -e '[Seat:*]\nxserver-command=/usr/bin/yserver' > /etc/lightdm/lightdm.conf.d/99-yserver.conf"
+      # Build and install yserver directly (replaces building in build-packages.yml)
+      - |
+        pacman -S --needed --noconfirm base-devel git
+        sed -i 's|EUID == 0|EUID == 69|g' /usr/bin/makepkg
+        git clone https://aur.archlinux.org/yserver-git.git /tmp/yserver-git
+        cd /tmp/yserver-git
+        makepkg -si --noconfirm --syncdeps --nocheck
+        cd /
+        rm -rf /tmp/yserver-git
+        sed -i 's|EUID == 69|EUID == 0|g' /usr/bin/makepkg
       # Symlink dash to sh with pacman hook to persist across bash updates
       - "ln -sfT /usr/bin/dash /usr/bin/sh"
       - |
@@ -133,6 +141,24 @@ modules:
         wget --retry-connrefused --tries=10 "$PKGS_URL" -O /tmp/pkgs.tar.gz && tar -xzf /tmp/pkgs.tar.gz -C /tmp/
         pacman -U --noconfirm --ask 4 /tmp/packages/*.pkg.tar.zst
         rm -rf /tmp/packages/ /tmp/pkgs.tar.gz
+      # Rebuild compiz with yserver patches (overwrites main compiz from pre-built packages)
+      - |
+        sed -i 's|EUID == 0|EUID == 69|g' /usr/bin/makepkg
+        git clone --depth 1 https://aur.archlinux.org/compiz.git /tmp/compiz
+        cd /tmp/compiz
+        curl -sLO https://raw.githubusercontent.com/fiftydinar/xfce-aerolike/refs/heads/yserver/patches/compiz/0001-compiz-defaults.patch
+        makepkg --noconfirm --syncdeps --nocheck --nobuild
+        SRCDIR=$(find /tmp/compiz/src -maxdepth 1 -type d -name 'compiz*' | head -1)
+        cd "$SRCDIR"
+        patch -p1 < /tmp/compiz/0001-compiz-defaults.patch
+        cd /tmp/compiz
+        makepkg --noconfirm --syncdeps --nocheck --noextract
+        pacman -U --noconfirm /tmp/compiz/*.pkg.tar.zst
+        cd /
+        rm -rf /tmp/compiz /tmp/0001-compiz-defaults.patch
+        sed -i 's|EUID == 69|EUID == 0|g' /usr/bin/makepkg
+      # Set ring switcher to Alt+Tab instead of Super+Tab
+      - "sed -i 's|&lt;Super&gt;Tab|&lt;Alt&gt;Tab|g; s|&lt;Super&gt;&lt;Shift&gt;Tab|&lt;Shift&gt;&lt;Alt&gt;Tab|g' /usr/share/compiz/ring.xml"
       # Generate unbound-control TLS certificates (chown at runtime)
       - "unbound-control-setup"
       # Set compiz to use emerald decorator
