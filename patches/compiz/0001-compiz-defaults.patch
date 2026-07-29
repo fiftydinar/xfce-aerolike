@@ -42,10 +42,10 @@ diff -ruN '--exclude=.git' compiz-aur-patched/metadata/core.xml.in compiz-final/
 +		    <value>regex</value>
 +		    <value>resize</value>
 +		    <value>snap</value>
++		    <value>compiztoolbox</value>
 +		    <value>staticswitcher</value>
 +		    <value>wall</value>
 +		    <value>animation</value>
-+		    <value>compiztoolbox</value>
 +		    <value>blur</value>
 +		</default>
  	    </option>
