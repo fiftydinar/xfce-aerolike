@@ -12,10 +12,10 @@ index 7509145..46ae163 100644
  
  	void configureFrame (XConfigureEvent *ce);
 diff --git a/src/window.cpp b/src/window.cpp
-index 10f0eea..2cee1d7 100644
+index 10f0eea..7e3c0bc 100644
 --- a/src/window.cpp
 +++ b/src/window.cpp
-@@ -1679,9 +1679,35 @@ PrivateWindow::resize (const CompWindow::Geometry &gm)
+@@ -1679,9 +1679,39 @@ PrivateWindow::resize (const CompWindow::Geometry &gm)
  	move (gm.x () - priv->geometry.x (),
  	      gm.y () - priv->geometry.y (), true);
  
@@ -38,10 +38,14 @@ index 10f0eea..2cee1d7 100644
 +
 +    CompOutput &fsOutput = screen->fullscreenOutput ();
 +
-+    if (priv->geometry.x ()     == fsOutput.x ()      &&
-+	priv->geometry.y ()     == fsOutput.y ()      &&
-+	priv->geometry.width () == fsOutput.width ()  &&
-+	priv->geometry.height ()== fsOutput.height ())
++    int fsX2 = fsOutput.x () + fsOutput.width ();
++    int fsY2 = fsOutput.y () + fsOutput.height ();
++    int wX2  = priv->geometry.x () + priv->geometry.width ();
++    int wY2  = priv->geometry.y () + priv->geometry.height ();
++
++    if (priv->geometry.x () <= fsOutput.x () &&
++	priv->geometry.y () <= fsOutput.y () &&
++	wX2 >= fsX2 && wY2 >= fsY2)
 +    {
 +	window->changeState (priv->state | CompWindowStateFullscreenMask);
 +	window->updateAttributes (CompStackingUpdateModeNormal);
