@@ -74,7 +74,7 @@ jobs:
             enabled: true
             repo: https://aur.archlinux.org/compiz.git
             prepare: |
-              sed -i 's|staticswitcher|ring,text|g' ./PKGBUILD
+              sed -i 's|-DCOMPIZ_DEFAULT_PLUGINS=.*|-DCOMPIZ_DEFAULT_PLUGINS="composite,opengl,decor,resize,place,move,compiztoolbox,ring,text,regex,animation,wall,ccp"|' ./PKGBUILD
             patch: |
               SRCDIR=$(find "${BUILDDIR:-/build}/src" -maxdepth 1 -type d -name 'compiz*' | head -1)
               [ -n "$SRCDIR" ] || { echo "ERROR: source dir not found"; exit 1; }
