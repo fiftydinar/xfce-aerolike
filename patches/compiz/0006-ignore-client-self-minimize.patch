@@ -1,0 +1,16 @@
+diff --git a/src/event.cpp b/src/event.cpp
+index 0abcc34..fde010d 100644
+--- a/src/event.cpp
++++ b/src/event.cpp
+@@ -2029,7 +2029,10 @@
+ 		if (event->xclient.data.l[0] == IconicState)
+ 		{
+ 		    if (w->actions () & CompWindowActionMinimizeMask)
+-			w->minimize ();
++		    {
++			if (w->focused ())
++			    w->minimize ();
++		    }
+ 		}
+ 		else if (event->xclient.data.l[0] == NormalState)
+ 		{
