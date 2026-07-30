@@ -1,0 +1,52 @@
+--- compiz-aur-patched/compizconfig/ccsm/ccm/Pages.py	2022-08-22 07:55:24.000000000 +0200
++++ compiz-aur-patched/compizconfig/ccsm/ccm/Pages.py	2026-07-30 13:33:56.291202293 +0200
+@@ -672,7 +672,9 @@
+                 active = i
+         self.ProfileHandler = self.ProfileComboBox.connect("changed",
+             self.ProfileChangedAddTimeout)
++        self.ProfileComboBox.handler_block(self.ProfileHandler)
+         self.ProfileComboBox.set_active(active+1)
++        self.ProfileComboBox.handler_unblock(self.ProfileHandler)
+         profileAdd.connect("clicked", self.AddProfile)
+         profileRemove.connect("clicked", self.RemoveProfile)
+         profileBox.pack_start(self.ProfileComboBox, True, True, 0)
+@@ -760,15 +762,17 @@
+     def ProfileChanged(self, widget):
+         name = widget.get_active_text()
+         if name == _("Default"):
+-            self.Context.ResetProfile()
++            self.ResetProfile(None)
++            self.ProfileRemoveButton.set_sensitive(False)
++            GlobalUpdater.UpdatePlugins()
++            return False
+         elif name in self.Context.Profiles:
+             self.Context.CurrentProfile = self.Context.Profiles[name]
+         else:
+-            self.ProfileComboBox.set_active (0)
++            self.ProfileComboBox.set_active(0)
+             return
+ 
+-        self.ProfileRemoveButton.set_sensitive (self.ProfileComboBox.get_active() != 0)
+-
++        self.ProfileRemoveButton.set_sensitive(self.ProfileComboBox.get_active() != 0)
+         self.Context.Read()
+         self.Context.Write()
+         GlobalUpdater.UpdatePlugins()
+@@ -797,7 +801,7 @@
+         activePlugins = self.Context.Plugins['core'].Screen['active_plugins'].Value
+         for plugin in self.Context.Plugins.values():
+             plugin.Enabled = plugin.Name in activePlugins
+-        self.Context.Write()
++        self.Context.Write(onlyChanged=False)
+         GlobalUpdater.UpdatePlugins()
+     
+     def ExportProfile(self, widget):
+@@ -880,7 +884,7 @@
+     def RemoveProfile(self, widget):
+         name = self.ProfileComboBox.get_active_text()
+         if name != _("Default"):
+-            self.Context.ResetProfile()
++            self.ResetProfile(None)
+             self.Context.Profiles[name].Delete()
+             self.UpdateProfiles()
+     

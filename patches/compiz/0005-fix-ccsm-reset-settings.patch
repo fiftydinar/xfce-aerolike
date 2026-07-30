@@ -1,0 +1,47 @@
+--- compiz-aur-patched/compizconfig/ccsm/ccm/Settings.py	2022-08-22 07:55:24.000000000 +0200
++++ compiz-aur-patched/compizconfig/ccsm/ccm/Settings.py	2026-07-30 13:34:23.572129553 +0200
+@@ -99,7 +99,7 @@
+     
+     def DoReset(self, foo):
+         self.Setting.Reset()
+-        self.Setting.Plugin.Context.Write()
++        self.Setting.Plugin.Context.Write(onlyChanged=False)
+         self.Read()
+ 
+     def MakeLabel(self):
+@@ -588,7 +588,7 @@
+     def DoReset(self, widget):
+         for setting in self.Settings:
+             setting.Reset()
+-        self.Settings[0].Plugin.Context.Write()
++        self.Settings[0].Plugin.Context.Write(onlyChanged=False)
+         self.Read()
+ 
+     def MakeLabel(self):
+@@ -951,7 +951,7 @@
+         conflict = KeyConflict (self.Setting, self.Setting.DefaultValue)
+         if conflict.Resolve (GlobalUpdater):
+             self.Setting.Reset ()
+-            self.Setting.Plugin.Context.Write ()
++            self.Setting.Plugin.Context.Write (onlyChanged=False)
+             self.Read ()
+ 
+     def ReorderKeyString (self, accel):
+@@ -1127,7 +1127,7 @@
+         conflict = ButtonConflict (self.Setting, self.Setting.DefaultValue)
+         if conflict.Resolve (GlobalUpdater):
+             self.Setting.Reset ()
+-            self.Setting.Plugin.Context.Write ()
++            self.Setting.Plugin.Context.Write (onlyChanged=False)
+             self.Read ()
+ 
+     def ReorderButtonString (self, old):
+@@ -1314,7 +1314,7 @@
+         conflict = EdgeConflict (self.Setting, self.Setting.DefaultValue)
+         if conflict.Resolve (GlobalUpdater):
+             self.Setting.Reset ()
+-            self.Setting.Plugin.Context.Write ()
++            self.Setting.Plugin.Context.Write (onlyChanged=False)
+             self.Read ()
+ 
+     def GetDialogText (self):
