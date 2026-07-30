@@ -1,0 +1,76 @@
+--- plugins/ring/ring.xml.in.orig	2026-07-30 04:30:15.482500239 +0200
++++ plugins/ring/ring.xml.in	2026-07-30 04:32:34.207964990 +0200
+@@ -21,7 +21,7 @@
+ 				<option name="next_key" type="key">
+ 					<_short>Next Window Key</_short>
+ 					<_long>Reveals the ring and selects the next window on the current workspace.</_long>
+-					<default>&lt;Super&gt;Tab</default>
++					<default>&lt;Alt&gt;Tab</default>
+ 				</option>
+ 				<option name="next_button" type="button">
+ 					<_short>Next Window Button</_short>
+@@ -30,7 +30,7 @@
+ 				<option name="prev_key" type="key">
+ 					<_short>Previous Window Key</_short>
+ 					<_long>Reveals the ring and selects the previous window on the current workspace.</_long>
+-					<default>&lt;Super&gt;&lt;Shift&gt;Tab</default>
++					<default>&lt;Shift&gt;&lt;Alt&gt;Tab</default>
+ 				</option>
+ 				<option name="prev_button" type="button">
+ 					<_short>Previous Window Button</_short>
+@@ -39,7 +39,7 @@
+ 				<option name="next_all_key" type="key">
+ 					<_short>Next Window Key (All Workspaces)</_short>
+ 					<_long>Reveals the ring and selects the next window, taking into account all workspaces.</_long>
+-					<default>&lt;Super&gt;&lt;Alt&gt;Tab</default>
++					<default>&lt;Control&gt;&lt;Alt&gt;Tab</default>
+ 				</option>
+ 				<option name="next_all_button" type="button">
+ 					<_short>Next Window Button (All Workspaces)</_short>
+@@ -48,7 +48,7 @@
+ 				<option name="prev_all_key" type="key">
+ 					<_short>Previous Window Key (All Workspaces)</_short>
+ 					<_long>Reveals the ring and selects the previous window, taking into account all workspaces.</_long>
+-					<default>&lt;Super&gt;&lt;Shift&gt;&lt;Alt&gt;Tab</default>
++					<default>&lt;Shift&gt;&lt;Control&gt;&lt;Alt&gt;Tab</default>
+ 				</option>
+ 				<option name="prev_all_button" type="button">
+ 					<_short>Previous Window Button (All Workspaces)</_short>
+--- plugins/staticswitcher/staticswitcher.xml.in.orig	2026-07-30 04:30:15.487137977 +0200
++++ plugins/staticswitcher/staticswitcher.xml.in	2026-07-30 04:32:34.213964962 +0200
+@@ -29,7 +29,7 @@
+ 		<option name="next_key" type="key">
+ 		    <_short>Next window</_short>
+ 		    <_long>Popup switcher if not visible and select next window</_long>
+-		    <default>&lt;Alt&gt;Tab</default>
++		    <default>&lt;Super&gt;Tab</default>
+ 		</option>
+ 		<option name="prev_button" type="button">
+ 		    <_short>Prev window</_short>
+@@ -38,7 +38,7 @@
+ 		<option name="prev_key" type="key">
+ 		    <_short>Prev window</_short>
+ 		    <_long>Popup switcher if not visible and select previous window</_long>
+-		    <default>&lt;Shift&gt;&lt;Alt&gt;Tab</default>
++		    <default>&lt;Shift&gt;&lt;Super&gt;Tab</default>
+ 		</option>
+ 		<option name="next_all_button" type="button">
+ 		    <_short>Next window (All windows)</_short>
+@@ -47,7 +47,7 @@
+ 		<option name="next_all_key" type="key">
+ 		    <_short>Next window (All windows)</_short>
+ 		    <_long>Popup switcher if not visible and select next window out of all windows</_long>
+-		    <default>&lt;Control&gt;&lt;Alt&gt;Tab</default>
++		    <default>&lt;Control&gt;&lt;Super&gt;Tab</default>
+ 		</option>
+ 		<option name="prev_all_button" type="button">
+ 		    <_short>Prev window (All windows)</_short>
+@@ -56,7 +56,7 @@
+ 		<option name="prev_all_key" type="key">
+ 		    <_short>Prev window (All windows)</_short>
+ 		    <_long>Popup switcher if not visible and select previous window out of all windows</_long>
+-		    <default>&lt;Shift&gt;&lt;Control&gt;&lt;Alt&gt;Tab</default>
++		    <default>&lt;Shift&gt;&lt;Control&gt;&lt;Super&gt;Tab</default>
+ 		</option>
+ 		<option name="next_group_button" type="button">
+ 		    <_short>Next window (Group)</_short>

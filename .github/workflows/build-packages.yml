@@ -78,14 +78,12 @@ jobs:
             patch: |
               SRCDIR=$(find "${BUILDDIR:-/build}/src" -maxdepth 1 -type d -name 'compiz*' | head -1)
               [ -n "$SRCDIR" ] || { echo "ERROR: source dir not found"; exit 1; }
-              for p in 0001-compiz-defaults 0002-auto-fullscreen; do
+              for p in 0001-compiz-defaults 0002-auto-fullscreen 0003-invert-keybindings; do
                 curl -sLO "https://raw.githubusercontent.com/fiftydinar/xfce-aerolike/refs/heads/main/patches/compiz/${p}.patch"
                 cd "$SRCDIR"
                 patch -p1 -F100 < "/build/${p}.patch"
                 cd /build
               done
-              sed -i 's|&lt;Super&gt;Tab|&lt;Alt&gt;Tab|g; s|&lt;Super&gt;&lt;Shift&gt;Tab|&lt;Shift&gt;&lt;Alt&gt;Tab|g' "$SRCDIR/plugins/ring/ring.xml.in"
-              sed -i 's|&lt;Alt&gt;Tab|&lt;Super&gt;Tab|g' "$SRCDIR/plugins/staticswitcher/staticswitcher.xml.in"
 
           - name: xfce4-docklike-plugin-git
             enabled: true
