@@ -1,6 +1,13 @@
 --- compiz-aur-patched/compizconfig/ccsm/ccm/Pages.py	2022-08-22 07:55:24.000000000 +0200
-+++ compiz-aur-patched/compizconfig/ccsm/ccm/Pages.py	2026-07-30 13:33:56.291202293 +0200
-@@ -672,7 +672,9 @@
++++ compiz-aur-patched/compizconfig/ccsm/ccm/Pages.py	2026-07-30 23:51:40.986469122 +0200
+@@ -665,21 +665,23 @@ class ProfileBackendPage(object):
+         self.ProfileComboBox.set_sensitive(self.Context.CurrentBackend.ProfileSupport)
+         self.ProfileComboBox.append_text(_("Default"))
+         active = -1
+         for i, name in enumerate(self.Context.Profiles):
+             profile = self.Context.Profiles[name]
+             self.ProfileComboBox.append_text(profile.Name)
+             if name == self.Context.CurrentProfile.Name:
                  active = i
          self.ProfileHandler = self.ProfileComboBox.connect("changed",
              self.ProfileChangedAddTimeout)
@@ -10,7 +17,21 @@
          profileAdd.connect("clicked", self.AddProfile)
          profileRemove.connect("clicked", self.RemoveProfile)
          profileBox.pack_start(self.ProfileComboBox, True, True, 0)
-@@ -760,15 +762,17 @@
+         profileBox.pack_start(profileAdd, False, False, 0)
+         profileBox.pack_start(profileRemove, False, False, 0)
+         profileLabel = Label()
+         profileLabel.set_markup(HeaderMarkup % (_("Profile")))
+         self.ProfileImportExportBox = Gtk.HBox()
+         self.ProfileImportExportBox.set_spacing(5)
+         profileImportButton = Gtk.Button(label=_("Import"))
+@@ -753,29 +755,31 @@ class ProfileBackendPage(object):
+ 
+         GlobalUpdater.UpdatePlugins()
+ 
+     def IntegrationChanged(self, widget):
+         value = widget.get_active()
+         self.Context.Integration = value
+ 
      def ProfileChanged(self, widget):
          name = widget.get_active_text()
          if name == _("Default"):
@@ -32,7 +53,21 @@
          self.Context.Read()
          self.Context.Write()
          GlobalUpdater.UpdatePlugins()
-@@ -797,7 +801,7 @@
+         return False
+ 
+     def ProfileChangedAddTimeout(self, widget):
+         GLib.timeout_add (500, self.ProfileChanged, widget)
+ 
+     def CreateFilter(self, chooser):
+         filter = Gtk.FileFilter()
+@@ -790,21 +794,21 @@ class ProfileBackendPage(object):
+ 
+     def ResetProfile(self, widget):
+         for plugin in self.Context.Plugins.values():
+             settings = GetSettings(plugin)
+             for setting in settings:
+                 setting.Reset()
+ 
          activePlugins = self.Context.Plugins['core'].Screen['active_plugins'].Value
          for plugin in self.Context.Plugins.values():
              plugin.Enabled = plugin.Name in activePlugins
@@ -41,7 +76,21 @@
          GlobalUpdater.UpdatePlugins()
      
      def ExportProfile(self, widget):
-@@ -880,7 +884,7 @@
+         main = widget.get_toplevel()
+         chooser = Gtk.FileChooserDialog(title=_("Save file.."), transient_for=main, action=Gtk.FileChooserAction.SAVE)
+         chooser.add_buttons(_("Cancel"), Gtk.ResponseType.CANCEL, _("Save"), Gtk.ResponseType.OK)
+         chooser.set_current_folder(os.environ.get("HOME"))
+         self.CreateFilter(chooser)
+         ret = chooser.run()
+ 
+@@ -873,21 +877,21 @@ class ProfileBackendPage(object):
+     def AddProfile (self, widget):
+         main = widget.get_toplevel ()
+         name = self.ProfileNameDialog (main)
+         if name:
+             self.Context.CurrentProfile = ccs.Profile (self.Context, name)
+             self.UpdateProfiles (name)
+     
      def RemoveProfile(self, widget):
          name = self.ProfileComboBox.get_active_text()
          if name != _("Default"):
@@ -50,3 +99,10 @@
              self.Context.Profiles[name].Delete()
              self.UpdateProfiles()
      
+     def BackendChanged(self, widget):
+         shortDesc = widget.get_active_text()
+         name = ""
+         for backend in self.Context.Backends.values():
+             if backend.ShortDesc == shortDesc:
+                 name = backend.Name
+                 break
