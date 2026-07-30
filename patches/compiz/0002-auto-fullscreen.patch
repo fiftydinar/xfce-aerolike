@@ -12,15 +12,10 @@ index 7509145..46ae163 100644
  
  	void configureFrame (XConfigureEvent *ce);
 diff --git a/src/window.cpp b/src/window.cpp
-index 10f0eea..9bed28a 100644
+index 10f0eea..3c5bb36 100644
 --- a/src/window.cpp
 +++ b/src/window.cpp
-@@ -1679,9 +1679,38 @@ PrivateWindow::resize (const CompWindow::Geometry &gm)
- 	move (gm.x () - priv->geometry.x (),
- 	      gm.y () - priv->geometry.y (), true);
- 
-+    autoDetectFullscreen ();
-+
+@@ -1682,6 +1682,36 @@ PrivateWindow::resize (const CompWindow::Geometry &gm)
      return true;
  }
  
@@ -33,20 +28,23 @@ index 10f0eea..9bed28a 100644
 +    if (!(priv->wmType & (CompWindowTypeNormalMask | CompWindowTypeUnknownMask)))
 +	return;
 +
-+    if (priv->state & CompWindowStateFullscreenMask)
-+	return;
++    int outputDev = screen->outputDeviceForGeometry (priv->frameGeometry);
++    CompOutput &output = screen->outputDevs ().at (outputDev);
 +
-+    CompOutput &fsOutput = screen->fullscreenOutput ();
-+    int fsX2 = fsOutput.x () + fsOutput.width ();
-+    int fsY2 = fsOutput.y () + fsOutput.height ();
-+    int wX2  = priv->frameGeometry.x () + priv->frameGeometry.width ();
-+    int wY2  = priv->frameGeometry.y () + priv->frameGeometry.height ();
++    bool coversOutput =
++	priv->frameGeometry.x () == output.x () &&
++	priv->frameGeometry.y () == output.y () &&
++	priv->frameGeometry.x () + priv->frameGeometry.width ()  == output.x () + output.width () &&
++	priv->frameGeometry.y () + priv->frameGeometry.height () == output.y () + output.height ();
 +
-+    if (priv->frameGeometry.x () <= fsOutput.x () &&
-+	priv->frameGeometry.y () <= fsOutput.y () &&
-+	wX2 >= fsX2 && wY2 >= fsY2)
++    if (coversOutput && !(priv->state & CompWindowStateFullscreenMask))
 +    {
 +	window->changeState (priv->state | CompWindowStateFullscreenMask);
++	window->updateAttributes (CompStackingUpdateModeNormal);
++    }
++    else if (!coversOutput && (priv->state & CompWindowStateFullscreenMask))
++    {
++	window->changeState (priv->state & ~CompWindowStateFullscreenMask);
 +	window->updateAttributes (CompStackingUpdateModeNormal);
 +    }
 +}
@@ -54,3 +52,12 @@ index 10f0eea..9bed28a 100644
  bool
  PrivateWindow::resize (const XWindowAttributes &attr)
  {
+@@ -1876,6 +1906,8 @@ PrivateWindow::configure (XConfigureEvent *ce)
+ 
+     if (ce->event == screen->root ())
+ 	priv->restack (ce->above);
++
++    autoDetectFullscreen ();
+ }
+ 
+ void
