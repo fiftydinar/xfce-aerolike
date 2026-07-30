@@ -1,5 +1,6 @@
---- plugins/ring/ring.xml.in.orig	2026-07-30 04:30:15.482500239 +0200
-+++ plugins/ring/ring.xml.in	2026-07-30 04:32:34.207964990 +0200
+diff -ruN '--exclude=.git' compiz-aur-patched/plugins/ring/ring.xml.in compiz-aur-patched/plugins/ring/ring.xml.in
+--- compiz-aur-patched/plugins/ring/ring.xml.in	2026-07-30 04:30:15.482500239 +0200
++++ compiz-aur-patched/plugins/ring/ring.xml.in	2026-07-30 04:32:34.207964990 +0200
 @@ -21,7 +21,7 @@
  				<option name="next_key" type="key">
  					<_short>Next Window Key</_short>
@@ -36,8 +37,9 @@
  				</option>
  				<option name="prev_all_button" type="button">
  					<_short>Previous Window Button (All Workspaces)</_short>
---- plugins/staticswitcher/staticswitcher.xml.in.orig	2026-07-30 04:30:15.487137977 +0200
-+++ plugins/staticswitcher/staticswitcher.xml.in	2026-07-30 04:32:34.213964962 +0200
+diff -ruN '--exclude=.git' compiz-aur-patched/plugins/staticswitcher/staticswitcher.xml.in compiz-aur-patched/plugins/staticswitcher/staticswitcher.xml.in
+--- compiz-aur-patched/plugins/staticswitcher/staticswitcher.xml.in	2026-07-30 04:30:15.487137977 +0200
++++ compiz-aur-patched/plugins/staticswitcher/staticswitcher.xml.in	2026-07-30 04:32:34.213964962 +0200
 @@ -29,7 +29,7 @@
  		<option name="next_key" type="key">
  		    <_short>Next window</_short>
