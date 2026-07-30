@@ -73,6 +73,8 @@ jobs:
           - name: compiz
             enabled: true
             repo: https://aur.archlinux.org/compiz.git
+            prepare: |
+              sed -i 's|staticswitcher|ring|g' ./PKGBUILD
             patch: |
               SRCDIR=$(find "${BUILDDIR:-/build}/src" -maxdepth 1 -type d -name 'compiz*' | head -1)
               [ -n "$SRCDIR" ] || { echo "ERROR: source dir not found"; exit 1; }
@@ -83,6 +85,7 @@ jobs:
                 cd /build
               done
               sed -i 's|&lt;Super&gt;Tab|&lt;Alt&gt;Tab|g; s|&lt;Super&gt;&lt;Shift&gt;Tab|&lt;Shift&gt;&lt;Alt&gt;Tab|g' "$SRCDIR/plugins/ring/ring.xml.in"
+              sed -i 's|&lt;Alt&gt;Tab|&lt;Super&gt;Tab|g' "$SRCDIR/plugins/staticswitcher/staticswitcher.xml.in"
 
           - name: xfce4-docklike-plugin-git
             enabled: true
