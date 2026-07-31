@@ -182,6 +182,19 @@ static int redirect_exec(const char *path, char *const argv[], char *const envp[
     if (!real_execve) real_execve = (execve_t)dlsym(RTLD_NEXT, "execve");
     if (!real_execve) { errno = ENOSYS; return -1; }
 
+    /* Only redirect when the target is a real executable. Callers that
+     * search PATH (execvp, posix_spawnp, GLib) iterate by calling execve
+     * on each candidate; the first candidate may be a bogus path (e.g. a
+     * nonexistent AppImage mount bin dir). If we redirected that to
+     * systemd-run verbatim, systemd-run would fail on the dead path and
+     * the caller's loop -- now replaced by systemd-run -- would never
+     * reach the real binary. Falling through to real execve returns
+     * ENOENT so the PATH search continues. PATH itself is left intact;
+     * only the execve target is validated. */
+    if (access(path, X_OK) != 0) {
+        return real_execve(path, argv, envp);
+    }
+
     int argc = count_argv(argv);
     int envc = count_envp(envp);
 
