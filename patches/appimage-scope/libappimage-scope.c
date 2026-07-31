@@ -16,11 +16,13 @@
  * oomd-manageable unit instead of an untracked part of the session blob.
  *
  * Scoping XFCE apps moves disposable utilities (settings, power
- * manager, notifications, terminal, file manager, applets) out of the
- * protected desktop.slice DE blob into killable app.slice scopes, so a
- * runaway settings daemon or file manager can be killed without
- * touching the desktop. The core DE (xfce4-session, xfce4-panel,
- * compiz/emerald) is deliberately NOT in this list and stays protected.
+ * manager, notifications, terminal, file manager, screensaver,
+ * screenshooter, appfinder, pavucontrol, xarchiver, ccsm, tray
+ * applets) out of the protected desktop.slice DE blob into killable
+ * app.slice scopes, so a runaway settings daemon or file manager can be
+ * killed without touching the desktop. The core DE (xfce4-session,
+ * xfce4-panel, compiz/emerald) is deliberately NOT in this list and
+ * stays protected.
  *
  * The recursion guard (APPIMAGE_SCOPED=1 + stripping our own lib from
  * LD_PRELOAD when spawning systemd-run) prevents the hook from looping.
@@ -78,11 +80,15 @@ static int is_de_app(const char *path) {
         "xfce4-power-manager",
         "xfce4-notifyd",
         "xfce4-screenshooter",
+        "xfce4-screensaver",
         "xfce4-appfinder",
         "xfce4-terminal",
         "thunar",
         "nm-applet",
         "blueman-applet",
+        "pavucontrol",
+        "xarchiver",
+        "ccsm",
         NULL
     };
     const char *base;
