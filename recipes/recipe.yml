@@ -156,8 +156,15 @@ modules:
       - "echo 'VISUAL=nano\nEDITOR=nano' >> /etc/environment"
       # Download and install aerothemeplasma Kvantum theme
       - "wget --retry-connrefused --tries=30 https://gitgud.io/aeroshell/atp/aerothemeplasma/-/raw/HEAD/misc/kvantum/Windows7Aero/Windows7Aero.kvconfig -P /usr/share/Kvantum/Windows7Aero && wget --retry-connrefused --tries=30 https://gitgud.io/aeroshell/atp/aerothemeplasma/-/raw/HEAD/misc/kvantum/Windows7Aero/Windows7Aero.svg -P /usr/share/Kvantum/Windows7Aero"
+      # Build and install libappimage-scope (LD_PRELOAD shim that runs
+      # AppImages in their own systemd user scope under app.slice, so
+      # oomd can manage each AppImage independently)
+      - |
+        wget --retry-connrefused --tries=30 -O /tmp/libappimage-scope.c https://raw.githubusercontent.com/fiftydinar/xfce-aerolike/refs/heads/main/patches/appimage-scope/libappimage-scope.c
+        gcc -shared -fPIC -O2 -o /usr/lib/libappimage-scope.so /tmp/libappimage-scope.c -ldl
+        rm -f /tmp/libappimage-scope.c
       # Set gtk-nocsd by default
-      - "echo 'LD_PRELOAD=/usr/lib/libgtk-nocsd.so' >> /etc/environment"
+      - "echo 'LD_PRELOAD=/usr/lib/libgtk-nocsd.so:/usr/lib/libappimage-scope.so' >> /etc/environment"
       - "echo 'SHARUN_ALLOW_LD_PRELOAD=1' >> /etc/environment"
       - "echo 'QT_QPA_PLATFORMTHEME=qt5ct' >> /etc/environment"
       # Set compiz as the default window manager and compositor
