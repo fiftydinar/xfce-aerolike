@@ -1,12 +1,18 @@
 /*
- * libappimage-scope: LD_PRELOAD shim that runs AppImages inside their
- * own systemd user scope (app.slice) so oomd can rank/kill each
- * AppImage independently and the app.slice MemoryHigh cap applies.
+ * libappimage-scope: LD_PRELOAD shim that runs AppImages (and the sas
+ * AppImage sandbox) inside their own systemd user scope (app.slice) so
+ * oomd can rank/kill each one independently and the app.slice
+ * MemoryHigh cap applies.
  *
  * Intercepts execve/execveat. If the target file is an AppImage
- * (ELF + "AI"/"RI"/"AB" magic at offset 8), rewrites the exec to:
+ * (ELF + "AI"/"RI"/"AB" magic at offset 8), or the sas sandbox launcher
+ * (/usr/bin/sas), rewrites the exec to:
  *
- *   systemd-run --user --scope --slice=app.slice -- <appimage> [args]
+ *   systemd-run --user --scope --slice=app.slice -- <target> [args]
+ *
+ * Scoping sas pulls its whole process tree (sas -> bwrap -> AppRun ->
+ * FUSE daemon) into one cgroup, so the sandbox becomes a single
+ * oomd-manageable unit instead of an untracked part of the session blob.
  *
  * The recursion guard (APPIMAGE_SCOPED=1 + stripping our own lib from
  * LD_PRELOAD when spawning systemd-run) prevents the hook from looping.
@@ -43,6 +49,14 @@ static int is_appimage(const char *path) {
     return (buf[8]=='A' && buf[9]=='I') ||
            (buf[8]=='R' && buf[9]=='I') ||
            (buf[8]=='A' && buf[9]=='B');
+}
+
+static int is_sas(const char *path) {
+    if (!path) return 0;
+    if (strcmp(path, "/usr/bin/sas") == 0) return 1;
+    const char *base = strrchr(path, '/');
+    base = base ? base + 1 : path;
+    return strcmp(base, "sas") == 0;
 }
 
 static int count_argv(char *const argv[]) {
@@ -138,7 +152,7 @@ int execve(const char *path, char *const argv[], char *const envp[]) {
     if (!real) real = (execve_t)dlsym(RTLD_NEXT, "execve");
     if (!real) { errno = ENOSYS; return -1; }
     if (getenv("APPIMAGE_SCOPED")) return real(path, argv, envp);
-    if (is_appimage(path)) {
+    if (is_appimage(path) || is_sas(path)) {
         redirect_exec(path, argv, envp);
     }
     return real(path, argv, envp);
@@ -149,7 +163,7 @@ int execveat(int dirfd, const char *path, char *const argv[], char *const envp[]
     if (!real) real = (execveat_t)dlsym(RTLD_NEXT, "execveat");
     if (!real) { errno = ENOSYS; return -1; }
     if (getenv("APPIMAGE_SCOPED")) return real(dirfd, path, argv, envp, flags);
-    if (dirfd == AT_FDCWD && is_appimage(path)) {
+    if (dirfd == AT_FDCWD && (is_appimage(path) || is_sas(path))) {
         redirect_exec(path, argv, envp);
     }
     return real(dirfd, path, argv, envp, flags);
