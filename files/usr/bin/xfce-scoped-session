@@ -1,0 +1,29 @@
+#!/bin/sh
+# xfce-scoped-session: run the whole XFCE desktop session inside its
+# own systemd user scope under desktop.slice.
+#
+# Why this helps:
+#   - The DE (xfce4-session, panel, compiz, applets) finally has a real
+#     cgroup unit.
+#   - oomd's kill patterns (session-*.scope, app.slice/*, system.slice/*)
+#     never match desktop.slice/run-*.scope, so the DE is permanently
+#     UNTARGETABLE by oomd -- it can never be chosen as a kill victim.
+#   - desktop.slice.d/10-memory-low-aerolike.conf reserves MemoryLow so
+#     apps can't starve the DE into swap.
+#   - oomd-protect-self tags the scope with user.oomd_avoid as
+#     defense-in-depth in case oomd patterns ever change.
+#
+# Apps launched from the panel inherit this scope and are protected by
+# association. Heavy native apps should still be wrapped explicitly
+# (systemd-run --scope, or the AppImage/sas shim) to get their own
+# killable cgroup.
+#
+# Used as LightDM session-wrapper:
+#   [Seat:*]
+#   session-wrapper=/usr/bin/xfce-scoped-session
+
+# Run inside the scope: tag our own scope cgroup with oomd_avoid, then
+# exec the real session command ($@ is the session command + its args).
+# $0 is set to a label so $@ starts at the session command.
+exec systemd-run --user --scope --slice=desktop.slice -- \
+    /bin/sh -c '/usr/bin/oomd-protect-self; exec "$@"' xfce-scoped-session "$@"
