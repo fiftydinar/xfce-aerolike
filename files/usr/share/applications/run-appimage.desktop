@@ -1,8 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Run AppImage
-Comment=Run an AppImage inside its own systemd user scope for OOM protection
-Exec=run-appimage %f
-Terminal=false
-NoDisplay=true
-MimeType=application/vnd.appimage;application/x-iso9660-appimage;
