@@ -1,30 +1,22 @@
---- compiz-aur-patched/compizconfig/ccsm/ccm/Pages.py	2022-08-22 07:55:24.000000000 +0200
-+++ compiz-aur-patched/compizconfig/ccsm/ccm/Pages.py	2026-07-30 23:51:40.986469122 +0200
-@@ -665,21 +665,23 @@ class ProfileBackendPage(object):
-         self.ProfileComboBox.set_sensitive(self.Context.CurrentBackend.ProfileSupport)
-         self.ProfileComboBox.append_text(_("Default"))
-         active = -1
-         for i, name in enumerate(self.Context.Profiles):
-             profile = self.Context.Profiles[name]
-             self.ProfileComboBox.append_text(profile.Name)
-             if name == self.Context.CurrentProfile.Name:
-                 active = i
-         self.ProfileHandler = self.ProfileComboBox.connect("changed",
-             self.ProfileChangedAddTimeout)
-+        self.ProfileComboBox.handler_block(self.ProfileHandler)
-         self.ProfileComboBox.set_active(active+1)
-+        self.ProfileComboBox.handler_unblock(self.ProfileHandler)
-         profileAdd.connect("clicked", self.AddProfile)
-         profileRemove.connect("clicked", self.RemoveProfile)
-         profileBox.pack_start(self.ProfileComboBox, True, True, 0)
-         profileBox.pack_start(profileAdd, False, False, 0)
-         profileBox.pack_start(profileRemove, False, False, 0)
-         profileLabel = Label()
-         profileLabel.set_markup(HeaderMarkup % (_("Profile")))
-         self.ProfileImportExportBox = Gtk.HBox()
-         self.ProfileImportExportBox.set_spacing(5)
-         profileImportButton = Gtk.Button(label=_("Import"))
-@@ -753,29 +755,31 @@ class ProfileBackendPage(object):
+--- compiz-aur-patched/compizconfig/ccsm/ccm/Pages.py
++++ compiz-aur-patched/compizconfig/ccsm/ccm/Pages.py
+@@ -738,42 +738,45 @@ class ProfileBackendPage(object):
+         self.ProfileComboBox.handler_block (self.ProfileHandler)
+ 
+         self.Context.Read ()
+         self.Context.UpdateProfiles ()
+ 
+         self.ProfileComboBox.get_model ().clear ()
+         set = False
+         for index, profile in enumerate ([_("Default")] + list (self.Context.Profiles)):
+             self.ProfileComboBox.append_text (profile)
+             if profile == current and not set:
+                 self.ProfileComboBox.set_active (index)
+                 set = True
+-        self.ProfileRemoveButton.set_sensitive (self.ProfileComboBox.get_active() != 0)
++        self.ProfileRemoveButton.set_sensitive(self.ProfileComboBox.get_active() != 0)
+ 
+         self.ProfileComboBox.handler_unblock (self.ProfileHandler)
  
          GlobalUpdater.UpdatePlugins()
  
@@ -47,9 +39,8 @@
 +            self.ProfileComboBox.set_active(0)
              return
  
--        self.ProfileRemoveButton.set_sensitive (self.ProfileComboBox.get_active() != 0)
--
-+        self.ProfileRemoveButton.set_sensitive(self.ProfileComboBox.get_active() != 0)
+         self.ProfileRemoveButton.set_sensitive (self.ProfileComboBox.get_active() != 0)
+ 
          self.Context.Read()
          self.Context.Write()
          GlobalUpdater.UpdatePlugins()
@@ -58,9 +49,9 @@
      def ProfileChangedAddTimeout(self, widget):
          GLib.timeout_add (500, self.ProfileChanged, widget)
  
-     def CreateFilter(self, chooser):
-         filter = Gtk.FileFilter()
-@@ -790,21 +794,21 @@ class ProfileBackendPage(object):
+@@ -788,25 +791,25 @@ class ProfileBackendPage(object):
+         filter.set_name(_("All files"))
+         chooser.add_filter(filter)
  
      def ResetProfile(self, widget):
          for plugin in self.Context.Plugins.values():
@@ -83,7 +74,11 @@
          self.CreateFilter(chooser)
          ret = chooser.run()
  
-@@ -873,21 +877,21 @@ class ProfileBackendPage(object):
+         path = chooser.get_filename()
+         chooser.destroy()
+@@ -871,25 +874,25 @@ class ProfileBackendPage(object):
+         self.Context.Import (path)
+ 
      def AddProfile (self, widget):
          main = widget.get_toplevel ()
          name = self.ProfileNameDialog (main)
@@ -106,3 +101,5 @@
              if backend.ShortDesc == shortDesc:
                  name = backend.Name
                  break
+         
+         if name != "":
