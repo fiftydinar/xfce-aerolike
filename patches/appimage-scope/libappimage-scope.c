@@ -4,10 +4,14 @@
  * scope (app.slice) so oomd can rank/kill each one independently and
  * the app.slice MemoryHigh cap applies.
  *
- * Intercepts execve/execveat. If the target file is an AppImage
- * (ELF + "AI"/"RI"/"AB" magic at offset 8), the sas sandbox launcher
- * (/usr/bin/sas), or a listed XFCE app (xfsettingsd, xfce4-power-manager,
- * thunar, etc.), rewrites the exec to:
+ * Intercepts the full exec family (execve, execv, execvp, execvpe,
+ * execl/execlp/execle, execveat) and posix_spawn/posix_spawnp. glibc
+ * routes execv/execvp/execl/execle and posix_spawn through internal
+ * helpers that call __execve directly, which cannot be interposed, so
+ * each public entry point must be wrapped individually. If the target
+ * file is an AppImage (ELF + "AI"/"RI"/"AB" magic at offset 8), the sas
+ * sandbox launcher (/usr/bin/sas), or a listed XFCE app (xfsettingsd,
+ * xfce4-power-manager, thunar, etc.), rewrites the exec to:
  *
  *   systemd-run --user --scope --slice=app.slice -- <target> [args]
  *
@@ -30,7 +34,7 @@
  *
  * The recursion guard (APPIMAGE_SCOPED=1 + stripping our own lib from
  * LD_PRELOAD when spawning systemd-run) prevents the hook from looping.
- * Any failure falls back to the real execve.
+ * Any failure falls back to the real exec.
  *
  * Detection is by magic bytes only (not extension), covering the
  * squashfs runtime (Type 2, "AI"), the dwarfs runtime ("AI"), and the
@@ -44,9 +48,25 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <spawn.h>
+#include <stdarg.h>
+#include <sys/types.h>
+
+extern char **environ;
 
 typedef int (*execve_t)(const char *, char *const[], char *const[]);
 typedef int (*execveat_t)(int, const char *, char *const[], char *const[], int);
+typedef int (*execv_t)(const char *, char *const[]);
+typedef int (*execvp_t)(const char *, char *const[]);
+typedef int (*execvpe_t)(const char *, char *const[], char *const[]);
+typedef int (*posix_spawn_t)(pid_t *, const char *,
+                             const posix_spawn_file_actions_t *,
+                             const posix_spawnattr_t *,
+                             char *const[], char *const[]);
+typedef int (*posix_spawnp_t)(pid_t *, const char *,
+                              const posix_spawn_file_actions_t *,
+                              const posix_spawnattr_t *,
+                              char *const[], char *const[]);
 
 static int is_appimage(const char *path) {
     unsigned char buf[10];
@@ -170,27 +190,77 @@ static int scrub_envp(char **out, char *const envp[]) {
             }
             continue;
         }
-        out[o++] = envp[i];
+        out[o++] = strdup(envp[i]);
     }
-    out[o++] = "APPIMAGE_SCOPED=1";
+    out[o++] = strdup("APPIMAGE_SCOPED=1");
     out[o] = NULL;
     return o;
 }
 
+/* Resolve a command name to its full path using PATH, exactly like
+ * execvp/posix_spawnp do (first X_OK entry wins). This matches the
+ * binary the caller would actually launch, avoiding guessing. Returns a
+ * strdup'd full path, or NULL if not found / not executable. */
+static char *resolve_in_path(const char *name) {
+    const char *path;
+    char *dup, *dir, *save = NULL;
+    if (!name || !*name) return NULL;
+    if (strchr(name, '/')) {
+        if (access(name, X_OK) == 0) return strdup(name);
+        return NULL;
+    }
+    path = getenv("PATH");
+    if (!path || !*path) return NULL;
+    dup = strdup(path);
+    if (!dup) return NULL;
+    for (dir = strtok_r(dup, ":", &save); dir; dir = strtok_r(NULL, ":", &save)) {
+        if (*dir == '\0') dir = ".";
+        size_t len = strlen(dir) + 1 + strlen(name) + 1;
+        char *cand = malloc(len);
+        if (!cand) break;
+        snprintf(cand, len, "%s/%s", dir, name);
+        if (access(cand, X_OK) == 0) { free(dup); return cand; }
+        free(cand);
+    }
+    free(dup);
+    return NULL;
+}
+
+/* Build the argv/envp that runs <target> [args] through systemd-run in
+ * app.slice. Returns the new argv (caller must free) and fills newenvp
+ * (each entry strdup'd; caller must free). target must already be a
+ * resolved, verified full path. */
+static char **build_redirect(int argc, char *const argv[], const char *target,
+                             char **newenvp, char *const envp[]) {
+    char **newargv = calloc(argc + 8, sizeof(char *));
+    if (!newargv) return NULL;
+    int i = 0;
+    newargv[i++] = "systemd-run";
+    newargv[i++] = "--user";
+    newargv[i++] = "--scope";
+    newargv[i++] = "--slice=app.slice";
+    newargv[i++] = "--";
+    newargv[i++] = (char *)target;
+    for (int j = 1; j < argc; j++) newargv[i++] = argv[j];
+    newargv[i] = NULL;
+    scrub_envp(newenvp, envp);
+    return newargv;
+}
+
+/* Only redirect when the target is a real executable. Callers that
+ * search PATH (execvp, posix_spawnp, GLib) iterate by calling execve
+ * on each candidate; the first candidate may be a bogus path (e.g. a
+ * nonexistent AppImage mount bin dir). If we redirected that to
+ * systemd-run verbatim, systemd-run would fail on the dead path and
+ * the caller's loop -- now replaced by systemd-run -- would never
+ * reach the real binary. Falling through to real execve returns
+ * ENOENT so the PATH search continues. PATH itself is left intact;
+ * only the execve target is validated. */
 static int redirect_exec(const char *path, char *const argv[], char *const envp[]) {
     static execve_t real_execve = NULL;
     if (!real_execve) real_execve = (execve_t)dlsym(RTLD_NEXT, "execve");
     if (!real_execve) { errno = ENOSYS; return -1; }
 
-    /* Only redirect when the target is a real executable. Callers that
-     * search PATH (execvp, posix_spawnp, GLib) iterate by calling execve
-     * on each candidate; the first candidate may be a bogus path (e.g. a
-     * nonexistent AppImage mount bin dir). If we redirected that to
-     * systemd-run verbatim, systemd-run would fail on the dead path and
-     * the caller's loop -- now replaced by systemd-run -- would never
-     * reach the real binary. Falling through to real execve returns
-     * ENOENT so the PATH search continues. PATH itself is left intact;
-     * only the execve target is validated. */
     if (access(path, X_OK) != 0) {
         return real_execve(path, argv, envp);
     }
@@ -198,21 +268,12 @@ static int redirect_exec(const char *path, char *const argv[], char *const envp[
     int argc = count_argv(argv);
     int envc = count_envp(envp);
 
-    char **newargv = calloc(argc + 8, sizeof(char *));
     char **newenvp = calloc(envc + 8, sizeof(char *));
-    if (!newargv || !newenvp) { free(newargv); free(newenvp); errno = ENOMEM; return -1; }
+    if (!newenvp) { errno = ENOMEM; return -1; }
+    char **newargv = build_redirect(argc, argv, path, newenvp, envp);
+    if (!newargv) { free(newenvp); errno = ENOMEM; return -1; }
 
-    int i = 0;
-    newargv[i++] = "systemd-run";
-    newargv[i++] = "--user";
-    newargv[i++] = "--scope";
-    newargv[i++] = "--slice=app.slice";
-    newargv[i++] = "--";
-    newargv[i++] = (char *)path;
-    for (int j = 1; j < argc; j++) newargv[i++] = argv[j];
-    newargv[i] = NULL;
-
-    int nenv = scrub_envp(newenvp, envp);
+    int nenv = count_envp(newenvp);
 
     real_execve("/usr/bin/systemd-run", newargv, newenvp);
     /* exec failed; fall through and let caller run the original */
@@ -221,6 +282,20 @@ static int redirect_exec(const char *path, char *const argv[], char *const envp[
     free(newargv); free(newenvp);
     errno = saved;
     return -1;
+}
+
+/* Decide whether a spawn/execvp-style target (which may be a bare
+ * command name resolved via PATH) is something we scope. Resolves bare
+ * names so AppImages reachable only via PATH are detected. */
+static int target_matches(const char *file) {
+    if (!file || !*file) return 0;
+    if (is_appimage(file) || is_sas(file) || is_de_app(file)) return 1;
+    if (strchr(file, '/')) return 0;
+    char *resolved = resolve_in_path(file);
+    if (!resolved) return 0;
+    int m = is_appimage(resolved) || is_sas(resolved) || is_de_app(resolved);
+    free(resolved);
+    return m;
 }
 
 int execve(const char *path, char *const argv[], char *const envp[]) {
@@ -234,6 +309,112 @@ int execve(const char *path, char *const argv[], char *const envp[]) {
     return real(path, argv, envp);
 }
 
+int execv(const char *path, char *const argv[]) {
+    static execv_t real = NULL;
+    if (!real) real = (execv_t)dlsym(RTLD_NEXT, "execv");
+    if (!real) { errno = ENOSYS; return -1; }
+    if (getenv("APPIMAGE_SCOPED")) return real(path, argv);
+    if (target_matches(path)) {
+        char *resolved = resolve_in_path(path);
+        if (resolved) {
+            redirect_exec(resolved, argv, environ);
+            free(resolved);
+        }
+    }
+    return real(path, argv);
+}
+
+int execvp(const char *file, char *const argv[]) {
+    static execvp_t real = NULL;
+    if (!real) real = (execvp_t)dlsym(RTLD_NEXT, "execvp");
+    if (!real) { errno = ENOSYS; return -1; }
+    if (getenv("APPIMAGE_SCOPED")) return real(file, argv);
+    if (target_matches(file)) {
+        char *resolved = resolve_in_path(file);
+        if (resolved) {
+            redirect_exec(resolved, argv, environ);
+            free(resolved);
+        }
+    }
+    return real(file, argv);
+}
+
+int execvpe(const char *file, char *const argv[], char *const envp[]) {
+    static execvpe_t real = NULL;
+    if (!real) real = (execvpe_t)dlsym(RTLD_NEXT, "execvpe");
+    if (!real) { errno = ENOSYS; return -1; }
+    if (getenv("APPIMAGE_SCOPED")) return real(file, argv, envp);
+    if (target_matches(file)) {
+        char *resolved = resolve_in_path(file);
+        if (resolved) {
+            redirect_exec(resolved, argv, envp);
+            free(resolved);
+        }
+    }
+    return real(file, argv, envp);
+}
+
+/* Shared redirect for posix_spawn/posix_spawnp. Resolves the target (a
+ * bare name gets PATH resolution matching the caller's semantics),
+ * then spawns systemd-run instead of the target via the real
+ * posix_spawnp, so the app ends up in its own app.slice scope. */
+static int redirect_spawn(pid_t *pid, const char *file,
+                          const posix_spawn_file_actions_t *file_actions,
+                          const posix_spawnattr_t *attrp,
+                          char *const argv[], char *const envp[]) {
+    static posix_spawnp_t real_spawnp = NULL;
+    if (!real_spawnp) real_spawnp = (posix_spawnp_t)dlsym(RTLD_NEXT, "posix_spawnp");
+    if (!real_spawnp) return EINVAL;
+
+    char *target = resolve_in_path(file);
+    if (!target) return EINVAL;
+
+    int argc = count_argv(argv);
+    int envc = count_envp(envp);
+    char **newenvp = calloc(envc + 8, sizeof(char *));
+    char **newargv = NULL;
+    if (newenvp) newargv = build_redirect(argc, argv, target, newenvp, envp);
+    if (!newargv) { free(newenvp); free(target); return ENOMEM; }
+
+    int nenv = count_envp(newenvp);
+    int ret = real_spawnp(pid, "/usr/bin/systemd-run", file_actions, attrp,
+                          newargv, newenvp);
+    for (int j = 0; j < nenv; j++) free(newenvp[j]);
+    free(newargv); free(newenvp);
+    free(target);
+    return ret;
+}
+
+int posix_spawn(pid_t *pid, const char *file,
+                const posix_spawn_file_actions_t *file_actions,
+                const posix_spawnattr_t *attrp,
+                char *const argv[], char *const envp[]) {
+    static posix_spawn_t real = NULL;
+    if (!real) real = (posix_spawn_t)dlsym(RTLD_NEXT, "posix_spawn");
+    if (!real) return EINVAL;
+    if (getenv("APPIMAGE_SCOPED")) return real(pid, file, file_actions, attrp, argv, envp);
+    if (target_matches(file)) {
+        int r = redirect_spawn(pid, file, file_actions, attrp, argv, envp);
+        if (r == 0) return 0;
+    }
+    return real(pid, file, file_actions, attrp, argv, envp);
+}
+
+int posix_spawnp(pid_t *pid, const char *file,
+                 const posix_spawn_file_actions_t *file_actions,
+                 const posix_spawnattr_t *attrp,
+                 char *const argv[], char *const envp[]) {
+    static posix_spawnp_t real = NULL;
+    if (!real) real = (posix_spawnp_t)dlsym(RTLD_NEXT, "posix_spawnp");
+    if (!real) return EINVAL;
+    if (getenv("APPIMAGE_SCOPED")) return real(pid, file, file_actions, attrp, argv, envp);
+    if (target_matches(file)) {
+        int r = redirect_spawn(pid, file, file_actions, attrp, argv, envp);
+        if (r == 0) return 0;
+    }
+    return real(pid, file, file_actions, attrp, argv, envp);
+}
+
 int execveat(int dirfd, const char *path, char *const argv[], char *const envp[], int flags) {
     static execveat_t real = NULL;
     if (!real) real = (execveat_t)dlsym(RTLD_NEXT, "execveat");
@@ -243,4 +424,65 @@ int execveat(int dirfd, const char *path, char *const argv[], char *const envp[]
         redirect_exec(path, argv, envp);
     }
     return real(dirfd, path, argv, envp, flags);
+}
+
+/* Variadic exec* wrappers: build the argv array from the varargs and
+ * delegate to the vector forms above (which own the redirect logic). */
+
+static char **build_exec_argv(const char *arg, va_list ap) {
+    int n = 0, cap = 8;
+    char **argv = malloc(cap * sizeof(char *));
+    if (!argv) return NULL;
+    argv[n++] = (char *)arg;
+    for (;;) {
+        const char *s = va_arg(ap, const char *);
+        if (!s) break;
+        if (n + 1 >= cap) {
+            cap *= 2;
+            char **na = realloc(argv, cap * sizeof(char *));
+            if (!na) { free(argv); return NULL; }
+            argv = na;
+        }
+        argv[n++] = (char *)s;
+    }
+    argv[n] = NULL;
+    return argv;
+}
+
+int execl(const char *path, const char *arg, ...) {
+    va_list ap;
+    char **argv;
+    va_start(ap, arg);
+    argv = build_exec_argv(arg, ap);
+    va_end(ap);
+    if (!argv) { errno = ENOMEM; return -1; }
+    int r = execv(path, argv);
+    free(argv);
+    return r;
+}
+
+int execlp(const char *file, const char *arg, ...) {
+    va_list ap;
+    char **argv;
+    va_start(ap, arg);
+    argv = build_exec_argv(arg, ap);
+    va_end(ap);
+    if (!argv) { errno = ENOMEM; return -1; }
+    int r = execvp(file, argv);
+    free(argv);
+    return r;
+}
+
+int execle(const char *path, const char *arg, ...) {
+    va_list ap;
+    char **argv;
+    char **envp;
+    va_start(ap, arg);
+    argv = build_exec_argv(arg, ap);
+    envp = va_arg(ap, char **);
+    va_end(ap);
+    if (!argv) { errno = ENOMEM; return -1; }
+    int r = execvpe(path, argv, envp);
+    free(argv);
+    return r;
 }
