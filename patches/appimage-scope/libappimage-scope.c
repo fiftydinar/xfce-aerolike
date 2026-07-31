@@ -1,18 +1,26 @@
 /*
  * libappimage-scope: LD_PRELOAD shim that runs AppImages (and the sas
- * AppImage sandbox) inside their own systemd user scope (app.slice) so
- * oomd can rank/kill each one independently and the app.slice
- * MemoryHigh cap applies.
+ * AppImage sandbox, and select XFCE apps) inside their own systemd user
+ * scope (app.slice) so oomd can rank/kill each one independently and
+ * the app.slice MemoryHigh cap applies.
  *
  * Intercepts execve/execveat. If the target file is an AppImage
- * (ELF + "AI"/"RI"/"AB" magic at offset 8), or the sas sandbox launcher
- * (/usr/bin/sas), rewrites the exec to:
+ * (ELF + "AI"/"RI"/"AB" magic at offset 8), the sas sandbox launcher
+ * (/usr/bin/sas), or a listed XFCE app (xfsettingsd, xfce4-power-manager,
+ * thunar, etc.), rewrites the exec to:
  *
  *   systemd-run --user --scope --slice=app.slice -- <target> [args]
  *
  * Scoping sas pulls its whole process tree (sas -> bwrap -> AppRun ->
  * FUSE daemon) into one cgroup, so the sandbox becomes a single
  * oomd-manageable unit instead of an untracked part of the session blob.
+ *
+ * Scoping XFCE apps moves disposable utilities (settings, power
+ * manager, notifications, terminal, file manager, applets) out of the
+ * protected desktop.slice DE blob into killable app.slice scopes, so a
+ * runaway settings daemon or file manager can be killed without
+ * touching the desktop. The core DE (xfce4-session, xfce4-panel,
+ * compiz/emerald) is deliberately NOT in this list and stays protected.
  *
  * The recursion guard (APPIMAGE_SCOPED=1 + stripping our own lib from
  * LD_PRELOAD when spawning systemd-run) prevents the hook from looping.
@@ -57,6 +65,35 @@ static int is_sas(const char *path) {
     const char *base = strrchr(path, '/');
     base = base ? base + 1 : path;
     return strcmp(base, "sas") == 0;
+}
+
+/* XFCE apps that should get their own killable scope instead of living
+ * in the desktop.slice DE blob. These are disposable utilities that can
+ * be safely killed and restarted by the user, unlike the core DE
+ * (session/panel/compiz) which stays protected in desktop.slice. */
+static int is_de_app(const char *path) {
+    static const char *apps[] = {
+        "xfce4-settings-manager",
+        "xfsettingsd",
+        "xfce4-power-manager",
+        "xfce4-notifyd",
+        "xfce4-screenshooter",
+        "xfce4-appfinder",
+        "xfce4-terminal",
+        "thunar",
+        "nm-applet",
+        "blueman-applet",
+        NULL
+    };
+    const char *base;
+    int i;
+    if (!path) return 0;
+    base = strrchr(path, '/');
+    base = base ? base + 1 : path;
+    for (i = 0; apps[i]; i++) {
+        if (strcmp(base, apps[i]) == 0) return 1;
+    }
+    return 0;
 }
 
 static int count_argv(char *const argv[]) {
@@ -152,7 +189,7 @@ int execve(const char *path, char *const argv[], char *const envp[]) {
     if (!real) real = (execve_t)dlsym(RTLD_NEXT, "execve");
     if (!real) { errno = ENOSYS; return -1; }
     if (getenv("APPIMAGE_SCOPED")) return real(path, argv, envp);
-    if (is_appimage(path) || is_sas(path)) {
+    if (is_appimage(path) || is_sas(path) || is_de_app(path)) {
         redirect_exec(path, argv, envp);
     }
     return real(path, argv, envp);
@@ -163,7 +200,7 @@ int execveat(int dirfd, const char *path, char *const argv[], char *const envp[]
     if (!real) real = (execveat_t)dlsym(RTLD_NEXT, "execveat");
     if (!real) { errno = ENOSYS; return -1; }
     if (getenv("APPIMAGE_SCOPED")) return real(dirfd, path, argv, envp, flags);
-    if (dirfd == AT_FDCWD && (is_appimage(path) || is_sas(path))) {
+    if (dirfd == AT_FDCWD && (is_appimage(path) || is_sas(path) || is_de_app(path))) {
         redirect_exec(path, argv, envp);
     }
     return real(dirfd, path, argv, envp, flags);
