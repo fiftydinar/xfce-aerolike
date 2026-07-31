@@ -20,11 +20,13 @@
  * screenshooter, appfinder, terminal, file manager, session settings/
  * logout/about, tray applets, nm-connection-editor, pavucontrol,
  * xarchiver, blueman manager/adapters, ccsm, qt5ct/qt6ct,
- * kvantummanager, emerald-theme-manager, polkit auth agent) out of the
- * protected desktop.slice DE blob into killable app.slice scopes, so a
- * runaway settings daemon or file manager can be killed without
- * touching the desktop. The core DE (xfce4-session, xfce4-panel,
- * compiz/emerald) is deliberately NOT in this list and stays protected.
+ * kvantummanager, emerald-theme-manager) out of the protected
+ * desktop.slice DE blob into killable app.slice scopes, so a runaway
+ * settings daemon or file manager can be killed without touching the
+ * desktop. The core DE (xfce4-session, xfce4-panel, compiz/emerald) is
+ * deliberately NOT in this list and stays protected. The polkit auth
+ * agent is also excluded: it's a critical daemon, not a disposable app,
+ * and killing it would break all graphical elevation prompts.
  *
  * The recursion guard (APPIMAGE_SCOPED=1 + stripping our own lib from
  * LD_PRELOAD when spawning systemd-run) prevents the hook from looping.
@@ -107,7 +109,6 @@ static int is_de_app(const char *path) {
         "qt6ct",
         "kvantummanager",
         "emerald-theme-manager",
-        "polkit-gnome-authentication-agent-1",
         NULL
     };
     const char *base;
