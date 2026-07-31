@@ -15,14 +15,16 @@
  * FUSE daemon) into one cgroup, so the sandbox becomes a single
  * oomd-manageable unit instead of an untracked part of the session blob.
  *
- * Scoping XFCE apps moves disposable utilities (settings, power
- * manager, notifications, terminal, file manager, screensaver,
- * screenshooter, appfinder, pavucontrol, xarchiver, ccsm, tray
- * applets) out of the protected desktop.slice DE blob into killable
- * app.slice scopes, so a runaway settings daemon or file manager can be
- * killed without touching the desktop. The core DE (xfce4-session,
- * xfce4-panel, compiz/emerald) is deliberately NOT in this list and
- * stays protected.
+ * Scoping XFCE apps moves disposable GUI utilities (settings manager +
+ * all its frontends, power manager, notifications, screensaver,
+ * screenshooter, appfinder, terminal, file manager, session settings/
+ * logout/about, tray applets, nm-connection-editor, pavucontrol,
+ * xarchiver, blueman manager/adapters, ccsm, qt5ct/qt6ct,
+ * kvantummanager, emerald-theme-manager, polkit auth agent) out of the
+ * protected desktop.slice DE blob into killable app.slice scopes, so a
+ * runaway settings daemon or file manager can be killed without
+ * touching the desktop. The core DE (xfce4-session, xfce4-panel,
+ * compiz/emerald) is deliberately NOT in this list and stays protected.
  *
  * The recursion guard (APPIMAGE_SCOPED=1 + stripping our own lib from
  * LD_PRELOAD when spawning systemd-run) prevents the hook from looping.
@@ -77,6 +79,15 @@ static int is_de_app(const char *path) {
     static const char *apps[] = {
         "xfce4-settings-manager",
         "xfsettingsd",
+        "xfce4-appearance-settings",
+        "xfce4-display-settings",
+        "xfce4-keyboard-settings",
+        "xfce4-mouse-settings",
+        "xfce4-mime-settings",
+        "xfce4-print-settings",
+        "xfce4-session-settings",
+        "xfce4-session-logout",
+        "xfce4-about",
         "xfce4-power-manager",
         "xfce4-notifyd",
         "xfce4-screenshooter",
@@ -85,10 +96,18 @@ static int is_de_app(const char *path) {
         "xfce4-terminal",
         "thunar",
         "nm-applet",
+        "nm-connection-editor",
         "blueman-applet",
+        "blueman-manager",
+        "blueman-adapters",
         "pavucontrol",
         "xarchiver",
         "ccsm",
+        "qt5ct",
+        "qt6ct",
+        "kvantummanager",
+        "emerald-theme-manager",
+        "polkit-gnome-authentication-agent-1",
         NULL
     };
     const char *base;
