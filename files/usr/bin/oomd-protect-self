@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 # Marks this process's cgroup as a last-resort kill target for oomd.
 # oomd only kills cgroups tagged trusted.oomd_avoid / user.oomd_avoid
 # when there are no other kill candidates left.
