@@ -1,0 +1,29 @@
+#!/bin/sh
+# run-appimage - launch an AppImage inside its own systemd user scope
+# so oomd can rank/kill it independently and the app.slice MemoryHigh
+# soft cap applies. Falls back to direct execution when systemd --user
+# is unavailable or the file is not an AppImage.
+#
+# Magic-byte detection is intentionally fast (single head -c + shell
+# glob), matching the approach of simple-appimage-sandbox. Patterns
+# cover the squashfs runtime (Type 2, "AI"), the dwarfs runtime ("AI"),
+# and the ISO/runtime variants ("RI", "AB").
+set -eu
+
+if [ "$#" -lt 1 ]; then
+    echo "usage: run-appimage FILE [ARGS...]" >&2
+    exit 2
+fi
+
+app="$1"
+shift
+
+case "$(head -c 10 "$app" 2>/dev/null)" in
+    *ELF*AI|*ELF*RI|*ELF*AB)
+        if command -v systemd-run >/dev/null 2>&1; then
+            exec systemd-run --user --scope --slice=app.slice --collect -- "$app" "$@"
+        fi
+        ;;
+esac
+
+exec "$app" "$@"

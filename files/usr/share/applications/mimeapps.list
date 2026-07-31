@@ -1,0 +1,3 @@
+[Default Applications]
+application/vnd.appimage=run-appimage.desktop;
+application/x-iso9660-appimage=run-appimage.desktop;
