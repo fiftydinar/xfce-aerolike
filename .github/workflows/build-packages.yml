@@ -78,7 +78,7 @@ jobs:
             patch: |
               SRCDIR=$(find "${BUILDDIR:-/build}/src" -maxdepth 1 -type d -name 'compiz*' | head -1)
               [ -n "$SRCDIR" ] || { echo "ERROR: source dir not found"; exit 1; }
-              for p in 0001-compiz-defaults 0002-auto-fullscreen 0003-invert-keybindings 0004-fix-ccsm-reset-profile 0005-fix-ccsm-reset-settings 0006-ignore-client-self-minimize; do
+              for p in 0001-compiz-defaults 0002-auto-fullscreen 0003-invert-keybindings 0004-fix-ccsm-reset-profile 0005-fix-ccsm-reset-settings 0006-ignore-client-self-minimize 0007-fix-cache-content-hash; do
                 curl -sLO "https://raw.githubusercontent.com/fiftydinar/xfce-aerolike/refs/heads/main/patches/compiz/${p}.patch"
                 cd "$SRCDIR"
                 patch -p1 -F100 < "/build/${p}.patch"
