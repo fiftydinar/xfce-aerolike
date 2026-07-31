@@ -15,7 +15,7 @@ diff --git a/src/window.cpp b/src/window.cpp
 index 10f0eea..3c5bb36 100644
 --- a/src/window.cpp
 +++ b/src/window.cpp
-@@ -1682,6 +1682,36 @@ PrivateWindow::resize (const CompWindow::Geometry &gm)
+@@ -1682,6 +1682,43 @@ PrivateWindow::resize (const CompWindow::Geometry &gm)
      return true;
  }
  
@@ -31,18 +31,25 @@ index 10f0eea..3c5bb36 100644
 +    int outputDev = screen->outputDeviceForGeometry (priv->frameGeometry);
 +    CompOutput &output = screen->outputDevs ().at (outputDev);
 +
++    /* Use tolerant matching: DXVK reports sizes that can differ from the
++       output bounds by a pixel or two (frame extents, intermediate
++       configure events), so exact == would never trigger. */
 +    bool coversOutput =
-+	priv->frameGeometry.x () == output.x () &&
-+	priv->frameGeometry.y () == output.y () &&
-+	priv->frameGeometry.x () + priv->frameGeometry.width ()  == output.x () + output.width () &&
-+	priv->frameGeometry.y () + priv->frameGeometry.height () == output.y () + output.height ();
++	priv->frameGeometry.x () <= output.x () &&
++	priv->frameGeometry.y () <= output.y () &&
++	priv->frameGeometry.x () + priv->frameGeometry.width () >=
++	    output.x () + output.width () &&
++	priv->frameGeometry.y () + priv->frameGeometry.height () >=
++	    output.y () + output.height ();
 +
 +    if (coversOutput && !(priv->state & CompWindowStateFullscreenMask))
 +    {
 +	window->changeState (priv->state | CompWindowStateFullscreenMask);
 +	window->updateAttributes (CompStackingUpdateModeNormal);
 +    }
-+    else if (!coversOutput && (priv->state & CompWindowStateFullscreenMask))
++    else if (!coversOutput && (priv->state & CompWindowStateFullscreenMask) &&
++	     priv->frameGeometry.width ()  < output.width () &&
++	     priv->frameGeometry.height () < output.height ())
 +    {
 +	window->changeState (priv->state & ~CompWindowStateFullscreenMask);
 +	window->updateAttributes (CompStackingUpdateModeNormal);
@@ -52,7 +59,7 @@ index 10f0eea..3c5bb36 100644
  bool
  PrivateWindow::resize (const XWindowAttributes &attr)
  {
-@@ -1876,6 +1906,8 @@ PrivateWindow::configure (XConfigureEvent *ce)
+@@ -1876,6 +1913,8 @@ PrivateWindow::configure (XConfigureEvent *ce)
  
      if (ce->event == screen->root ())
  	priv->restack (ce->above);
