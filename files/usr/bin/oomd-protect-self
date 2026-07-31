@@ -1,0 +1,19 @@
+#!/bin/bash
+# Marks this process's cgroup as a last-resort kill target for oomd.
+# oomd only kills cgroups tagged trusted.oomd_avoid / user.oomd_avoid
+# when there are no other kill candidates left.
+#
+# user.oomd_avoid is used because it can be set by the cgroup owner
+# without CAP_SYS_ADMIN, which is required for the trusted.* namespace.
+# This makes the script work for both system services (root-owned) and
+# user services (delegated to the user by systemd --user).
+#
+# Run via ExecStartPost in a systemd service drop-in so the service's
+# own cgroup is tagged the moment it starts, before oomd can pick it.
+
+cgroup="$(awk -F: '/^0:/ { print $3 }' /proc/self/cgroup)"
+[ -n "${cgroup}" ] || exit 0
+
+setfattr -n user.oomd_avoid -v 1 "/sys/fs/cgroup${cgroup}" 2>/dev/null || true
+# Also try the trusted.* namespace for system services (root only).
+setfattr -n trusted.oomd_avoid -v 1 "/sys/fs/cgroup${cgroup}" 2>/dev/null || true

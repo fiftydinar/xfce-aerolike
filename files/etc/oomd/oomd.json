@@ -22,6 +22,49 @@
             ]
         },
         {
+            "name": "memory pressure warning",
+            "post_action_delay": "60",
+            "detectors": [
+                [
+                    "user pressure above 40 for 30s",
+                    {
+                        "name": "pressure_above",
+                        "args": {
+                            "cgroup": "user.slice",
+                            "resource": "memory",
+                            "threshold": "40",
+                            "duration": "30"
+                        }
+                    }
+                ],
+                [
+                    "system pressure above 60 for 60s",
+                    {
+                        "name": "pressure_above",
+                        "args": {
+                            "cgroup": "system.slice",
+                            "resource": "memory",
+                            "threshold": "60",
+                            "duration": "60"
+                        }
+                    }
+                ]
+            ],
+            "actions": [
+                {
+                    "name": "dump_cgroup_overview",
+                    "args": {
+                        "cgroup": "user.slice,system.slice",
+                        "always": true
+                    }
+                },
+                {
+                    "name": "stop",
+                    "args": {}
+                }
+            ]
+        },
+        {
             "name": "user session protection",
             "detectors": [
                 [
@@ -67,7 +110,7 @@
                 {
                     "name": "kill_by_memory_size_or_growth",
                     "args": {
-                        "cgroup": "user.slice/user-*.slice/session-*.scope,user.slice/user-*.slice/user@*.service/*,system.slice/*"
+                        "cgroup": "user.slice/user-*.slice/session-*.scope,user.slice/user-*.slice/user@*.service/app.slice/*,system.slice/*"
                     }
                 }
             ]
@@ -76,11 +119,11 @@
             "name": "protection against low swap",
             "detectors": [
                 [
-                    "free swap goes below 5 percent",
+                    "free swap goes below 10 percent",
                     {
                         "name": "swap_free",
                         "args": {
-                            "threshold_pct": "5"
+                            "threshold_pct": "10"
                         }
                     }
                 ]
@@ -89,8 +132,8 @@
                 {
                     "name": "kill_by_swap_usage",
                     "args": {
-                        "cgroup": "user.slice/user-*.slice/session-*.scope,user.slice/user-*.slice/user@*.service/*,system.slice/*",
-                        "post_action_delay": "30"
+                        "cgroup": "user.slice/user-*.slice/session-*.scope,user.slice/user-*.slice/user@*.service/app.slice/*,system.slice/*",
+                        "post_action_delay": "15"
                     }
                 }
             ]

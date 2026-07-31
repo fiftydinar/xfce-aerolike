@@ -94,6 +94,8 @@ modules:
         - nss-mdns
         # OOM prevention
         - jsoncpp
+        # Provides setfattr for oomd-protect-self (user.oomd_avoid xattr tagging)
+        - attr
         # Other
         - expac
         - dash
