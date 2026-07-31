@@ -1,0 +1,64 @@
+#!/bin/sh
+# oomd-notify: pop a desktop notification whenever oomd kills a process.
+# Runs as a SYSTEM service (root); tails oomd's system journal via
+# journalctl --follow (event-driven, no polling, near-zero idle cost).
+#
+# oomd is the Meta/facebook build (/usr/bin/oomd), NOT systemd-oomd, so there
+# is no org.freedesktop.oom1 Killed() D-Bus signal. Kill events are detected
+# from oomd's OLOG lines in the journal:
+#   Killed <n>: <pid>(<comm>) <pid>(<comm>) ...
+#
+# Notifications are delivered to the user's desktop by running notify-send as
+# the owner of an active graphical login session (inspired by blue-build's
+# system-flatpak-setup notify-send-as-user helper, but more robust: it prefers
+# the graphical session instead of session[0], uses runuser instead of sudo,
+# and only fires once a session bus socket actually exists).
+
+# Print "user uid" of the first graphical (seated) user session, else "".
+pick_user_session() {
+    loginctl list-sessions --no-legend --no-pager 2>/dev/null |
+        awk '$6 == "user" && $4 != "-" { print $3, $2; exit }'
+}
+
+notify_user() {
+    # $1 = urgency, $2 = summary, $3 = body
+    urgency="$1"
+    summary="$2"
+    body="$3"
+    session=$(pick_user_session)
+    user=${session%% *}
+    uid=${session##* }
+    [ -n "$user" ] || return 1
+    [ -S "/run/user/$uid/bus" ] || return 1
+    runuser -u "$user" -- env \
+        DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" \
+        notify-send -u "$urgency" -i dialog-warning "$summary" "$body"
+}
+
+# Pull the first comm from a "pid(comm)" tuple -> just the name
+first_comm() {
+    echo "$1" | grep -oE '[0-9]+\([^)]*\)' | head -1 | sed -E 's/[0-9]+\((.*)\)/\1/'
+}
+
+# oomd can log "Killed" twice for the same target (kill + reap, within the
+# same second). Use a temp file to remember the last notified comm and only
+# skip re-notifications of the same process within a short cooldown.
+last_file=$(mktemp /tmp/oomd-notify.XXXXXX)
+trap 'rm -f "$last_file"' EXIT
+journalctl --follow --output=cat --unit=oomd --since now | while IFS= read -r line; do
+    case "$line" in
+        *"Killed "*)
+            rest=$(echo "$line" | sed 's/.*Killed //')
+            comm=$(first_comm "$rest")
+            [ -n "$comm" ] || continue
+            now=$(date +%s)
+            [ -f "$last_file" ] || echo "$now $comm" > "$last_file"
+            old_now=$(awk '{print $1}' "$last_file")
+            old_comm=$(awk '{print $2}' "$last_file")
+            [ "$old_comm" = "$comm" ] && [ $((now - old_now)) -lt 3 ] && continue
+            echo "$now $comm" > "$last_file"
+            notify_user critical "oomd stopped $comm" \
+                "$comm was using too much memory and was killed. Your other apps are fine."
+            ;;
+    esac
+done

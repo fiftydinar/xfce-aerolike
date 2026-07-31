@@ -199,6 +199,7 @@ modules:
         - bluetooth.service
         - lightdm.service
         - oomd.service
+        - oomd-notify.service
         - bootloader-update.service
   - type: files
     files:

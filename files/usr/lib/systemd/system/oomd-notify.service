@@ -1,0 +1,12 @@
+[Unit]
+Description=Desktop notification when oomd kills a process
+Wants=oomd.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/oomd-notify
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
