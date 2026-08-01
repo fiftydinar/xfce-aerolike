@@ -1,18 +1,28 @@
 #!/bin/sh
-# oomd-notify: pop a desktop notification whenever oomd kills a process.
+# oomd-notify: pop a desktop notification whenever oomd kills processes.
 # Runs as a SYSTEM service (root); tails oomd's system journal via
 # journalctl --follow (event-driven, no polling, near-zero idle cost).
 #
 # oomd is the Meta/facebook build (/usr/bin/oomd), NOT systemd-oomd, so there
 # is no org.freedesktop.oom1 Killed() D-Bus signal. Kill events are detected
-# from oomd's OLOG lines in the journal:
-#   Killed <n>: <pid>(<comm>) <pid>(<comm>) ...
-#
-# Notifications are delivered to the user's desktop by running notify-send as
-# the owner of an active graphical login session (inspired by blue-build's
-# system-flatpak-setup notify-send-as-user helper, but more robust: it prefers
-# the graphical session instead of session[0], uses runuser instead of sudo,
-# and only fires once a session bus socket actually exists).
+# from oomd's OLOG lines in the journal. oomd reports each kill event as:
+#   [BaseKillPlugin.cpp:554] Trying to kill /sys/fs/cgroup/<...>/<scope>
+#   [BaseKillPlugin.cpp:668] Killed 20: 1937(ai.opencode.des) 2061(...) ...
+#   [Ruleset.cpp:302] Action=kill_by_swap_usage returned STOP. ...
+# so one notification is produced per kill event, titled with the app that
+# owns the scope, and listing every process oomd killed inside it.
+
+# --- options (not used by the systemd unit) ---
+#   --stdin    read oomd log lines from stdin (for testing)
+#   --dry-run  print what would be notified instead of notifying
+STREAM="journalctl --follow --output=cat --unit=oomd --since now"
+DRY=0
+for arg in "$@"; do
+    case "$arg" in
+        --stdin) STREAM="cat" ;;
+        --dry-run) DRY=1 ;;
+    esac
+done
 
 # Print "user uid" of the first graphical (seated) user session, else "".
 pick_user_session() {
@@ -25,6 +35,12 @@ notify_user() {
     urgency="$1"
     summary="$2"
     body="$3"
+    if [ "$DRY" = 1 ]; then
+        echo "--- notify ---"
+        echo "summary: $summary"
+        printf '%s\n' "$body"
+        return 0
+    fi
     session=$(pick_user_session)
     user=${session%% *}
     uid=${session##* }
@@ -35,30 +51,63 @@ notify_user() {
         notify-send -u "$urgency" -i dialog-warning "$summary" "$body"
 }
 
-# Pull the first comm from a "pid(comm)" tuple -> just the name
-first_comm() {
-    echo "$1" | grep -oE '[0-9]+\([^)]*\)' | head -1 | sed -E 's/[0-9]+\((.*)\)/\1/'
+# Derive the app name that owns a scope from its cgroup path, e.g.
+#   .../app.slice/app-ai.opencode.desktop-1937.scope  -> ai.opencode.desktop
+#   .../app.slice/run-p9611-i9084.scope               -> run-p9611-i9084
+scope_app() {
+    base=$(basename "$1")
+    base=${base%.scope}
+    case "$base" in
+        app-*)
+            base=${base#app-}
+            base=${base%-[0-9]*}
+            ;;
+        run-* | session-*)
+            # transient/session scope; use process comm instead
+            base=""
+            ;;
+    esac
+    echo "$base"
 }
 
-# oomd can log "Killed" twice for the same target (kill + reap, within the
-# same second). Use a temp file to remember the last notified comm and only
-# skip re-notifications of the same process within a short cooldown.
-last_file=$(mktemp /tmp/oomd-notify.XXXXXX)
-trap 'rm -f "$last_file"' EXIT
-journalctl --follow --output=cat --unit=oomd --since now | while IFS= read -r line; do
+# --- per-event state ---
+pending=$(mktemp /tmp/oomd-notify.XXXXXX)   # one "pid comm" per line, for current event
+cur_scope=""                                 # scope path of current event ("" = none)
+
+flush_event() {
+    [ -s "$pending" ] || return 0
+    total=$(sort -u "$pending" | wc -l)
+    # collapse to "count comm" lines, dedup pids
+    body=$(sort -u "$pending" | awk '{ print $2 }' | sort | uniq -c |
+        sort -rn | awk '{ printf "%s x %s\n", $1, $2 }' | head -12)
+    app=$(scope_app "$cur_scope")
+    [ -n "$app" ] || app=$(awk '{ print $2 }' "$pending" | sort | uniq -c |
+        sort -rn | head -1 | awk '{ print $2 }')
+    [ -n "$app" ] || app="unknown"
+    summary="oomd stopped $app"
+    body="$app was using too much memory and was killed. Your other apps are fine."
+    notify_user critical "$summary" "$body"
+    : > "$pending"
+    cur_scope=""
+}
+
+trap 'flush_event; rm -f "$pending"' EXIT INT TERM
+
+eval "$STREAM" | while IFS= read -r line; do
     case "$line" in
-        *"Killed "*)
-            rest=$(echo "$line" | sed 's/.*Killed //')
-            comm=$(first_comm "$rest")
-            [ -n "$comm" ] || continue
-            now=$(date +%s)
-            [ -f "$last_file" ] || echo "$now $comm" > "$last_file"
-            old_now=$(awk '{print $1}' "$last_file")
-            old_comm=$(awk '{print $2}' "$last_file")
-            [ "$old_comm" = "$comm" ] && [ $((now - old_now)) -lt 3 ] && continue
-            echo "$now $comm" > "$last_file"
-            notify_user critical "oomd stopped $comm" \
-                "$comm was using too much memory and was killed. Your other apps are fine."
+        *"Trying to kill "*)     # new kill event begins
+            flush_event
+            cur_scope=$(echo "$line" | sed 's/.*Trying to kill //')
+            : > "$pending"
+            ;;
+        *"Killed "*)             # oomd reports killed pids: "Killed 20: pid(comm) ..."
+            rest=$(echo "$line" | sed 's/.*Killed [0-9]*: //')
+            echo "$rest" | grep -oE '[0-9]+\([^)]*\)' |
+                sed -E 's/([0-9]+)\(([^)]*)\)/\1 \2/' >> "$pending"
+            [ -n "$cur_scope" ] || cur_scope="unknown"
+            ;;
+        *"returned STOP"* | *"Terminating action chain"*)  # kill event ends
+            flush_event
             ;;
     esac
 done
