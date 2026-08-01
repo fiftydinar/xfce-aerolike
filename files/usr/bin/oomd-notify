@@ -85,7 +85,7 @@ flush_event() {
                 sorted=$(sort -u "$pending" | awk '{print $2}' | sort | uniq -c | sort -rn)
                 main=$(echo "$sorted" | head -1 | awk '{print $2}')
                 term=$(echo "$sorted" | awk '{print $2}' |
-                    grep -E 'xfce4-terminal|gnome-terminal|konsole|alacritty|kitty|wezterm|terminator|lxterminal|mate-terminal|foot|st$' |
+                    grep -E 'xfce4-terminal|gnome-terminal|konsole|alacritty|kitty|wezterm|terminator|lxterminal|mate-terminal|foot|^st$|ptyxis' |
                     head -1)
                 if [ -n "$term" ] && [ "$term" != "$main" ]; then
                     app="$main and $term"
