@@ -97,19 +97,27 @@ diff -ruN '--exclude=.git' compiz-aur-patched/plugins/blur/blur.xml.in compiz-fi
 diff -ruN '--exclude=.git' compiz-aur-patched/plugins/composite/composite.xml.in compiz-final/plugins/composite/composite.xml.in
 --- compiz-aur-patched/plugins/composite/composite.xml.in	2026-07-14 21:54:15.504039497 +0200
 +++ compiz-final/plugins/composite/composite.xml.in	2026-07-14 21:54:35.706098616 +0200
-@@ -24,10 +24,10 @@
- 	    <option name="unredirect_fullscreen_windows" type="bool">
- 		<_short>Unredirect Fullscreen Windows</_short>
- 		<_long>Allow drawing of fullscreen windows to not be redirected to offscreen pixmaps</_long>
+@@ -24,15 +24,15 @@
+	    <option name="unredirect_fullscreen_windows" type="bool">
+		<_short>Unredirect Fullscreen Windows</_short>
+		<_long>Allow drawing of fullscreen windows to not be redirected to offscreen pixmaps</_long>
 -		<default>true</default>
 +		<default>false</default>
- 	    </option>
- 	    <option name="unredirect_match" type="match">
- 		<_short>Unredirect Match</_short>
- 		<_long>Specifies which windows will be unredirected when they are fullscreen. You might want to exclude video players for example, to avoid tearing. But this will be at the expense of performance/frame rate. Note: "class=" matching requires the regex plugin to work.</_long>
+	    </option>
+	    <option name="unredirect_match" type="match">
+		<_short>Unredirect Match</_short>
+		<_long>Specifies which windows will be unredirected when they are fullscreen. You might want to exclude video players for example, to avoid tearing. But this will be at the expense of performance/frame rate. Note: "class=" matching requires the regex plugin to work.</_long>
 -		<default>(any) &amp; !(class=Totem) &amp; !(class=MPlayer) &amp; !(class=vlc) &amp; !(class=Plugin-container) &amp; !(class=QtQmlViewer) &amp; !(class=Firefox) &amp; !(class=google-chrome) &amp; !(class=google-chrome-unstable) &amp; !(class=chromium-browser)</default>
 +		<default>(any)</default>
- 	    </option>
+	    </option>
+	    <option name="force_independent_output_painting" type="bool">
+		<_short>Force independent output painting.</_short>
+		<_long>Paint each output device independly, even if the output devices overlap</_long>
+-		<default>false</default>
++		<default>true</default>
+	    </option>
+	</options>
+    </plugin>
 diff -ruN '--exclude=.git' compiz-aur-patched/plugins/grid/grid.xml.in compiz-final/plugins/grid/grid.xml.in
 --- compiz-aur-patched/plugins/grid/grid.xml.in	2026-07-14 21:54:15.583723818 +0200
 +++ compiz-final/plugins/grid/grid.xml.in	2026-07-14 21:54:35.706288574 +0200
