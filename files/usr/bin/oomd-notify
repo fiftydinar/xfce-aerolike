@@ -36,9 +36,7 @@ notify_user() {
     summary="$2"
     body="$3"
     if [ "$DRY" = 1 ]; then
-        echo "--- notify ---"
-        echo "summary: $summary"
-        printf '%s\n' "$body"
+        printf '%s\n%s\n' "$summary" "$body"
         return 0
     fi
     session=$(pick_user_session)
