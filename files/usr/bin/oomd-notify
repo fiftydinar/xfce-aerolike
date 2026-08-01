@@ -56,7 +56,7 @@ scope_app() {
     base=$(basename "$1")
     base=${base%.scope}
     case "$base" in
-        app-vte-spawn-* | run-* | session-*)
+        *vte-spawn-* | run-* | session-*)
             # terminal-wrapper/transient/session scope; use process comm instead
             base=""
             ;;
