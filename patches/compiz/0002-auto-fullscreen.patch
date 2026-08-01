@@ -12,10 +12,15 @@ index 7509145..46ae163 100644
  
  	void configureFrame (XConfigureEvent *ce);
 diff --git a/src/window.cpp b/src/window.cpp
-index 10f0eea..3c5bb36 100644
+index 10f0eea..2cee1d7 100644
 --- a/src/window.cpp
 +++ b/src/window.cpp
-@@ -1682,6 +1682,43 @@ PrivateWindow::resize (const CompWindow::Geometry &gm)
+@@ -1679,9 +1679,35 @@ PrivateWindow::resize (const CompWindow::Geometry &gm)
+ 	move (gm.x () - priv->geometry.x (),
+ 	      gm.y () - priv->geometry.y (), true);
+ 
++    autoDetectFullscreen ();
++
      return true;
  }
  
@@ -28,30 +33,17 @@ index 10f0eea..3c5bb36 100644
 +    if (!(priv->wmType & (CompWindowTypeNormalMask | CompWindowTypeUnknownMask)))
 +	return;
 +
-+    int outputDev = screen->outputDeviceForGeometry (priv->frameGeometry);
-+    CompOutput &output = screen->outputDevs ().at (outputDev);
++    if (priv->state & CompWindowStateFullscreenMask)
++	return;
 +
-+    /* Use tolerant matching: DXVK reports sizes that can differ from the
-+       output bounds by a pixel or two (frame extents, intermediate
-+       configure events), so exact == would never trigger. */
-+    bool coversOutput =
-+	priv->frameGeometry.x () <= output.x () &&
-+	priv->frameGeometry.y () <= output.y () &&
-+	priv->frameGeometry.x () + priv->frameGeometry.width () >=
-+	    output.x () + output.width () &&
-+	priv->frameGeometry.y () + priv->frameGeometry.height () >=
-+	    output.y () + output.height ();
++    CompOutput &fsOutput = screen->fullscreenOutput ();
 +
-+    if (coversOutput && !(priv->state & CompWindowStateFullscreenMask))
++    if (priv->geometry.x ()     == fsOutput.x ()      &&
++	priv->geometry.y ()     == fsOutput.y ()      &&
++	priv->geometry.width () == fsOutput.width ()  &&
++	priv->geometry.height ()== fsOutput.height ())
 +    {
 +	window->changeState (priv->state | CompWindowStateFullscreenMask);
-+	window->updateAttributes (CompStackingUpdateModeNormal);
-+    }
-+    else if (!coversOutput && (priv->state & CompWindowStateFullscreenMask) &&
-+	     priv->frameGeometry.width ()  < output.width () &&
-+	     priv->frameGeometry.height () < output.height ())
-+    {
-+	window->changeState (priv->state & ~CompWindowStateFullscreenMask);
 +	window->updateAttributes (CompStackingUpdateModeNormal);
 +    }
 +}
@@ -59,12 +51,3 @@ index 10f0eea..3c5bb36 100644
  bool
  PrivateWindow::resize (const XWindowAttributes &attr)
  {
-@@ -1876,6 +1913,8 @@ PrivateWindow::configure (XConfigureEvent *ce)
- 
-     if (ce->event == screen->root ())
- 	priv->restack (ce->above);
-+
-+    autoDetectFullscreen ();
- }
- 
- void
