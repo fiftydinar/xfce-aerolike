@@ -199,7 +199,6 @@ modules:
         - bluetooth.service
         - lightdm.service
         - oomd.service
-        - oomd-notify.service
         - bootloader-update.service
   - type: files
     files:
@@ -215,6 +214,7 @@ modules:
         - dirty-centisecs-aerolike.service
         - fix-resolv-conf.service
         - unbound-cert-setup.service
+        - oomd-notify.service
   - type: signing
   - type: script
     snippets:
