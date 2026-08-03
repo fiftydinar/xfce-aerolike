@@ -168,7 +168,7 @@ modules:
       # idle app memory, grades memory.low, and tunes CPU nice -- mirrors
       # Windows' Balance Set Manager + memory priority + process priority)
       - |
-        wget --retry-connrefused --tries=30 -O /tmp/adaptive-scheduler.c https://raw.githubusercontent.com/fiftydinar/xfce-aerolike/refs/heads/main/patches/working-set-trimmer/adaptive-scheduler.c
+        wget --retry-connrefused --tries=30 -O /tmp/adaptive-scheduler.c https://raw.githubusercontent.com/fiftydinar/xfce-aerolike/refs/heads/main/patches/adaptive-scheduler/adaptive-scheduler.c
         gcc -O2 -o /usr/bin/adaptive-scheduler /tmp/adaptive-scheduler.c
         rm -f /tmp/adaptive-scheduler.c
       # Set gtk-nocsd by default
