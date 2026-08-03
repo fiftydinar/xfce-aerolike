@@ -1,0 +1,11 @@
+[Unit]
+Description=Report active X window PID to adaptive-scheduler
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/aerolike-fg
+Restart=always
+
+[Install]
+WantedBy=default.target

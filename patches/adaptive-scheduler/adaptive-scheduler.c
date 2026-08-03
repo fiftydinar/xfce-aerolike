@@ -41,9 +41,12 @@
  *   - MADV_COLD trims IDLE/LONG_IDLE scopes under pressure. Pages stay
  *     in RAM (inactive list) -> cheap resume, not zram decompression.
  *
- * Active-window detection is per-display via xdotool; DISPLAY and the
- * user's XAUTHORITY are harvested from the session's /proc/<pid>/environ
- * so the root daemon can authenticate to the X server.
+ * Active-window detection is delegated to a per-user systemd service
+ * that runs xdotool inside the graphical session (where DISPLAY and
+ * XAUTHORITY are set) and writes the active window PID to
+ * /tmp/aerolike-fg-<uid>. The root daemon reads that file: it drops
+ * CAP_SYS_PTRACE and CAP_DAC_OVERRIDE, so it cannot reach the user's X
+ * auth itself.
  *
  * Build: gcc -O2 -o adaptive-scheduler adaptive-scheduler.c
  */
@@ -61,6 +64,7 @@
 #include <sys/uio.h>
 #include <limits.h>
 #include <signal.h>
+#include <time.h>
 #include <pwd.h>
 #include <stdbool.h>
 #include <sys/resource.h>
@@ -79,6 +83,7 @@ static const double PSI_THRESHOLD = 10.0;   /* trim when PSI "some" % >= this */
 static const int IDLE_CPU_SECS = 60;        /* idle after 60s of no CPU use */
 static const int LONG_IDLE_SECS = 300;      /* long-idle after 5min */
 static const unsigned SLEEP_SECS = 1;
+static const int TRIM_INTERVAL = 30;        /* min seconds between trims/scope */
 static const long long IDLE_JIFFY_DELTA = 1; /* >=1 tick counts as active */
 
 /* memory.low gradation, as fractions of total RAM */
@@ -123,6 +128,7 @@ typedef struct ScopeEnt {
     long long prev[MAX_PIDS];
     int npids;
     int idle_count;
+    time_t last_trim;      /* last MADV_COLD pass, for throttling */
     Tier last_tier;
     struct ScopeEnt *next;
 } ScopeEnt;
@@ -141,6 +147,23 @@ static ScopeEnt *find_or_create(const char *path) {
     e->next = scopes;
     scopes = e;
     return e;
+}
+
+/* Drop ScopeEnt records whose cgroup no longer exists (app closed).
+ * run-*.scope names are unique per launch, so without pruning the list
+ * grows unboundedly over long uptimes. */
+static void prune_scopes(void) {
+    ScopeEnt **pp = &scopes;
+    while (*pp) {
+        ScopeEnt *e = *pp;
+        struct stat st;
+        if (stat(e->path, &st) != 0) {
+            *pp = e->next;
+            free(e);
+        } else {
+            pp = &e->next;
+        }
+    }
 }
 
 /* ---------- total RAM ---------- */
@@ -191,8 +214,7 @@ static int cold_madvise(pid_t pid) {
 /* ---------- per-session active window ---------- */
 
 typedef struct {
-    char display[64];
-    pid_t fg;
+    pid_t fg;   /* active X window PID, reported by per-user helper */
 } SessionInfo;
 
 /* cgroup dir name "user-1000.slice" -> uid string "1000". The user's
@@ -208,70 +230,24 @@ static bool user_uid(const char *nm, char *out, size_t outsz) {
     return true;
 }
 
-/* Read /proc/<pid>/environ; copy DISPLAY and XAUTHORITY values if
- * present. Returns true once both are found. */
-static bool scan_proc_env(pid_t pid, char *display, size_t dsz,
-                          char *xauth, size_t xsz) {
+/* The root daemon cannot talk to a user's X server: it drops
+ * CAP_SYS_PTRACE (needed to read /proc/<pid>/environ cross-user) and
+ * CAP_DAC_OVERRIDE (needed to read the user's XAUTHORITY file). So a
+ * per-user systemd service runs xdotool inside the session -- where
+ * DISPLAY and XAUTHORITY are set -- and writes the active window PID to
+ * /tmp/aerolike-fg-<uid>. Read that here; 0 if none reported yet. */
+static pid_t session_foreground_pid(const char *uid) {
     char path[64];
-    char buf[16384];
-    snprintf(path, sizeof path, "/proc/%d/environ", pid);
+    char buf[64];
+    snprintf(path, sizeof path, "/tmp/aerolike-fg-%s", uid);
     int fd = open(path, O_RDONLY);
-    if (fd < 0) return false;
+    if (fd < 0) return 0;
     ssize_t n = read(fd, buf, sizeof buf - 1);
     close(fd);
-    if (n <= 0) return false;
+    if (n <= 0) return 0;
     buf[n] = 0;
-
-    bool got_disp = false, got_xauth = false;
-    char *p = buf;
-    while (p < buf + n) {
-        char *eq = memchr(p, '=', (size_t)(buf + n - p));
-        if (eq) {
-            char key[64];
-            size_t klen = (size_t)(eq - p);
-            if (klen < sizeof key) {
-                memcpy(key, p, klen);
-                key[klen] = 0;
-                char *val = eq + 1;
-                if (strcmp(key, "DISPLAY") == 0) {
-                    snprintf(display, dsz, "%s", val);
-                    got_disp = true;
-                } else if (strcmp(key, "XAUTHORITY") == 0) {
-                    snprintf(xauth, xsz, "%s", val);
-                    got_xauth = true;
-                }
-            }
-        }
-        p = memchr(p, 0, (size_t)(buf + n - p));
-        if (!p) break;
-        p += 1;
-    }
-    return got_disp && got_xauth;
-}
-
-/* Scan every process in a user session's cgroup for its X environment
- * (DISPLAY + XAUTHORITY). The daemon runs as root; X clients need the
- * user's XAUTHORITY to authenticate, so we harvest both from the session
- * processes' /proc/<pid>/environ rather than guessing ":0". */
-static void scan_session_env(const char *svc_root, char *display, size_t dsz,
-                             char *xauth, size_t xsz) {
-    char procs[65536];
-    snprintf(procs, sizeof procs, "%s/cgroup.procs", svc_root);
-    int fd = open(procs, O_RDONLY);
-    if (fd < 0) return;
-    ssize_t n = read(fd, procs, sizeof procs - 1);
-    close(fd);
-    if (n <= 0) return;
-    procs[n] = 0;
-
-    char *save = NULL;
-    char *tok = strtok_r(procs, "\n", &save);
-    while (tok) {
-        pid_t pid = (pid_t)strtol(tok, NULL, 10);
-        if (pid > 0 && scan_proc_env(pid, display, dsz, xauth, xsz))
-            return; /* found both DISPLAY and XAUTHORITY */
-        tok = strtok_r(NULL, "\n", &save);
-    }
+    pid_t pid = (pid_t)strtol(buf, NULL, 10);
+    return pid > 0 ? pid : 0;
 }
 
 static int find_sessions(SessionInfo *out, int max) {
@@ -288,36 +264,7 @@ static int find_sessions(SessionInfo *out, int max) {
         uid_t uidn = (uid_t)strtoul(uid, NULL, 10);
         if (uidn == 0) continue;
 
-        char svc[PATH_MAX];
-        snprintf(svc, sizeof svc,
-                 "/sys/fs/cgroup/user.slice/%s/user@%s.service", nm, uid);
-
-        char display[64] = "";
-        char xauth[PATH_MAX] = "";
-        scan_session_env(svc, display, sizeof display, xauth, sizeof xauth);
-
-        out[n].display[0] = 0;
-        out[n].fg = 0;
-        if (display[0]) {
-            char cmd[9000];
-            char buf[64];
-            FILE *fp;
-            if (xauth[0])
-                snprintf(cmd, sizeof cmd,
-                         "DISPLAY=%s XAUTHORITY=%s xdotool getactivewindow getwindowpid 2>/dev/null",
-                         display, xauth);
-            else
-                snprintf(cmd, sizeof cmd,
-                         "DISPLAY=%s xdotool getactivewindow getwindowpid 2>/dev/null",
-                         display);
-            fp = popen(cmd, "r");
-            if (fp) {
-                if (fgets(buf, sizeof buf, fp))
-                    out[n].fg = (pid_t)strtol(buf, NULL, 10);
-                pclose(fp);
-            }
-            snprintf(out[n].display, sizeof out[n].display, "%s", display);
-        }
+        out[n].fg = session_foreground_pid(uid);
         n++;
     }
     closedir(d);
@@ -508,11 +455,16 @@ static void process_scope(ScopeEnt *e, SessionInfo *sessions, int nsess,
         e->last_tier = tier;
     }
 
-    /* Working-set trimming: only under pressure, only idle/long-idle. */
+    /* Working-set trimming: only under pressure, only idle/long-idle,
+     * and at most every TRIM_INTERVAL per scope. cold_madvise rescans
+     * /proc/<pid>/maps per call; throttling avoids redoing that every
+     * second for the whole idle set under sustained pressure. */
     if (psi >= PSI_THRESHOLD &&
-        (tier == TIER_IDLE || tier == TIER_LONG_IDLE)) {
+        (tier == TIER_IDLE || tier == TIER_LONG_IDLE) &&
+        time(NULL) - e->last_trim >= TRIM_INTERVAL) {
         for (int i = 0; i < e->npids; i++)
             cold_madvise(e->pids[i]);
+        e->last_trim = time(NULL);
     }
 }
 
@@ -626,6 +578,8 @@ int main(void) {
 
     while (running) {
         double psi = psi_memory_some();
+        /* Drop state for scopes that have exited. */
+        prune_scopes();
         /* Boost the DE's CPU priority every pass (cheap, idempotent). */
         boost_desktop();
         /* Gradation runs every pass; trimming is gated by psi inside
