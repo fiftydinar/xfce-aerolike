@@ -224,6 +224,9 @@ modules:
         - unbound-cert-setup.service
         - oomd-notify.service
         - adaptive-scheduler.service
+    user:
+      enabled:
+        - aerolike-fg.service
   - type: signing
   - type: script
     snippets:
