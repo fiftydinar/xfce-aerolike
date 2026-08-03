@@ -171,6 +171,15 @@ modules:
         wget --retry-connrefused --tries=30 -O /tmp/adaptive-scheduler.c https://raw.githubusercontent.com/fiftydinar/xfce-aerolike/refs/heads/main/patches/adaptive-scheduler/adaptive-scheduler.c
         gcc -O2 -o /usr/bin/adaptive-scheduler /tmp/adaptive-scheduler.c
         rm -f /tmp/adaptive-scheduler.c
+      # Build and install the per-user helper (adaptive-scheduler-unprivileged):
+      # runs inside each graphical session to report the active window PID
+      # and to do the user-owned memory operations (writing the user's own
+      # memory.low files and reading its own /proc/<pid>/maps) that the root
+      # daemon deliberately cannot do (it runs with CAP_SYS_NICE only)
+      - |
+        wget --retry-connrefused --tries=30 -O /tmp/adaptive-scheduler-unprivileged.c https://raw.githubusercontent.com/fiftydinar/xfce-aerolike/refs/heads/main/patches/adaptive-scheduler/adaptive-scheduler-unprivileged.c
+        gcc -O2 -o /usr/bin/adaptive-scheduler-unprivileged /tmp/adaptive-scheduler-unprivileged.c
+        rm -f /tmp/adaptive-scheduler-unprivileged.c
       # Set gtk-nocsd by default
       - "echo 'LD_PRELOAD=/usr/lib/libgtk-nocsd.so:/usr/lib/libappimage-scope.so' >> /etc/environment"
       - "echo 'SHARUN_ALLOW_LD_PRELOAD=1' >> /etc/environment"
@@ -226,7 +235,7 @@ modules:
         - adaptive-scheduler.service
     user:
       enabled:
-        - aerolike-fg.service
+        - adaptive-scheduler-unprivileged.service
   - type: signing
   - type: script
     snippets:

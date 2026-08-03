@@ -1,0 +1,11 @@
+[Unit]
+Description=Adaptive scheduler unprivileged helper (fg PID, memory.low, trim ranges)
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/adaptive-scheduler-unprivileged
+Restart=always
+
+[Install]
+WantedBy=default.target
