@@ -138,9 +138,43 @@ static void atomic_write(const char *path, const char *data) {
 
 /* ---------- active X window PID ---------- */
 
+/* The helper unit starts with the user manager at login, but DISPLAY and
+ * XAUTHORITY only reach the manager a few seconds later, when the X
+ * session runs /etc/X11/xinit/xinitrc.d/50-systemd-user.sh
+ * (systemctl --user import-environment DISPLAY XAUTHORITY). Ordering after
+ * graphical-session.target cannot help -- nothing activates that target
+ * on this image. So pull the values straight from the manager each pass
+ * until they appear. Once set they never change, so the check becomes a
+ * cheap early return. */
+static void ensure_x_env(void) {
+    if (getenv("DISPLAY") && *getenv("DISPLAY") &&
+        getenv("XAUTHORITY") && *getenv("XAUTHORITY"))
+        return;
+
+    FILE *p = popen("systemctl --user show-environment 2>/dev/null", "r");
+    if (!p) return;
+    char line[512];
+    while (fgets(line, sizeof line, p)) {
+        char *eq = strchr(line, '=');
+        if (!eq) continue;
+        *eq = 0;
+        char *val = eq + 1;
+        val[strcspn(val, "\n")] = 0;
+        if (strcmp(line, "DISPLAY") == 0 &&
+            (!getenv("DISPLAY") || !*getenv("DISPLAY")))
+            setenv("DISPLAY", val, 1);
+        else if (strcmp(line, "XAUTHORITY") == 0 &&
+                 (!getenv("XAUTHORITY") || !*getenv("XAUTHORITY")))
+            setenv("XAUTHORITY", val, 1);
+    }
+    pclose(p);
+}
+
 static void report_fg(void) {
     char path[64];
     snprintf(path, sizeof path, "/tmp/aerolike-fg-%s", uidbuf);
+
+    ensure_x_env();
 
     FILE *p = popen("xdotool getactivewindow getwindowpid 2>/dev/null", "r");
     if (!p) return;
@@ -330,6 +364,9 @@ static void on_signal(int sig) { (void)sig; running = 0; }
 int main(void) {
     snprintf(uidbuf, sizeof uidbuf, "%lu", (unsigned long)getuid());
 
+    /* Best-effort early pickup; report_fg() keeps polling until DISPLAY
+     * appears if the session env is not imported yet. */
+    ensure_x_env();
     log_info("started: uid %s, DISPLAY=%s, XAUTHORITY=%s",
              uidbuf, getenv("DISPLAY") ? getenv("DISPLAY") : "(none)",
              getenv("XAUTHORITY") ? getenv("XAUTHORITY") : "(none)");

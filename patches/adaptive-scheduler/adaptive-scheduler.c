@@ -742,7 +742,7 @@ static void walk_users(double psi, unsigned long long total_ram) {
             if (strcmp(fg_uid[j], sessions[i].uid) == 0) { slot = j; break; }
         if (slot < 0 && fg_n < MAX_SESSIONS) {
             snprintf(fg_uid[fg_n], sizeof fg_uid[0], "%s", sessions[i].uid);
-            fg_pid[fg_n] = 0;
+            fg_pid[fg_n] = -1;   /* force a log of the very first state */
             slot = fg_n++;
         }
         if (slot >= 0 && fg_pid[slot] != sessions[i].fg) {
@@ -829,7 +829,8 @@ static bool have_sys_nice(void) {
         }
     }
     fclose(fp);
-    return (capeff >> 8) & 1ULL;   /* CAP_SYS_NICE == bit 8 */
+    /* CAP_SYS_NICE == bit 23 (0x800000), e.g. CapEff=0000000000800000. */
+    return (capeff >> 23) & 1ULL;
 }
 
 int main(void) {
