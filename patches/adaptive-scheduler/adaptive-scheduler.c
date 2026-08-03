@@ -41,7 +41,9 @@
  *   - MADV_COLD trims IDLE/LONG_IDLE scopes under pressure. Pages stay
  *     in RAM (inactive list) -> cheap resume, not zram decompression.
  *
- * Active-window detection is per-display via xdotool.
+ * Active-window detection is per-display via xdotool; DISPLAY and the
+ * user's XAUTHORITY are harvested from the session's /proc/<pid>/environ
+ * so the root daemon can authenticate to the X server.
  *
  * Build: gcc -O2 -o adaptive-scheduler adaptive-scheduler.c
  */
@@ -193,6 +195,85 @@ typedef struct {
     pid_t fg;
 } SessionInfo;
 
+/* cgroup dir name "user-1000.slice" -> uid string "1000". The user's
+ * session lives under user@<uid>.service (no ".slice" suffix), so the
+ * suffix must be stripped before building the service path. Returns
+ * false if the name is malformed. */
+static bool user_uid(const char *nm, char *out, size_t outsz) {
+    const char *rest = nm + 5;
+    size_t len = (size_t)strcspn(rest, ".");
+    if (len == 0 || len >= outsz) return false;
+    memcpy(out, rest, len);
+    out[len] = 0;
+    return true;
+}
+
+/* Read /proc/<pid>/environ; copy DISPLAY and XAUTHORITY values if
+ * present. Returns true once both are found. */
+static bool scan_proc_env(pid_t pid, char *display, size_t dsz,
+                          char *xauth, size_t xsz) {
+    char path[64];
+    char buf[16384];
+    snprintf(path, sizeof path, "/proc/%d/environ", pid);
+    int fd = open(path, O_RDONLY);
+    if (fd < 0) return false;
+    ssize_t n = read(fd, buf, sizeof buf - 1);
+    close(fd);
+    if (n <= 0) return false;
+    buf[n] = 0;
+
+    bool got_disp = false, got_xauth = false;
+    char *p = buf;
+    while (p < buf + n) {
+        char *eq = memchr(p, '=', (size_t)(buf + n - p));
+        if (eq) {
+            char key[64];
+            size_t klen = (size_t)(eq - p);
+            if (klen < sizeof key) {
+                memcpy(key, p, klen);
+                key[klen] = 0;
+                char *val = eq + 1;
+                if (strcmp(key, "DISPLAY") == 0) {
+                    snprintf(display, dsz, "%s", val);
+                    got_disp = true;
+                } else if (strcmp(key, "XAUTHORITY") == 0) {
+                    snprintf(xauth, xsz, "%s", val);
+                    got_xauth = true;
+                }
+            }
+        }
+        p = memchr(p, 0, (size_t)(buf + n - p));
+        if (!p) break;
+        p += 1;
+    }
+    return got_disp && got_xauth;
+}
+
+/* Scan every process in a user session's cgroup for its X environment
+ * (DISPLAY + XAUTHORITY). The daemon runs as root; X clients need the
+ * user's XAUTHORITY to authenticate, so we harvest both from the session
+ * processes' /proc/<pid>/environ rather than guessing ":0". */
+static void scan_session_env(const char *svc_root, char *display, size_t dsz,
+                             char *xauth, size_t xsz) {
+    char procs[65536];
+    snprintf(procs, sizeof procs, "%s/cgroup.procs", svc_root);
+    int fd = open(procs, O_RDONLY);
+    if (fd < 0) return;
+    ssize_t n = read(fd, procs, sizeof procs - 1);
+    close(fd);
+    if (n <= 0) return;
+    procs[n] = 0;
+
+    char *save = NULL;
+    char *tok = strtok_r(procs, "\n", &save);
+    while (tok) {
+        pid_t pid = (pid_t)strtol(tok, NULL, 10);
+        if (pid > 0 && scan_proc_env(pid, display, dsz, xauth, xsz))
+            return; /* found both DISPLAY and XAUTHORITY */
+        tok = strtok_r(NULL, "\n", &save);
+    }
+}
+
 static int find_sessions(SessionInfo *out, int max) {
     int n = 0;
     DIR *d = opendir("/sys/fs/cgroup/user.slice");
@@ -202,31 +283,40 @@ static int find_sessions(SessionInfo *out, int max) {
     while ((ent = readdir(d)) != NULL && n < max) {
         const char *nm = ent->d_name;
         if (strncmp(nm, "user-", 5) != 0) continue;
-        const char *rest = nm + 5;
-        char *dot = strchr(rest, '.');
-        if (!dot) continue;
-        size_t len = (size_t)(dot - rest);
-        char uidbuf[32];
-        if (len >= sizeof uidbuf) len = sizeof uidbuf - 1;
-        memcpy(uidbuf, rest, len);
-        uidbuf[len] = 0;
-        uid_t uid = (uid_t)strtoul(uidbuf, NULL, 10);
-        if (uid == 0) continue;
+        char uid[32];
+        if (!user_uid(nm, uid, sizeof uid)) continue;
+        uid_t uidn = (uid_t)strtoul(uid, NULL, 10);
+        if (uidn == 0) continue;
 
-        snprintf(out[n].display, sizeof out[n].display, ":0");
+        char svc[PATH_MAX];
+        snprintf(svc, sizeof svc,
+                 "/sys/fs/cgroup/user.slice/%s/user@%s.service", nm, uid);
+
+        char display[64] = "";
+        char xauth[PATH_MAX] = "";
+        scan_session_env(svc, display, sizeof display, xauth, sizeof xauth);
+
+        out[n].display[0] = 0;
         out[n].fg = 0;
-
-        char cmd[256];
-        char buf[64];
-        FILE *fp;
-        snprintf(cmd, sizeof cmd,
-            "DISPLAY=%s xdotool getactivewindow getwindowpid 2>/dev/null",
-            out[n].display);
-        fp = popen(cmd, "r");
-        if (fp) {
-            if (fgets(buf, sizeof buf, fp))
-                out[n].fg = (pid_t)strtol(buf, NULL, 10);
-            pclose(fp);
+        if (display[0]) {
+            char cmd[9000];
+            char buf[64];
+            FILE *fp;
+            if (xauth[0])
+                snprintf(cmd, sizeof cmd,
+                         "DISPLAY=%s XAUTHORITY=%s xdotool getactivewindow getwindowpid 2>/dev/null",
+                         display, xauth);
+            else
+                snprintf(cmd, sizeof cmd,
+                         "DISPLAY=%s xdotool getactivewindow getwindowpid 2>/dev/null",
+                         display);
+            fp = popen(cmd, "r");
+            if (fp) {
+                if (fgets(buf, sizeof buf, fp))
+                    out[n].fg = (pid_t)strtol(buf, NULL, 10);
+                pclose(fp);
+            }
+            snprintf(out[n].display, sizeof out[n].display, "%s", display);
         }
         n++;
     }
@@ -441,10 +531,12 @@ static void boost_desktop(void) {
     while ((ent = readdir(d)) != NULL) {
         const char *nm = ent->d_name;
         if (strncmp(nm, "user-", 5) != 0) continue;
+        char uid[32];
+        if (!user_uid(nm, uid, sizeof uid)) continue;
         char base[PATH_MAX];
         snprintf(base, sizeof base,
                  "/sys/fs/cgroup/user.slice/%s/user@%s.service/desktop.slice",
-                 nm, nm + 5);
+                 nm, uid);
 
         DIR *sd = opendir(base);
         if (!sd) continue;
@@ -496,10 +588,12 @@ static void walk_users(double psi, unsigned long long total_ram) {
     while ((ent = readdir(d)) != NULL) {
         const char *nm = ent->d_name;
         if (strncmp(nm, "user-", 5) != 0) continue;
+        char uid[32];
+        if (!user_uid(nm, uid, sizeof uid)) continue;
         char base[PATH_MAX];
         snprintf(base, sizeof base,
                  "/sys/fs/cgroup/user.slice/%s/user@%s.service/app.slice",
-                 nm, nm + 5);
+                 nm, uid);
 
         DIR *sd = opendir(base);
         if (!sd) continue;
