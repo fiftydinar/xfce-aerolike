@@ -12,8 +12,14 @@
 while :; do
     fg=$(xdotool getactivewindow getwindowpid 2>/dev/null)
     case $fg in
-        ''|*[!0-9]*) : ;;
-        *) printf '%s\n' "$fg" > "/tmp/aerolike-fg-$(id -u)" ;;
+        ''|*[!0-9]*)
+            # No window focused (desktop): drop the stale pid so the
+            # daemon stops treating the last foreground app as current.
+            rm -f "/tmp/aerolike-fg-$(id -u)"
+            ;;
+        *)
+            printf '%s\n' "$fg" > "/tmp/aerolike-fg-$(id -u)"
+            ;;
     esac
     sleep 1
 done

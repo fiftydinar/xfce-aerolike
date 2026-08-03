@@ -242,10 +242,35 @@ static bool user_uid(const char *nm, char *out, size_t outsz) {
  * per-user systemd service runs xdotool inside the session -- where
  * DISPLAY and XAUTHORITY are set -- and writes the active window PID to
  * /tmp/aerolike-fg-<uid>. Read that here; 0 if none reported yet. */
-static pid_t session_foreground_pid(const char *uid) {
+
+/* /tmp/aerolike-fg-<uid> is world-writable, so a local user could plant
+ * a pid for another uid. Validate that the reported pid actually belongs
+ * to the session uid via /proc/<pid>/status (world-readable) before
+ * trusting it. */
+static bool pid_belongs_to(pid_t pid, unsigned long uid) {
+    char path[64];
+    char line[256];
+    snprintf(path, sizeof path, "/proc/%ld/status", (long)pid);
+    FILE *fp = fopen(path, "r");
+    if (!fp) return false;
+    bool match = false;
+    while (fgets(line, sizeof line, fp)) {
+        if (strncmp(line, "Uid:", 4) == 0) {
+            unsigned long ruid, euid;
+            if (sscanf(line + 4, "%lu %lu", &ruid, &euid) == 2)
+                match = (euid == uid);
+            break;
+        }
+    }
+    fclose(fp);
+    return match;
+}
+
+static pid_t session_foreground_pid(const char *uid_str) {
+    unsigned long uid = strtoul(uid_str, NULL, 10);
     char path[64];
     char buf[64];
-    snprintf(path, sizeof path, "/tmp/aerolike-fg-%s", uid);
+    snprintf(path, sizeof path, "/tmp/aerolike-fg-%s", uid_str);
     int fd = open(path, O_RDONLY);
     if (fd < 0) return 0;
     ssize_t n = read(fd, buf, sizeof buf - 1);
@@ -253,7 +278,8 @@ static pid_t session_foreground_pid(const char *uid) {
     if (n <= 0) return 0;
     buf[n] = 0;
     pid_t pid = (pid_t)strtol(buf, NULL, 10);
-    return pid > 0 ? pid : 0;
+    if (pid <= 0 || !pid_belongs_to(pid, uid)) return 0;
+    return pid;
 }
 
 static int find_sessions(SessionInfo *out, int max) {
