@@ -25,6 +25,12 @@
  *       LONG_IDLE:  no CPU for >= LONG_IDLE_SECS (5min)
  *   - memory.low is written per tier (RAM %): foreground highest, idle
  *     lowest, so reclaim order is graded like Windows.
+ *   - CPU nice is set per tier on change: foreground/active get normal
+ *     nice, idle/long-idle get deprioritized. Behavioral classification
+ *     (what the scope is DOING, not its name) means a terminal running a
+ *     heavy CLI stays active/normal -- it only gets deprioritized when
+ *     genuinely idle. This avoids the static-classifier flaw of
+ *     ananicy-cpp/system76-scheduler.
  *   - MADV_COLD trims IDLE/LONG_IDLE scopes under pressure. Pages stay
  *     in RAM (inactive list) -> cheap resume, not zram decompression.
  *
@@ -48,6 +54,7 @@
 #include <signal.h>
 #include <pwd.h>
 #include <stdbool.h>
+#include <sys/resource.h>
 
 #ifndef SYS_process_madvise
 #define SYS_process_madvise 440
@@ -70,6 +77,16 @@ static const double MEMLOW_FOREGROUND = 0.20;  /* 20% - most protected */
 static const double MEMLOW_ACTIVE     = 0.10;  /* 10% */
 static const double MEMLOW_IDLE       = 0.03;  /*  3% */
 static const double MEMLOW_LONG_IDLE  = 0.0;   /*  0% - reclaim-first */
+
+/* CPU nice per tier (dynamic, behavioral). Foreground/active get
+ * normal nice so a terminal running a heavy CLI stays responsive; only
+ * genuinely idle scopes are deprioritized. Negative values would need
+ * CAP_SYS_NICE (which we have), but we keep >=0 to avoid starving
+ * background tasks that briefly become important. */
+static const int NICE_FOREGROUND = 0;   /* normal */
+static const int NICE_ACTIVE     = 0;   /* normal - has CPU, don't touch */
+static const int NICE_IDLE       = 5;   /* background */
+static const int NICE_LONG_IDLE  = 10;  /* very background */
 
 #define MAX_PIDS 256
 #define MAX_IOVEC 1024
@@ -290,6 +307,23 @@ static void set_memory_low(const char *scope_path, Tier tier,
     close(fd);
 }
 
+static int tier_nice(Tier tier) {
+    switch (tier) {
+    case TIER_FOREGROUND: return NICE_FOREGROUND;
+    case TIER_ACTIVE:     return NICE_ACTIVE;
+    case TIER_IDLE:       return NICE_IDLE;
+    case TIER_LONG_IDLE:  return NICE_LONG_IDLE;
+    default:              return 0;
+    }
+}
+
+static void set_nice(pid_t pid, Tier tier) {
+    errno = 0;
+    int rc = setpriority(PRIO_PROCESS, pid, tier_nice(tier));
+    /* On failure (ESRCH if it died) just ignore. */
+    (void)rc;
+}
+
 /* ---------- classify + grade + trim one scope ---------- */
 
 static void process_scope(ScopeEnt *e, SessionInfo *sessions, int nsess,
@@ -359,6 +393,14 @@ static void process_scope(ScopeEnt *e, SessionInfo *sessions, int nsess,
     /* Memory priority gradation: always write memory.low per tier. */
     if (tier != e->last_tier) {
         set_memory_low(e->path, tier, total_ram);
+        /* Dynamic CPU nice: apply per-process on tier change only, so
+         * we don't hammer setpriority every pass. A scope that becomes
+         * idle gets deprioritized; if it starts using CPU again it flips
+         * back to ACTIVE within 1s and nice is restored -- this is what
+         * avoids the ananicy/system76 terminal flaw (behavioral, not
+         * name-based classification). */
+        for (int i = 0; i < e->npids; i++)
+            set_nice(e->pids[i], tier);
         e->last_tier = tier;
     }
 
