@@ -1,29 +1,34 @@
 /*
- * working-set-trimmer: userspace working-set trimmer for desktop Linux.
+ * working-set-trimmer: userspace working-set trimmer + memory priority
+ * gradation for desktop Linux.
  *
- * Mirrors Windows' Balance Set Manager: continuously shed memory from
- * idle background apps BEFORE memory pressure peaks, so foreground apps
- * stay smooth. Conservative and cgroup-aware.
+ * Mirrors Windows' Balance Set Manager AND memory priority classes:
+ *   - Continuously shed memory from idle background apps BEFORE memory
+ *     pressure peaks (working-set trimming via MADV_COLD).
+ *   - Grade each app scope's memory.low so the kernel reclaims idle apps
+ *     before active ones, and foreground apps last (memory priority).
  *
- * Runs as a root system service because process_madvise(MADV_COLD)
- * requires CAP_SYS_NICE, which unprivileged users lack. Root also lets
- * one daemon coordinate trimming across ALL user sessions.
+ * Runs as a root system service because:
+ *   - process_madvise(MADV_COLD) cross-process requires CAP_SYS_NICE.
+ *   - One daemon coordinates trimming/gradation across ALL sessions.
+ * The service drops to CAP_SYS_NICE + NoNewPrivileges.
  *
- * Design:
- *   - Polls /proc/pressure/memory (PSI). Only acts when pressure is
- *     actually building.
- *   - Enumerates app.slice scopes for every user session. The DE lives
- *     in desktop.slice and protected services elsewhere -- structurally
- *     excluded by only walking user@UID.service/app.slice.
- *   - Idle = no CPU delta for IDLE_CPU_SECS consecutive checks AND the
- *     scope's processes don't own that session's active X window.
- *   - Trims with process_madvise(MADV_COLD): pages are deactivated but
- *     kept in RAM (inactive list), so resuming is a cheap soft fault,
- *     not a zram decompression. This is the key to Windows-like
- *     smoothness.
+ * Behavior:
+ *   - Polls /proc/pressure/memory (PSI). Gradation runs every pass;
+ *     trimming only when pressure is actually building (PSI >= 10).
+ *   - Enumerates app.slice scopes for every user session. desktop.slice
+ *     (DE) and protected services are structurally excluded.
+ *   - Each scope is classified into a tier:
+ *       FOREGROUND: owns the active X window (per-display)
+ *       ACTIVE:     any CPU activity in the last ~60s
+ *       IDLE:       no CPU for >= IDLE_CPU_SECS (60s)
+ *       LONG_IDLE:  no CPU for >= LONG_IDLE_SECS (5min)
+ *   - memory.low is written per tier (RAM %): foreground highest, idle
+ *     lowest, so reclaim order is graded like Windows.
+ *   - MADV_COLD trims IDLE/LONG_IDLE scopes under pressure. Pages stay
+ *     in RAM (inactive list) -> cheap resume, not zram decompression.
  *
- * Active-window detection is per-display: for each user session, find
- * its DISPLAY and the active window PID via xdotool.
+ * Active-window detection is per-display via xdotool.
  *
  * Build: gcc -O2 -o working-set-trimmer working-set-trimmer.c
  */
@@ -56,12 +61,26 @@
 static const char *PSI_PATH = "/proc/pressure/memory";
 static const double PSI_THRESHOLD = 10.0;   /* trim when PSI "some" % >= this */
 static const int IDLE_CPU_SECS = 60;        /* idle after 60s of no CPU use */
+static const int LONG_IDLE_SECS = 300;      /* long-idle after 5min */
 static const unsigned SLEEP_SECS = 1;
 static const long long IDLE_JIFFY_DELTA = 1; /* >=1 tick counts as active */
+
+/* memory.low gradation, as fractions of total RAM */
+static const double MEMLOW_FOREGROUND = 0.20;  /* 20% - most protected */
+static const double MEMLOW_ACTIVE     = 0.10;  /* 10% */
+static const double MEMLOW_IDLE       = 0.03;  /*  3% */
+static const double MEMLOW_LONG_IDLE  = 0.0;   /*  0% - reclaim-first */
 
 #define MAX_PIDS 256
 #define MAX_IOVEC 1024
 #define MAX_SESSIONS 64
+
+typedef enum {
+    TIER_FOREGROUND,
+    TIER_ACTIVE,
+    TIER_IDLE,
+    TIER_LONG_IDLE,
+} Tier;
 
 /* ---------- persistent per-scope state ---------- */
 
@@ -71,6 +90,7 @@ typedef struct ScopeEnt {
     long long prev[MAX_PIDS];
     int npids;
     int idle_count;
+    Tier last_tier;
     struct ScopeEnt *next;
 } ScopeEnt;
 
@@ -84,9 +104,19 @@ static ScopeEnt *find_or_create(const char *path) {
     if (!e) return NULL;
     snprintf(e->path, sizeof e->path, "%s", path);
     for (int i = 0; i < MAX_PIDS; i++) e->prev[i] = -1;
+    e->last_tier = TIER_ACTIVE; /* default until first classification */
     e->next = scopes;
     scopes = e;
     return e;
+}
+
+/* ---------- total RAM ---------- */
+
+static unsigned long long total_ram_bytes(void) {
+    long pages = sysconf(_SC_PHYS_PAGES);
+    long psz = sysconf(_SC_PAGESIZE);
+    if (pages <= 0 || psz <= 0) return 8ULL * 1024 * 1024 * 1024; /* 8G fallback */
+    return (unsigned long long)pages * (unsigned long long)psz;
 }
 
 /* ---------- syscalls ---------- */
@@ -132,11 +162,6 @@ typedef struct {
     pid_t fg;
 } SessionInfo;
 
-/* Use logind to find each active graphical session's display and pid.
- * Simplest robust method: iterate /run/user/<uid>/wayland-* or X11 via
- * `loginctl`. Here we resolve per-uid DISPLAY from the Xauthority-based
- * X server socket if present, else skip. For a desktop image this is
- * X11 (compiz), so DISPLAY=:0..N per session. We enumerate user dirs. */
 static int find_sessions(SessionInfo *out, int max) {
     int n = 0;
     DIR *d = opendir("/sys/fs/cgroup/user.slice");
@@ -146,7 +171,6 @@ static int find_sessions(SessionInfo *out, int max) {
     while ((ent = readdir(d)) != NULL && n < max) {
         const char *nm = ent->d_name;
         if (strncmp(nm, "user-", 5) != 0) continue;
-        /* user-UID.slice -> UID */
         const char *rest = nm + 5;
         char *dot = strchr(rest, '.');
         if (!dot) continue;
@@ -158,20 +182,12 @@ static int find_sessions(SessionInfo *out, int max) {
         uid_t uid = (uid_t)strtoul(uidbuf, NULL, 10);
         if (uid == 0) continue;
 
-        /* Determine DISPLAY for this user: look for X sockets.
-         * Typical: /tmp/.X11-unix/X0 for :0. We map by checking
-         * /proc/<any pid of uid>/environ would be heavy; instead use
-         * the common :0 for the primary session. For robustness, probe
-         * X socket files. */
         snprintf(out[n].display, sizeof out[n].display, ":0");
         out[n].fg = 0;
 
-        /* Resolve active window pid for this display. */
         char cmd[256];
         char buf[64];
         FILE *fp;
-        char disp_env[32];
-        snprintf(disp_env, sizeof disp_env, "DISPLAY=%s", out[n].display);
         snprintf(cmd, sizeof cmd,
             "DISPLAY=%s xdotool getactivewindow getwindowpid 2>/dev/null",
             out[n].display);
@@ -251,10 +267,35 @@ static double psi_memory_some(void) {
     return strtod(p, NULL);
 }
 
-/* ---------- trim one scope ---------- */
+/* ---------- memory.low gradation ---------- */
 
-static void trim_scope(ScopeEnt *e, SessionInfo *sessions, int nsess) {
-    bool active = false;
+static void set_memory_low(const char *scope_path, Tier tier,
+                           unsigned long long total_ram) {
+    double frac;
+    switch (tier) {
+    case TIER_FOREGROUND: frac = MEMLOW_FOREGROUND; break;
+    case TIER_ACTIVE:     frac = MEMLOW_ACTIVE;     break;
+    case TIER_IDLE:       frac = MEMLOW_IDLE;       break;
+    case TIER_LONG_IDLE:  frac = MEMLOW_LONG_IDLE;  break;
+    default:              return;
+    }
+    char path[PATH_MAX];
+    snprintf(path, sizeof path, "%s/memory.low", scope_path);
+    int fd = open(path, O_WRONLY);
+    if (fd < 0) return;
+    char buf[64];
+    unsigned long long bytes = (unsigned long long)(total_ram * frac);
+    int len = snprintf(buf, sizeof buf, "%llu", bytes);
+    write(fd, buf, (size_t)len);
+    close(fd);
+}
+
+/* ---------- classify + grade + trim one scope ---------- */
+
+static void process_scope(ScopeEnt *e, SessionInfo *sessions, int nsess,
+                          double psi, unsigned long long total_ram) {
+    bool has_foreground = false;
+    bool has_active = false;
     char path[PATH_MAX];
     char procs[65536];
     int fd;
@@ -275,12 +316,12 @@ static void trim_scope(ScopeEnt *e, SessionInfo *sessions, int nsess) {
         pid_t pid = (pid_t)strtol(tok, NULL, 10);
         if (pid > 0) {
             if (pid_is_foreground(pid, sessions, nsess))
-                active = true;
+                has_foreground = true;
             e->pids[npids] = pid;
             long long j = proc_cpu_jiffies(pid);
             if (j >= 0 && e->prev[npids] >= 0) {
                 if (j - e->prev[npids] >= IDLE_JIFFY_DELTA)
-                    active = true;
+                    has_active = true;
                 e->prev[npids] = j;
             } else if (j >= 0) {
                 e->prev[npids] = j;
@@ -293,22 +334,45 @@ static void trim_scope(ScopeEnt *e, SessionInfo *sessions, int nsess) {
     }
     e->npids = npids;
 
-    if (active || npids == 0) {
+    /* Classify tier. Foreground wins over everything; else active; else
+     * idle by consecutive counter; long-idle at LONG_IDLE_SECS. */
+    Tier tier;
+    if (has_foreground) {
+        tier = TIER_FOREGROUND;
         e->idle_count = 0;
-        return;
+    } else if (has_active) {
+        tier = TIER_ACTIVE;
+        e->idle_count = 0;
+    } else if (npids == 0) {
+        tier = e->last_tier;
+        return; /* empty scope, nothing to grade/trim */
+    } else {
+        e->idle_count++;
+        if (e->idle_count >= LONG_IDLE_SECS)
+            tier = TIER_LONG_IDLE;
+        else if (e->idle_count >= IDLE_CPU_SECS)
+            tier = TIER_IDLE;
+        else
+            tier = TIER_ACTIVE; /* too recent to call idle yet */
     }
 
-    e->idle_count++;
-    if (e->idle_count >= IDLE_CPU_SECS) {
+    /* Memory priority gradation: always write memory.low per tier. */
+    if (tier != e->last_tier) {
+        set_memory_low(e->path, tier, total_ram);
+        e->last_tier = tier;
+    }
+
+    /* Working-set trimming: only under pressure, only idle/long-idle. */
+    if (psi >= PSI_THRESHOLD &&
+        (tier == TIER_IDLE || tier == TIER_LONG_IDLE)) {
         for (int i = 0; i < e->npids; i++)
             cold_madvise(e->pids[i]);
-        e->idle_count = 0;
     }
 }
 
 /* ---------- enumerate scopes across all users ---------- */
 
-static void walk_users(void) {
+static void walk_users(double psi, unsigned long long total_ram) {
     SessionInfo sessions[MAX_SESSIONS];
     int nsess = find_sessions(sessions, MAX_SESSIONS);
 
@@ -336,7 +400,7 @@ static void walk_users(void) {
             struct stat st;
             if (stat(scope, &st) != 0 || !S_ISDIR(st.st_mode)) continue;
             ScopeEnt *e = find_or_create(scope);
-            if (e) trim_scope(e, sessions, nsess);
+            if (e) process_scope(e, sessions, nsess, psi, total_ram);
         }
         closedir(sd);
     }
@@ -349,14 +413,15 @@ static volatile sig_atomic_t running = 1;
 static void on_signal(int sig) { (void)sig; running = 0; }
 
 int main(void) {
+    unsigned long long total_ram = total_ram_bytes();
     signal(SIGTERM, on_signal);
     signal(SIGINT, on_signal);
 
     while (running) {
         double psi = psi_memory_some();
-        if (psi >= PSI_THRESHOLD) {
-            walk_users();
-        }
+        /* Gradation runs every pass; trimming is gated by psi inside
+         * process_scope (only acts on idle tiers when psi >= threshold). */
+        walk_users(psi, total_ram);
         sleep(SLEEP_SECS);
     }
     return 0;
