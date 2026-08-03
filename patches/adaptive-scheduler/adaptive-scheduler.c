@@ -122,10 +122,17 @@ typedef enum {
 
 /* ---------- persistent per-scope state ---------- */
 
+/* Per-process CPU jiffy state, keyed by pid. cgroup.procs order is not
+ * stable across passes (processes die/spawn), so jiffies must be matched
+ * by pid, not by array index. */
+typedef struct {
+    pid_t pid;
+    long long prev;   /* previous pass's total jiffies, or -1 */
+} ProcJiff;
+
 typedef struct ScopeEnt {
     char path[PATH_MAX];
-    pid_t pids[MAX_PIDS];
-    long long prev[MAX_PIDS];
+    ProcJiff procs[MAX_PIDS];
     int npids;
     int idle_count;
     time_t last_trim;      /* last MADV_COLD pass, for throttling */
@@ -142,7 +149,6 @@ static ScopeEnt *find_or_create(const char *path) {
     e = calloc(1, sizeof(ScopeEnt));
     if (!e) return NULL;
     snprintf(e->path, sizeof e->path, "%s", path);
-    for (int i = 0; i < MAX_PIDS; i++) e->prev[i] = -1;
     e->last_tier = TIER_ACTIVE; /* default until first classification */
     e->next = scopes;
     scopes = e;
@@ -386,7 +392,6 @@ static void process_scope(ScopeEnt *e, SessionInfo *sessions, int nsess,
     int fd;
     ssize_t n;
     char *save = NULL, *tok;
-    int npids = 0;
 
     snprintf(path, sizeof path, "%s/cgroup.procs", e->path);
     fd = open(path, O_RDONLY);
@@ -397,27 +402,32 @@ static void process_scope(ScopeEnt *e, SessionInfo *sessions, int nsess,
     procs[n] = 0;
 
     tok = strtok_r(procs, "\n", &save);
-    while (tok && npids < MAX_PIDS) {
+    ProcJiff cur[MAX_PIDS];
+    int ncur = 0;
+    while (tok && ncur < MAX_PIDS) {
         pid_t pid = (pid_t)strtol(tok, NULL, 10);
         if (pid > 0) {
             if (pid_is_foreground(pid, sessions, nsess))
                 has_foreground = true;
-            e->pids[npids] = pid;
+            /* Match jiffy state by pid: cgroup.procs order is not stable
+             * across passes, so an index match could compare two
+             * different processes (transient false ACTIVE/IDLE). Read the
+             * previous pass's state into a temp buffer first so lookups
+             * are not disturbed by in-place overwrite. */
+            long long prev = -1;
+            for (int i = 0; i < e->npids; i++)
+                if (e->procs[i].pid == pid) { prev = e->procs[i].prev; break; }
             long long j = proc_cpu_jiffies(pid);
-            if (j >= 0 && e->prev[npids] >= 0) {
-                if (j - e->prev[npids] >= IDLE_JIFFY_DELTA)
-                    has_active = true;
-                e->prev[npids] = j;
-            } else if (j >= 0) {
-                e->prev[npids] = j;
-            } else {
-                e->prev[npids] = -1;
-            }
-            npids++;
+            if (j >= 0 && prev >= 0 && j - prev >= IDLE_JIFFY_DELTA)
+                has_active = true;
+            cur[ncur].pid = pid;
+            cur[ncur].prev = (j >= 0) ? j : -1;
+            ncur++;
         }
         tok = strtok_r(NULL, "\n", &save);
     }
-    e->npids = npids;
+    memcpy(e->procs, cur, sizeof cur[0] * (size_t)ncur);
+    e->npids = ncur;
 
     /* Classify tier. Foreground wins over everything; else active; else
      * idle by consecutive counter; long-idle at LONG_IDLE_SECS. */
@@ -428,7 +438,7 @@ static void process_scope(ScopeEnt *e, SessionInfo *sessions, int nsess,
     } else if (has_active) {
         tier = TIER_ACTIVE;
         e->idle_count = 0;
-    } else if (npids == 0) {
+    } else if (ncur == 0) {
         tier = e->last_tier;
         return; /* empty scope, nothing to grade/trim */
     } else {
@@ -441,19 +451,25 @@ static void process_scope(ScopeEnt *e, SessionInfo *sessions, int nsess,
             tier = TIER_ACTIVE; /* too recent to call idle yet */
     }
 
-    /* Memory priority gradation: always write memory.low per tier. */
+    /* Memory priority gradation: write memory.low on tier change
+     * (per-cgroup, so a process spawned into the scope automatically
+     * inherits it). CPU nice is applied EVERY pass below instead. */
     if (tier != e->last_tier) {
         set_memory_low(e->path, tier, total_ram);
-        /* Dynamic CPU nice: apply per-process on tier change only, so
-         * we don't hammer setpriority every pass. A scope that becomes
-         * idle gets deprioritized; if it starts using CPU again it flips
-         * back to ACTIVE within 1s and nice is restored -- this is what
-         * avoids the ananicy/system76 terminal flaw (behavioral, not
-         * name-based classification). */
-        for (int i = 0; i < e->npids; i++)
-            set_nice(e->pids[i], tier);
         e->last_tier = tier;
     }
+
+    /* Dynamic CPU nice: applied every pass, not just on tier change.
+     * setpriority is idempotent and cheap, and applying it each pass
+     * means a process forked or exec'd inside an already-classified
+     * scope gets the right nice within a second, without relying on
+     * nice inheritance across fork/exec. A scope that becomes idle gets
+     * deprioritized; if it starts using CPU again it flips back to
+     * ACTIVE within 1s and nice is restored -- this is what avoids the
+     * ananicy/system76 terminal flaw (behavioral, not name-based
+     * classification). */
+    for (int i = 0; i < e->npids; i++)
+        set_nice(e->procs[i].pid, tier);
 
     /* Working-set trimming: only under pressure, only idle/long-idle,
      * and at most every TRIM_INTERVAL per scope. cold_madvise rescans
@@ -463,7 +479,7 @@ static void process_scope(ScopeEnt *e, SessionInfo *sessions, int nsess,
         (tier == TIER_IDLE || tier == TIER_LONG_IDLE) &&
         time(NULL) - e->last_trim >= TRIM_INTERVAL) {
         for (int i = 0; i < e->npids; i++)
-            cold_madvise(e->pids[i]);
+            cold_madvise(e->procs[i].pid);
         e->last_trim = time(NULL);
     }
 }
