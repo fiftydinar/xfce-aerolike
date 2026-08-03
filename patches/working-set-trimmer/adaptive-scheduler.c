@@ -1,12 +1,16 @@
 /*
- * working-set-trimmer: userspace working-set trimmer + memory priority
- * gradation for desktop Linux.
+ * adaptive-scheduler: userspace adaptive resource scheduler for desktop
+ * Linux -- working-set trimming + memory priority gradation + CPU nice.
  *
- * Mirrors Windows' Balance Set Manager AND memory priority classes:
+ * Mirrors Windows' Balance Set Manager AND memory priority classes AND
+ * process priority:
  *   - Continuously shed memory from idle background apps BEFORE memory
  *     pressure peaks (working-set trimming via MADV_COLD).
  *   - Grade each app scope's memory.low so the kernel reclaims idle apps
  *     before active ones, and foreground apps last (memory priority).
+ *   - Adjust CPU nice per tier so idle apps are deprioritized and active
+ *     apps (even if launched from a 'terminal' name) stay at normal
+ *     priority (CPU scheduling).
  *
  * Runs as a root system service because:
  *   - process_madvise(MADV_COLD) cross-process requires CAP_SYS_NICE.
@@ -36,7 +40,7 @@
  *
  * Active-window detection is per-display via xdotool.
  *
- * Build: gcc -O2 -o working-set-trimmer working-set-trimmer.c
+ * Build: gcc -O2 -o adaptive-scheduler adaptive-scheduler.c
  */
 #define _GNU_SOURCE
 #include <stdio.h>

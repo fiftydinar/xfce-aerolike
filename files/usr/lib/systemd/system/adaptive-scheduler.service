@@ -1,15 +1,15 @@
 [Unit]
-Description=Working-set trimmer: shed idle app memory before pressure peaks
-Documentation=man:working-set-trimmer(1)
+Description=Adaptive scheduler: working-set trim, memory priority gradation, CPU nice
+Documentation=man:adaptive-scheduler(1)
 After=systemd-user-sessions.service
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/working-set-trimmer
+ExecStart=/usr/bin/adaptive-scheduler
 Restart=on-failure
 # Runs as root: process_madvise(MADV_COLD) cross-process requires
 # CAP_SYS_NICE, which unprivileged users lack. Root also lets one daemon
-# coordinate trimming across all user sessions.
+# coordinate across all user sessions.
 # Drop other privileges/caps; we only need CAP_SYS_NICE.
 CapabilityBoundingSet=CAP_SYS_NICE
 AmbientCapabilities=CAP_SYS_NICE

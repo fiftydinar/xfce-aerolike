@@ -164,13 +164,13 @@ modules:
         wget --retry-connrefused --tries=30 -O /tmp/libappimage-scope.c https://raw.githubusercontent.com/fiftydinar/xfce-aerolike/refs/heads/main/patches/appimage-scope/libappimage-scope.c
         gcc -shared -fPIC -O2 -o /usr/lib/libappimage-scope.so /tmp/libappimage-scope.c -ldl
         rm -f /tmp/libappimage-scope.c
-      # Build and install working-set-trimmer (system service that sheds
-      # idle app memory via process_madvise(MADV_COLD) before pressure
-      # peaks, mirroring Windows' Balance Set Manager)
+      # Build and install adaptive-scheduler (system service that sheds
+      # idle app memory, grades memory.low, and tunes CPU nice -- mirrors
+      # Windows' Balance Set Manager + memory priority + process priority)
       - |
-        wget --retry-connrefused --tries=30 -O /tmp/working-set-trimmer.c https://raw.githubusercontent.com/fiftydinar/xfce-aerolike/refs/heads/main/patches/working-set-trimmer/working-set-trimmer.c
-        gcc -O2 -o /usr/bin/working-set-trimmer /tmp/working-set-trimmer.c
-        rm -f /tmp/working-set-trimmer.c
+        wget --retry-connrefused --tries=30 -O /tmp/adaptive-scheduler.c https://raw.githubusercontent.com/fiftydinar/xfce-aerolike/refs/heads/main/patches/working-set-trimmer/adaptive-scheduler.c
+        gcc -O2 -o /usr/bin/adaptive-scheduler /tmp/adaptive-scheduler.c
+        rm -f /tmp/adaptive-scheduler.c
       # Set gtk-nocsd by default
       - "echo 'LD_PRELOAD=/usr/lib/libgtk-nocsd.so:/usr/lib/libappimage-scope.so' >> /etc/environment"
       - "echo 'SHARUN_ALLOW_LD_PRELOAD=1' >> /etc/environment"
@@ -223,7 +223,7 @@ modules:
         - fix-resolv-conf.service
         - unbound-cert-setup.service
         - oomd-notify.service
-        - working-set-trimmer.service
+        - adaptive-scheduler.service
   - type: signing
   - type: script
     snippets:
