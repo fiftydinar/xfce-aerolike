@@ -11,6 +11,9 @@
  *   - Adjust CPU nice per tier so idle apps are deprioritized and active
  *     apps (even if launched from a 'terminal' name) stay at normal
  *     priority (CPU scheduling).
+ *   - Boost desktop.slice's CPU priority (nice -5) so the DE always wins
+ *     scheduling to respond to input and composite frames, even under
+ *     heavy app CPU load. CPU-only: the DE's memory is never touched.
  *
  * Runs as a root system service because:
  *   - process_madvise(MADV_COLD) cross-process requires CAP_SYS_NICE.
@@ -91,6 +94,13 @@ static const int NICE_FOREGROUND = 0;   /* normal */
 static const int NICE_ACTIVE     = 0;   /* normal - has CPU, don't touch */
 static const int NICE_IDLE       = 5;   /* background */
 static const int NICE_LONG_IDLE  = 10;  /* very background */
+
+/* The desktop environment (desktop.slice) gets a small CPU boost so it
+ * always wins scheduling over apps: the DE must respond to input and
+ * composite frames even when a heavy app is spinning. Negative nice
+ * requires CAP_SYS_NICE (we have it). Never apply memory actions to the
+ * DE -- only CPU priority. */
+static const int NICE_DESKTOP = -5;
 
 #define MAX_PIDS 256
 #define MAX_IOVEC 1024
@@ -416,6 +426,63 @@ static void process_scope(ScopeEnt *e, SessionInfo *sessions, int nsess,
     }
 }
 
+/* ---------- boost the desktop environment's CPU priority ---------- */
+
+/* Apply NICE_DESKTOP to every process in desktop.slice scopes. This is
+ * CPU-only: we never touch the DE's memory (no memory.low, no MADV_COLD).
+ * The DE must always win scheduling to respond to input and composite
+ * frames, even when a heavy app is using all cores. Called every pass;
+ * setpriority is idempotent so re-applying is cheap. */
+static void boost_desktop(void) {
+    DIR *d = opendir("/sys/fs/cgroup/user.slice");
+    if (!d) return;
+
+    struct dirent *ent;
+    while ((ent = readdir(d)) != NULL) {
+        const char *nm = ent->d_name;
+        if (strncmp(nm, "user-", 5) != 0) continue;
+        char base[PATH_MAX];
+        snprintf(base, sizeof base,
+                 "/sys/fs/cgroup/user.slice/%s/user@%s.service/desktop.slice",
+                 nm, nm + 5);
+
+        DIR *sd = opendir(base);
+        if (!sd) continue;
+        struct dirent *sent;
+        while ((sent = readdir(sd)) != NULL) {
+            const char *snm = sent->d_name;
+            size_t len = strlen(snm);
+            if (len < 7 || strcmp(snm + len - 6, ".scope") != 0) continue;
+            char scope[PATH_MAX];
+            snprintf(scope, sizeof scope, "%s/%s", base, snm);
+            struct stat st;
+            if (stat(scope, &st) != 0 || !S_ISDIR(st.st_mode)) continue;
+
+            /* Read cgroup.procs and boost each pid. */
+            char procs[65536];
+            snprintf(procs, sizeof procs, "%s/cgroup.procs", scope);
+            int fd = open(procs, O_RDONLY);
+            if (fd < 0) continue;
+            ssize_t n = read(fd, procs, sizeof procs - 1);
+            close(fd);
+            if (n <= 0) continue;
+            procs[n] = 0;
+            char *save = NULL;
+            char *tok = strtok_r(procs, "\n", &save);
+            while (tok) {
+                pid_t pid = (pid_t)strtol(tok, NULL, 10);
+                if (pid > 0) {
+                    errno = 0;
+                    (void)setpriority(PRIO_PROCESS, pid, NICE_DESKTOP);
+                }
+                tok = strtok_r(NULL, "\n", &save);
+            }
+        }
+        closedir(sd);
+    }
+    closedir(d);
+}
+
 /* ---------- enumerate scopes across all users ---------- */
 
 static void walk_users(double psi, unsigned long long total_ram) {
@@ -465,6 +532,8 @@ int main(void) {
 
     while (running) {
         double psi = psi_memory_some();
+        /* Boost the DE's CPU priority every pass (cheap, idempotent). */
+        boost_desktop();
         /* Gradation runs every pass; trimming is gated by psi inside
          * process_scope (only acts on idle tiers when psi >= threshold). */
         walk_users(psi, total_ram);
