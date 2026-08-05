@@ -74,7 +74,7 @@ jobs:
             enabled: true
             repo: https://aur.archlinux.org/compiz.git
             prepare: |
-              awk -i inplace 'BEGIN{rc=1} /-DCOMPIZ_DEFAULT_PLUGINS=/{sub(/-DCOMPIZ_DEFAULT_PLUGINS=.*/,"-DCOMPIZ_DEFAULT_PLUGINS=\"composite,opengl,decor,resize,place,move,compiztoolbox,ring,extrawm,text,regex,animation,wall,ccp\""); rc=0} 1; END{exit rc}' ./PKGBUILD
+              awk -i inplace 'BEGIN{rc=1} /-DCOMPIZ_DEFAULT_PLUGINS=/{sub(/-DCOMPIZ_DEFAULT_PLUGINS=.*/,"-DCOMPIZ_DEFAULT_PLUGINS=\"composite,opengl,decor,grid,move,place,regex,resize,snap,text,compiztoolbox,ring,wall,animation,blur,extrawm\""); rc=0} 1; END{exit rc}' ./PKGBUILD
             patch: |
               SRCDIR=$(find "${BUILDDIR:-/build}/src" -maxdepth 1 -type d -name 'compiz*' | head -1)
               [ -n "$SRCDIR" ] || { echo "ERROR: source dir not found"; exit 1; }

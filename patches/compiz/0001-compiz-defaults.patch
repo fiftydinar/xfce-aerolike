@@ -48,6 +48,7 @@ diff -ruN '--exclude=.git' compiz-aur-patched/metadata/core.xml.in compiz-final/
 +		    <value>wall</value>
 +		    <value>animation</value>
 +		    <value>blur</value>
++		    <value>extrawm</value>
 +		</default>
   	    </option>
   	    <option name="audible_bell" type="bool">
