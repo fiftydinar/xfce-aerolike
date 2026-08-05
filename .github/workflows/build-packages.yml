@@ -74,11 +74,11 @@ jobs:
             enabled: true
             repo: https://aur.archlinux.org/compiz.git
             prepare: |
-              awk -i inplace 'BEGIN{rc=1} /-DCOMPIZ_DEFAULT_PLUGINS=/{sub(/-DCOMPIZ_DEFAULT_PLUGINS=.*/,"-DCOMPIZ_DEFAULT_PLUGINS=\"composite,opengl,decor,resize,place,move,compiztoolbox,ring,text,regex,animation,wall,ccp\""); rc=0} 1; END{exit rc}' ./PKGBUILD
+              awk -i inplace 'BEGIN{rc=1} /-DCOMPIZ_DEFAULT_PLUGINS=/{sub(/-DCOMPIZ_DEFAULT_PLUGINS=.*/,"-DCOMPIZ_DEFAULT_PLUGINS=\"composite,opengl,decor,resize,place,move,compiztoolbox,ring,extrawm,text,regex,animation,wall,ccp\""); rc=0} 1; END{exit rc}' ./PKGBUILD
             patch: |
               SRCDIR=$(find "${BUILDDIR:-/build}/src" -maxdepth 1 -type d -name 'compiz*' | head -1)
               [ -n "$SRCDIR" ] || { echo "ERROR: source dir not found"; exit 1; }
-              for p in 0001-compiz-defaults 0002-auto-fullscreen 0003-invert-keybindings 0004-fix-ccsm-reset-profile 0005-fix-ccsm-reset-settings 0006-ignore-client-self-minimize 0007-fix-cache-content-hash; do
+              for p in 0001-compiz-defaults 0002-auto-fullscreen 0003-invert-keybindings 0004-fix-ccsm-reset-profile 0005-fix-ccsm-reset-settings 0006-ignore-client-self-minimize 0007-fix-cache-content-hash 0008-set-fullscreen-keybinding; do
                 curl -sLO "https://raw.githubusercontent.com/fiftydinar/xfce-aerolike/refs/heads/main/patches/compiz/${p}.patch"
                 cd "$SRCDIR"
                 patch -p1 -F100 < "/build/${p}.patch"

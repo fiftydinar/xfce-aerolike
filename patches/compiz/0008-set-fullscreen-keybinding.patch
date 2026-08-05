@@ -1,0 +1,11 @@
+diff -ruN '--exclude=.git' compiz-aur-patched/plugins/extrawm/extrawm.xml.in compiz-final/plugins/extrawm/extrawm.xml.in
+--- compiz-aur-patched/plugins/extrawm/extrawm.xml.in	2026-08-05 19:43:47.739525590 +0200
++++ compiz-final/plugins/extrawm/extrawm.xml.in	2026-08-05 19:43:47.740663790 +0200
+@@ -23,6 +23,7 @@
+ 	    <option name="toggle_fullscreen_key" type="key">
+ 		<_short>Toggle Fullscreen</_short>
+ 		<_long>Toggle window fullscreen</_long>
++		<default>&lt;Alt&gt;Return</default>
+ 	    </option>
+ 	    <option name="toggle_always_on_top_key" type="key">
+ 		<_short>Toggle Always-On-Top</_short>
