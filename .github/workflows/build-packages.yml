@@ -131,7 +131,8 @@ jobs:
               BCACHEFS_TAG=$(git ls-remote --tags --refs https://evilpiepirate.org/git/bcachefs-tools.git | grep -o 'v[0-9.]*$' | sort -V | tail -1)
               BCACHEFS_VER=${BCACHEFS_TAG#v}
               # Switch source from GitHub to evilpiepirate (matches kernel module source)
-              sed -i "/^source=(/,/^b2sums=/c source=(\"git+https://evilpiepirate.org/git/bcachefs-tools.git#tag=${BCACHEFS_TAG}\")" PKGBUILD
+              # Range ends at the closing ') of the b2sums array (which spans two lines)
+              sed -i "/^source=(/,/')$/c source=(\"git+https://evilpiepirate.org/git/bcachefs-tools.git#tag=${BCACHEFS_TAG}\")" PKGBUILD
               echo "sha256sums=('SKIP')" >> PKGBUILD
               sed -i "s/^pkgver=.*/pkgver=$BCACHEFS_VER/" PKGBUILD
               # Remove dkms subpackage — kernel module is built separately
