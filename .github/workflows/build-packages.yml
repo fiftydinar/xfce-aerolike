@@ -141,6 +141,8 @@ jobs:
               sed -i '/^pkgrel=/s/=.*/=1/' PKGBUILD
               # Drop valgrind to speed up build
               sed -i '/valgrind/d' PKGBUILD
+              # prepare() references a dkms patch no longer in source; neutralize it
+              sed -i '/^prepare() {/,/^}/c prepare() {\n  cd ${pkgname}\n}' PKGBUILD
 
 
     container:
