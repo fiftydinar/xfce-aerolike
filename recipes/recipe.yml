@@ -50,6 +50,8 @@ modules:
         - noto-fonts-emoji
         - noto-fonts-extra
         # Desktop environment
+        - xorg
+        - xorg-drivers
         - xfce4
         - xfce4-screenshooter
         - obsidian-icon-theme
