@@ -11,6 +11,12 @@
 # Filesystem-aware: ext4/xfs use fallocate + mkswap; btrfs uses
 # btrfs filesystem mkswapfile (sets noCOW/no-compression itself);
 # bcachefs has no swapfile support, so it is skipped (zram-only).
+#
+# Probe /var, not /: the swapfile lives there, and on bootc/composefs
+# systems the root can be overlay/EROFS while /var sits on the real
+# persistent filesystem (ext4/xfs/btrfs/bcachefs). findmnt on /var
+# resolves through that. A live/container root returns empty or overlay,
+# which falls through to the skip case (zram-only).
 
 SWAPFILE=/var/swapfile
 
@@ -21,7 +27,7 @@ size_mb=$(( ram_mb / 4 ))
 if [ "$size_mb" -lt 1024 ]; then size_mb=1024; fi
 if [ "$size_mb" -gt 8192 ]; then size_mb=8192; fi
 
-case "$(findmnt -no FSTYPE /)" in
+case "$(findmnt -no FSTYPE /var)" in
   ext4|xfs)
     if ! fallocate -l "${size_mb}M" "$SWAPFILE"; then
       echo "swapfile-setup: fallocate failed, skipping (zram-only)" >&2
@@ -50,4 +56,4 @@ case "$(findmnt -no FSTYPE /)" in
     ;;
 esac
 
-echo "swapfile-setup: created $SWAPFILE (${size_mb}M) on $(findmnt -no FSTYPE /)"
+echo "swapfile-setup: created $SWAPFILE (${size_mb}M) on $(findmnt -no FSTYPE /var)"
