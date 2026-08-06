@@ -119,3 +119,46 @@ else
   printf "Applying the following vm.dirty_background_ratio value: %s\n" "${memperc}"
   sysctl -w "vm.dirty_background_ratio=${memperc}"
 fi
+
+# vm.swappiness
+# Low-RAM: eagerly swap anon to zram so file cache stays warm (disk reads
+# are the killer on a 4GB Celeron). High-RAM: reclaim cache first like
+# Windows -- anon is cheap to keep resident, so eager zram-swapping is
+# just wasted compression work.
+
+echo "Modifying 'vm.swappiness' process begins"
+
+current_swappiness=$(sysctl vm.swappiness | awk '{print $3}')
+
+swappiness=180
+if (( "${memmeg}" > 8000 )); then
+  swappiness=120
+fi
+if (( "${memmeg}" > 16000 )); then
+  swappiness=80
+fi
+
+printf "Current 'vm.swappiness' value: %s\n" "${current_swappiness}"
+printf "Applying the following 'vm.swappiness' value: %s\n" "${swappiness}"
+sysctl -w "vm.swappiness=${swappiness}"
+
+# vm.watermark_scale_factor
+# watermark_scale_factor is a fraction of total memory, so 125 on 32GB is
+# a much larger absolute kswapd wake-up headroom than on 4GB -- pointless
+# proactive reclaim churn on big machines. Scale it down as RAM grows.
+
+echo "Modifying 'vm.watermark_scale_factor' process begins"
+
+current_wmark=$(sysctl vm.watermark_scale_factor | awk '{print $3}')
+
+wmark=125
+if (( "${memmeg}" > 8000 )); then
+  wmark=100
+fi
+if (( "${memmeg}" > 16000 )); then
+  wmark=50
+fi
+
+printf "Current 'vm.watermark_scale_factor' value: %s\n" "${current_wmark}"
+printf "Applying the following 'vm.watermark_scale_factor' value: %s\n" "${wmark}"
+sysctl -w "vm.watermark_scale_factor=${wmark}"
