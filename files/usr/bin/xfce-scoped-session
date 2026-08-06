@@ -116,8 +116,16 @@ fi
 
 echo "X session wrapper complete, running session $@"
 
-# Run inside the scope: tag our own scope cgroup with oomd_avoid, then
-# exec the real session command ($@ is the session command + its args).
-# $0 is set to a label so $@ starts at the session command.
-exec systemd-run --user --scope --slice=desktop.slice -- \
+# Run inside the scope: tag our own scope cgroup with oomd_avoid and set
+# a low oom_score_adj, then exec the real session command ($@ is the
+# session command + its args). $0 is set to a label so $@ starts at the
+# session command.
+#
+# OOMScoreAdjust=-800 makes the kernel OOM killer avoid the DE the same
+# way oomd_avoid + the kill patterns protect it from oomd: oomd never
+# targets desktop.slice, but the kernel OOM killer ignores both, so
+# without this a large DE process (e.g. compiz) could still be selected
+# by oom_score under extreme pressure.
+exec systemd-run --user --scope --slice=desktop.slice \
+    -p OOMScoreAdjust=-800 -- \
     /bin/sh -c '/usr/bin/oomd-protect-self; exec "$@"' xfce-scoped-session "$@"
