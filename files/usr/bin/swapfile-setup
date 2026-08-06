@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 # swapfile-setup: create /var/swapfile for a low-priority disk swap on top
 # of zram. Runs as a one-shot systemd service whenever /var/swapfile is
 # absent (ConditionPathExists=!); var-swapfile.swap then activates it.
