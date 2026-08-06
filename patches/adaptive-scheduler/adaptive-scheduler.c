@@ -810,7 +810,7 @@ static void walk_users(double psi, unsigned long long total_ram) {
     closedir(d);
 }
 
-/* ---------- dynamic swappiness by zram fill ---------- */
+/* ---------- dynamic swappiness + swap-device awareness ---------- */
 
 /* Base swappiness by RAM. This is a workload-adaptive knob now, so it
  * lives here (set every pass) rather than in the one-shot
@@ -852,17 +852,39 @@ static double zram_fill_pct(void) {
 
 #define SWAPPINESS_FILL_START 50.0  /* fill% at which we start lowering */
 #define SWAPPINESS_FILL_FULL  90.0  /* fill% at which we hit the floor */
-#define SWAPPINESS_FLOOR      40    /* keep some anon->zram headroom */
+#define SWAPPINESS_FLOOR_ZRAMONLY 40  /* zram-only: stop feeding a full store */
+#define SWAPPINESS_FLOOR_DISK    100 /* with a disk-swap exit, keep spilling anon */
+
+/* True if a non-zram swap device is active (a disk swapfile or
+ * partition). With one, the zram-fill floor must stay higher so the
+ * kernel keeps spilling cold anon to disk instead of dropping cache --
+ * the disk swap is the cold-page exit that the floor would otherwise
+ * suppress. */
+static bool has_disk_swap(void) {
+    FILE *fp = fopen("/proc/swaps", "r");
+    if (!fp) return false;
+    char line[256];
+    bool disk = false;
+    while (fgets(line, sizeof line, fp)) {
+        char dev[256];
+        if (sscanf(line, "%255s", dev) != 1) continue;
+        if (dev[0] != '/') continue;              /* skip header line */
+        if (strncmp(dev, "/dev/zram", 9) != 0)
+            disk = true;
+    }
+    fclose(fp);
+    return disk;
+}
 
 /* Lower swappiness as zram fills so a nearly-full compressed store stops
  * absorbing anon pages (which thrashes the store) and the kernel
  * reclaims file cache instead. Returns base when zram is absent. */
-static int swappiness_for_fill(double fill, int base) {
+static int swappiness_for_fill(double fill, int base, int floor) {
     if (fill < 0.0 || fill <= SWAPPINESS_FILL_START) return base;
     double t = (fill - SWAPPINESS_FILL_START) /
                (SWAPPINESS_FILL_FULL - SWAPPINESS_FILL_START);
     if (t > 1.0) t = 1.0;
-    return (int)(base - (double)(base - SWAPPINESS_FLOOR) * t + 0.5);
+    return (int)(base - (double)(base - floor) * t + 0.5);
 }
 
 /* ---------- main ---------- */
@@ -892,6 +914,7 @@ int main(void) {
     unsigned long long total_ram = total_ram_bytes();
     int base_sw = base_swappiness(total_ram);
     int swappiness = -1;
+    int page_cluster = -1;
     signal(SIGTERM, on_signal);
     signal(SIGINT, on_signal);
 
@@ -909,10 +932,34 @@ int main(void) {
          * gated by psi inside process_ranges via the helper's data. */
         walk_users(psi, total_ram);
 
+        /* Swap-device awareness: a disk swapfile/partition (shipped as
+         * swapfile-setup.service + var-swapfile.swap) changes two policy
+         * knobs. Per-pass /proc/swaps read is tiny; it also catches the
+         * swap unit activating around the same time and a manual swapon. */
+        bool disk = has_disk_swap();
+
+        /* page-cluster: 0 for zram-only (no readahead on RAM-backed
+         * swap), 3 for disk swap (readahead on swap-in). It is a global
+         * knob, so the flip is a best-of-both compromise. */
+        int pc = disk ? 3 : 0;
+        if (pc != page_cluster) {
+            int fd = open("/proc/sys/vm/page-cluster", O_WRONLY);
+            if (fd >= 0) {
+                char buf[8];
+                int len = snprintf(buf, sizeof buf, "%d", pc);
+                (void)write(fd, buf, (size_t)len);
+                close(fd);
+                log_info("vm.page-cluster = %d (%s)", pc,
+                         disk ? "disk swap present" : "zram-only");
+                page_cluster = pc;
+            }
+        }
+
         /* Dynamic swappiness: react to zram fill, not just RAM at boot.
          * Writes only on change; the value drifts back to base as pages
          * leave the compressed store. */
-        int want = swappiness_for_fill(zram_fill_pct(), base_sw);
+        int floor = disk ? SWAPPINESS_FLOOR_DISK : SWAPPINESS_FLOOR_ZRAMONLY;
+        int want = swappiness_for_fill(zram_fill_pct(), base_sw, floor);
         if (want != swappiness) {
             int fd = open("/proc/sys/vm/swappiness", O_WRONLY);
             if (fd >= 0) {
@@ -920,7 +967,8 @@ int main(void) {
                 int len = snprintf(buf, sizeof buf, "%d", want);
                 (void)write(fd, buf, (size_t)len);
                 close(fd);
-                log_info("vm.swappiness = %d (zram-fill adaptive)", want);
+                log_info("vm.swappiness = %d (zram-fill adaptive%s)", want,
+                         disk ? ", disk swap present" : "");
                 swappiness = want;
             }
         }

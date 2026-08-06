@@ -1,0 +1,16 @@
+[Unit]
+Description=Low-priority disk swap on /var/swapfile
+# Activates only if the setup service created the file (skips cleanly on
+# bcachefs/unsupported filesystems, keeping the system zram-only).
+ConditionPathExists=/var/swapfile
+After=swapfile-setup.service
+Requires=swapfile-setup.service
+
+[Swap]
+# Priority 10 sits below zram-generator's 100, so zram is always filled
+# first and this disk swap is the last-resort cold-page exit.
+What=/var/swapfile
+Options=pri=10
+
+[Install]
+WantedBy=multi-user.target

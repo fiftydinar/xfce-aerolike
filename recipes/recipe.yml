@@ -235,6 +235,8 @@ modules:
         - unbound-cert-setup.service
         - oomd-notify.service
         - adaptive-scheduler.service
+        - swapfile-setup.service
+        - var-swapfile.swap
     user:
       enabled:
         - adaptive-scheduler-unprivileged.service

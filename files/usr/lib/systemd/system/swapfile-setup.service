@@ -1,0 +1,18 @@
+[Unit]
+Description=Create low-priority disk swapfile on /var/swapfile
+# Runs only when the swapfile is absent (first boot, or after deletion).
+ConditionPathExists=!/var/swapfile
+# DefaultDependencies=no: without it the service would get an implicit
+# After=sysinit.target, which combined with the swap unit's
+# Requires=/After= would pull sysinit.target into the swap.target chain
+# (swap.target -> local-fs.target -> sysinit.target) and deadlock. We
+# only need /var mounted, so order after local-fs.target explicitly.
+DefaultDependencies=no
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/swapfile-setup
+
+[Install]
+WantedBy=multi-user.target

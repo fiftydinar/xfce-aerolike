@@ -1,0 +1,53 @@
+#!/bin/bash
+# swapfile-setup: create /var/swapfile for a low-priority disk swap on top
+# of zram. Runs as a one-shot systemd service whenever /var/swapfile is
+# absent (ConditionPathExists=!); var-swapfile.swap then activates it.
+#
+# zram is the primary swap (priority 100); this disk swapfile is the
+# cold-page / incompressible-page exit (priority 10), used only after
+# zram is full. It must live in /var -- the bootc-persistent state -- so
+# it survives image updates (files in the deployment root would not).
+#
+# Filesystem-aware: ext4/xfs use fallocate + mkswap; btrfs uses
+# btrfs filesystem mkswapfile (sets noCOW/no-compression itself);
+# bcachefs has no swapfile support, so it is skipped (zram-only).
+
+SWAPFILE=/var/swapfile
+
+# Size by RAM: RAM/4, clamped to [1G, 8G]. This is an exit for dead
+# pages, not capacity -- zram handles the working-set spillover.
+ram_mb=$(vmstat -sS M | head -n1 | awk '{print $1}')
+size_mb=$(( ram_mb / 4 ))
+if [ "$size_mb" -lt 1024 ]; then size_mb=1024; fi
+if [ "$size_mb" -gt 8192 ]; then size_mb=8192; fi
+
+case "$(findmnt -no FSTYPE /)" in
+  ext4|xfs)
+    if ! fallocate -l "${size_mb}M" "$SWAPFILE"; then
+      echo "swapfile-setup: fallocate failed, skipping (zram-only)" >&2
+      exit 0
+    fi
+    chmod 600 "$SWAPFILE" || { rm -f "$SWAPFILE"; exit 0; }
+    if ! mkswap "$SWAPFILE"; then
+      rm -f "$SWAPFILE"
+      echo "swapfile-setup: mkswap failed, skipping (zram-only)" >&2
+      exit 0
+    fi
+    ;;
+  btrfs)
+    if ! btrfs filesystem mkswapfile --size "${size_mb}M" "$SWAPFILE" 2>/dev/null; then
+      echo "swapfile-setup: btrfs swapfile unsupported here, skipping (zram-only)" >&2
+      exit 0
+    fi
+    ;;
+  bcachefs)
+    echo "swapfile-setup: bcachefs has no swapfile support, skipping (zram-only)" >&2
+    exit 0
+    ;;
+  *)
+    echo "swapfile-setup: unsupported root filesystem, skipping (zram-only)" >&2
+    exit 0
+    ;;
+esac
+
+echo "swapfile-setup: created $SWAPFILE (${size_mb}M) on $(findmnt -no FSTYPE /)"
