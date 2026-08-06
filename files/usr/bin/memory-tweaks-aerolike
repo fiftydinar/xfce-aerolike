@@ -121,9 +121,13 @@ else
 fi
 
 # vm.watermark_scale_factor
-# watermark_scale_factor is a fraction of total memory, so 125 on 32GB is
-# a much larger absolute kswapd wake-up headroom than on 4GB -- pointless
-# proactive reclaim churn on big machines. Scale it down as RAM grows.
+# The knob is a fraction of total memory, so any fixed value gives a much
+# larger absolute kswapd wake-up headroom on big machines than on small
+# ones -- pointless proactive reclaim churn on a 32-64GB box. Instead of
+# RAM tiers, invert the formula to normalize the ABSOLUTE headroom:
+#   scale = target_headroom_bytes / ram_bytes * 10000
+# targeting ~128 MiB per watermark gap everywhere, clamped to the sane
+# [10, 200] range (10 = kernel default, 200 = 2% of RAM).
 # (vm.swappiness is no longer set here: it is now workload-adaptive and
 # owned by adaptive-scheduler, which lowers it as zram fills.)
 
@@ -131,12 +135,13 @@ echo "Modifying 'vm.watermark_scale_factor' process begins"
 
 current_wmark=$(sysctl vm.watermark_scale_factor | awk '{print $3}')
 
-wmark=125
-if (( "${memmeg}" > 8000 )); then
-  wmark=100
+# 128 MiB target -> 128*1024*1024*10000 / (memmeg*1024*1024) == 1280000/memmeg
+wmark=$(( 1280000 / memmeg ))
+if (( wmark < 10 )); then
+  wmark=10
 fi
-if (( "${memmeg}" > 16000 )); then
-  wmark=50
+if (( wmark > 200 )); then
+  wmark=200
 fi
 
 printf "Current 'vm.watermark_scale_factor' value: %s\n" "${current_wmark}"
