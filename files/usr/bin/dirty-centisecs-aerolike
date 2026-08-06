@@ -3,8 +3,8 @@
 OS_INSTALLED_DISK=$(lsblk -ls | awk '$NF == "/boot" { m = 1; next } m && $NF == "disk" { print $1 ; exit}')
 
 if [[ -z "${OS_INSTALLED_DISK}" ]]; then
-  echo "Cannot determine OS installed disk, exiting"
-  exit 1
+  echo "Cannot determine OS installed disk, leaving dirty centisecs at defaults"
+  exit 0
 fi
 
 # Check if the disk is rotational
