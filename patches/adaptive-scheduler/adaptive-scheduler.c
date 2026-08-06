@@ -810,6 +810,61 @@ static void walk_users(double psi, unsigned long long total_ram) {
     closedir(d);
 }
 
+/* ---------- dynamic swappiness by zram fill ---------- */
+
+/* Base swappiness by RAM. This is a workload-adaptive knob now, so it
+ * lives here (set every pass) rather than in the one-shot
+ * memory-tweaks service. Low RAM eagerly swaps anon to zram so file
+ * cache stays warm; high RAM reclaims cache first (Windows-like), where
+ * eager zram-swap would be wasted compression work. */
+static int base_swappiness(unsigned long long total_ram) {
+    unsigned long long meg = total_ram / (1024ULL * 1024ULL);
+    if (meg <= 8000ULL)  return 180;
+    if (meg <= 16000ULL) return 120;
+    return 80;
+}
+
+/* zram fill ratio in percent = mem_used_total / disksize. Returns -1 if
+ * zram is absent or unreadable. mm_stat fields: orig_size compr_size
+ * mem_used mem_limit mem_used_max same_pages compacted huge_pages. */
+static double zram_fill_pct(void) {
+    char buf[256];
+    int fd = open("/sys/block/zram0/mm_stat", O_RDONLY);
+    if (fd < 0) return -1.0;
+    ssize_t n = read(fd, buf, sizeof buf - 1);
+    close(fd);
+    if (n <= 0) return -1.0;
+    buf[n] = 0;
+    unsigned long long orig = 0, compr = 0, used = 0;
+    if (sscanf(buf, "%llu %llu %llu", &orig, &compr, &used) != 3)
+        return -1.0;
+
+    fd = open("/sys/block/zram0/disksize", O_RDONLY);
+    if (fd < 0) return -1.0;
+    n = read(fd, buf, sizeof buf - 1);
+    close(fd);
+    if (n <= 0) return -1.0;
+    buf[n] = 0;
+    unsigned long long disksize = strtoull(buf, NULL, 10);
+    if (disksize == 0) return -1.0;
+    return (double)used * 100.0 / (double)disksize;
+}
+
+#define SWAPPINESS_FILL_START 50.0  /* fill% at which we start lowering */
+#define SWAPPINESS_FILL_FULL  90.0  /* fill% at which we hit the floor */
+#define SWAPPINESS_FLOOR      40    /* keep some anon->zram headroom */
+
+/* Lower swappiness as zram fills so a nearly-full compressed store stops
+ * absorbing anon pages (which thrashes the store) and the kernel
+ * reclaims file cache instead. Returns base when zram is absent. */
+static int swappiness_for_fill(double fill, int base) {
+    if (fill < 0.0 || fill <= SWAPPINESS_FILL_START) return base;
+    double t = (fill - SWAPPINESS_FILL_START) /
+               (SWAPPINESS_FILL_FULL - SWAPPINESS_FILL_START);
+    if (t > 1.0) t = 1.0;
+    return (int)(base - (double)(base - SWAPPINESS_FLOOR) * t + 0.5);
+}
+
 /* ---------- main ---------- */
 
 static volatile sig_atomic_t running = 1;
@@ -835,6 +890,8 @@ static bool have_sys_nice(void) {
 
 int main(void) {
     unsigned long long total_ram = total_ram_bytes();
+    int base_sw = base_swappiness(total_ram);
+    int swappiness = -1;
     signal(SIGTERM, on_signal);
     signal(SIGINT, on_signal);
 
@@ -851,6 +908,22 @@ int main(void) {
         /* Gradation + trim requests run every pass; actual MADV_COLD is
          * gated by psi inside process_ranges via the helper's data. */
         walk_users(psi, total_ram);
+
+        /* Dynamic swappiness: react to zram fill, not just RAM at boot.
+         * Writes only on change; the value drifts back to base as pages
+         * leave the compressed store. */
+        int want = swappiness_for_fill(zram_fill_pct(), base_sw);
+        if (want != swappiness) {
+            int fd = open("/proc/sys/vm/swappiness", O_WRONLY);
+            if (fd >= 0) {
+                char buf[32];
+                int len = snprintf(buf, sizeof buf, "%d", want);
+                (void)write(fd, buf, (size_t)len);
+                close(fd);
+                log_info("vm.swappiness = %d (zram-fill adaptive)", want);
+                swappiness = want;
+            }
+        }
         sleep(SLEEP_SECS);
     }
     log_info("stopped");
