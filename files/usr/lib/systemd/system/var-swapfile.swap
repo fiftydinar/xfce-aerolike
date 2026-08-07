@@ -2,9 +2,14 @@
 Description=Low-priority disk swap on /var/swapfile
 # Activates only if the setup service created the file (skips cleanly on
 # bcachefs/unsupported filesystems, keeping the system zram-only).
+#
+# No Requires= or After= on the setup service: any ordering dependency
+# between a swap unit and a service creates an unavoidable cycle through
+# swap.target -> local-fs.target -> tmp.mount -> swap.target. Instead,
+# ConditionPathExists alone handles it — on first boot the file does not
+# yet exist (skipped → zram-only), the service creates it, and subsequent
+# boots activate the swap.
 ConditionPathExists=/var/swapfile
-After=swapfile-setup.service
-Requires=swapfile-setup.service
 
 [Swap]
 # Priority 10 sits below zram-generator's 100, so zram is always filled
