@@ -91,7 +91,9 @@ jobs:
 
           - name: glycin-ng
             enabled: true
-            repo: https://aur.archlinux.org/glycin-ng.git
+            repo: https://github.com/QaidVoid/glycin-ng.git
+            prepare: |
+              cp pkgbuilds/glycin-ng/PKGBUILD .
 
           - name: gtk-nocsd-git
             enabled: true
@@ -266,6 +268,12 @@ jobs:
             repo: https://aur.archlinux.org/emerald.git
             deps: gtk2 libwnck compiz
 
+          - name: glycin-ng-librsvg
+            repo: https://github.com/QaidVoid/glycin-ng.git
+            deps: glycin-ng
+            prepare: |
+              cp pkgbuilds/glycin-ng-librsvg/PKGBUILD .
+
     container:
       image: docker.io/archlinux:latest
       options: --cap-add=SYS_ADMIN --tmpfs /build:size=14G,exec
@@ -317,6 +325,11 @@ jobs:
         run: |
           git clone --depth 1 "${{ matrix.pkg.repo }}" /build
           ls -la /build/
+
+      - name: Apply patches
+        if: ${{ matrix.pkg.prepare }}
+        run: |
+          cd /build && ${{ matrix.pkg.prepare }}
 
       - name: Install official dependencies
         run: |
