@@ -142,6 +142,12 @@ def run():
     _status = "Configuring auto-login..."
     autologin_user = gs.value("autoLoginUser") if gs.contains("autoLoginUser") else ""
     if autologin_user:
+        # LightDM's lightdm-autologin PAM service requires the user to be in
+        # the 'autologin' group (pam_succeed_if user ingroup autologin).
+        # Without this the PAM check fails and autologin falls back to the
+        # greeter.
+        subprocess.run(["chroot", deploy, "groupadd", "-f", "autologin"], capture_output=True)
+        subprocess.run(["chroot", deploy, "gpasswd", "-a", autologin_user, "autologin"], capture_output=True)
         dropin_dir = os.path.join(etc, "lightdm", "lightdm.conf.d")
         dropin = os.path.join(dropin_dir, "90-calamares-autologin.conf")
         try:
