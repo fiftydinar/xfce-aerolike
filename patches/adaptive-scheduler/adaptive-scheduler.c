@@ -96,6 +96,20 @@ static const unsigned SLEEP_SECS = 1;
 static const int TRIM_INTERVAL = 30;        /* min seconds between trims/scope */
 static const long long IDLE_JIFFY_DELTA = 1; /* >=1 tick counts as active */
 
+/* page-cluster (swap-in readahead) flip thresholds, KB and passes.
+ * PAGE_CLUSTER_UP_DEBOUNCE: consecutive passes with the disk swap being
+ * used before enabling readahead (3); DN: consecutive passes with it
+ * drained before disabling (30s of idle at 1 pass/sec). */
+static const long long PAGE_CLUSTER_USED_MIN = 1024;  /* KB: >=1MB in use counts */
+static const int PAGE_CLUSTER_UP_DEBOUNCE = 3;
+static const int PAGE_CLUSTER_DN_DEBOUNCE = 30;
+
+/* last written value of vm.page-cluster (0/3); starts at 0, the value
+ * the shipped sysctl.d sets at boot */
+static int page_cluster = 0;
+static int page_used_up = 0;   /* consecutive passes swap disk in use */
+static int page_used_dn = 0;   /* consecutive passes swap disk drained */
+
 /* memory.low gradation, as fractions of total RAM */
 static const double MEMLOW_FOREGROUND = 0.20;  /* 20% - most protected */
 static const double MEMLOW_ACTIVE     = 0.10;  /* 10% */
@@ -855,25 +869,55 @@ static double zram_fill_pct(void) {
 #define SWAPPINESS_FLOOR_ZRAMONLY 40  /* zram-only: stop feeding a full store */
 #define SWAPPINESS_FLOOR_DISK    100 /* with a disk-swap exit, keep spilling anon */
 
-/* True if a non-zram swap device is active (a disk swapfile or
- * partition). With one, the zram-fill floor must stay higher so the
- * kernel keeps spilling cold anon to disk instead of dropping cache --
- * the disk swap is the cold-page exit that the floor would otherwise
- * suppress. */
-static bool has_disk_swap(void) {
-    FILE *fp = fopen("/proc/swaps", "r");
-    if (!fp) return false;
-    char line[256];
-    bool disk = false;
+/* Probe /proc/swaps (or a fixture path for testing) for a non-zram swap
+ * device -- a disk swapfile or partition (shipped as
+ * swapfile-setup.service + var-swapfile.swap). Two signals come out:
+ *   - present: a disk-swap device exists. Controls the zram-fill
+ *     swappiness floor: with one, the floor must stay higher so the
+ *     kernel keeps spilling cold anon to disk instead of dropping
+ *     cache -- the disk swap is the cold-page exit that a zram-only
+ *     floor would otherwise suppress.
+ *   - used_kb: the largest Used column of any non-zram device (KB, as
+ *     reported by /proc/swaps). This is the "is the disk swap actually
+ *     holding pages" signal that gates page-cluster readahead:
+ *     presence alone is not enough, because swap-in reads only happen
+ *     once pages resident on disk are faulted back. */
+static void probe_disk_swap(const char *path, bool *present, long long *used_kb) {
+    *present = false;
+    *used_kb = 0;
+    FILE *fp = fopen(path, "r");
+    if (!fp) return;
+    char line[1024];
     while (fgets(line, sizeof line, fp)) {
-        char dev[256];
-        if (sscanf(line, "%255s", dev) != 1) continue;
+        char dev[256] = "", typ[32] = "";
+        unsigned long long size = 0, used = 0;
+        int pri = 0;
+        /* /proc/swaps: Filename Type Size Used Priority */
+        if (sscanf(line, "%255s %31s %llu %llu %d",
+                   dev, typ, &size, &used, &pri) != 5)
+            continue;
         if (dev[0] != '/') continue;              /* skip header line */
-        if (strncmp(dev, "/dev/zram", 9) != 0)
-            disk = true;
+        if (strncmp(dev, "/dev/zram", 9) == 0) continue;  /* not disk */
+        *present = true;
+        if ((long long)used > *used_kb) *used_kb = (long long)used;
     }
     fclose(fp);
-    return disk;
+}
+
+/* Write the value to /proc/sys/vm/page-cluster and log a transition.
+ * No-op (with no log noise) if the run lacks permission. Resets the
+ * debounce counters so the next flip needs a fresh sustained run. */
+static void write_page_cluster(int value, const char *why) {
+    int fd = open("/proc/sys/vm/page-cluster", O_WRONLY);
+    if (fd < 0) return;
+    char buf[8];
+    int len = snprintf(buf, sizeof buf, "%d", value);
+    (void)write(fd, buf, (size_t)len);
+    close(fd);
+    page_cluster = value;
+    page_used_up = 0;
+    page_used_dn = 0;
+    log_info("vm.page-cluster = %d (%s)", value, why);
 }
 
 /* Lower swappiness as zram fills so a nearly-full compressed store stops
@@ -914,7 +958,6 @@ int main(void) {
     unsigned long long total_ram = total_ram_bytes();
     int base_sw = base_swappiness(total_ram);
     int swappiness = -1;
-    int page_cluster = -1;
     signal(SIGTERM, on_signal);
     signal(SIGINT, on_signal);
 
@@ -935,24 +978,31 @@ int main(void) {
         /* Swap-device awareness: a disk swapfile/partition (shipped as
          * swapfile-setup.service + var-swapfile.swap) changes two policy
          * knobs. Per-pass /proc/swaps read is tiny; it also catches the
-         * swap unit activating around the same time and a manual swapon. */
-        bool disk = has_disk_swap();
+         * swap unit activating around the same time and a manual swapon.
+         * 'disk' (presence) drives the swappiness floor below; swap
+         * USAGE (disk_used_kb) drives the page-cluster flip below, so
+         * readahead tracks actual swap-in demand rather than the mere
+         * existence of a disk swap. */
+        bool disk = false;
+        long long disk_used_kb = 0;
+        probe_disk_swap("/proc/swaps", &disk, &disk_used_kb);
 
         /* page-cluster: 0 for zram-only (no readahead on RAM-backed
-         * swap), 3 for disk swap (readahead on swap-in). It is a global
-         * knob, so the flip is a best-of-both compromise. */
-        int pc = disk ? 3 : 0;
-        if (pc != page_cluster) {
-            int fd = open("/proc/sys/vm/page-cluster", O_WRONLY);
-            if (fd >= 0) {
-                char buf[8];
-                int len = snprintf(buf, sizeof buf, "%d", pc);
-                (void)write(fd, buf, (size_t)len);
-                close(fd);
-                log_info("vm.page-cluster = %d (%s)", pc,
-                         disk ? "disk swap present" : "zram-only");
-                page_cluster = pc;
-            }
+         * swap), 3 for a disk swap that is actually being used
+         * (readahead on swap-in). Presence alone is not enough: disk
+         * swap-in reads only happen once pages are resident on the disk
+         * swap. Debounced both ways so a single pushed-out page cannot
+         * flap a global knob. */
+        if (disk_used_kb > PAGE_CLUSTER_USED_MIN)
+            page_used_up++;
+        else
+            page_used_dn++;
+
+        if (page_cluster == 3 && page_used_dn >= PAGE_CLUSTER_DN_DEBOUNCE) {
+            write_page_cluster(0, "disk swap drained");
+        } else if (page_cluster == 0 && page_used_up >= PAGE_CLUSTER_UP_DEBOUNCE &&
+                   disk_used_kb > PAGE_CLUSTER_USED_MIN) {
+            write_page_cluster(3, "disk swap in use");
         }
 
         /* Dynamic swappiness: react to zram fill, not just RAM at boot.
