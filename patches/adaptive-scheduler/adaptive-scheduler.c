@@ -993,10 +993,13 @@ int main(void) {
          * swap-in reads only happen once pages are resident on the disk
          * swap. Debounced both ways so a single pushed-out page cannot
          * flap a global knob. */
-        if (disk_used_kb > PAGE_CLUSTER_USED_MIN)
-            page_used_up++;
-        else
-            page_used_dn++;
+        if (disk_used_kb > PAGE_CLUSTER_USED_MIN) {
+            if (page_used_up < PAGE_CLUSTER_UP_DEBOUNCE) page_used_up++;
+            page_used_dn = 0;
+        } else {
+            if (page_used_dn < PAGE_CLUSTER_DN_DEBOUNCE) page_used_dn++;
+            page_used_up = 0;
+        }
 
         if (page_cluster == 3 && page_used_dn >= PAGE_CLUSTER_DN_DEBOUNCE) {
             write_page_cluster(0, "disk swap drained");
