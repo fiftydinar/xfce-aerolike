@@ -26,9 +26,15 @@ jobs:
               # needed at runtime). The eval loop generates one package
               # function per pkgname entry, so removing it is sufficient.
               # Assertion: fail loudly if the edit didn't take effect
-              # (upstream PKGBUILD structure changed).
+              # (upstream PKGBUILD structure changed). Note: this must be
+              # an `if` block, NOT `grep -q ... && exit 1` -- the latter
+              # returns 1 when grep finds nothing (the success case) and
+              # trips `set -e`.
               bash -n ./PKGBUILD || { echo "ERROR: linux PKGBUILD syntax broken after edits"; exit 1; }
-              grep -q 'pkgbase-docs' ./PKGBUILD && { echo "ERROR: linux-docs still present in PKGBUILD after edits"; exit 1; }
+              if grep -q 'pkgbase-docs' ./PKGBUILD; then
+                echo "ERROR: linux-docs still present in PKGBUILD after edits"
+                exit 1
+              fi
             patch: |
               SRCDIR=$(find "${BUILDDIR:-/build}/src" -maxdepth 1 -type d -name 'linux-*' | head -1)
               [ -n "$SRCDIR" ] || { echo "ERROR: source dir not found"; exit 1; }
@@ -141,10 +147,15 @@ jobs:
               sed -i '/^  # tests shipped with systemd-tests (for upstream)$/,/mv "\$pkgdir"\/usr\/lib\/systemd\/tests systemd-tests\/$/d' ./PKGBUILD
               # Assertions: if the PKGBUILD edits above didn't take effect
               # (upstream structure changed), fail loudly instead of
-              # silently shipping the unwanted subpackages.
+              # silently shipping the unwanted subpackages. Use `if` blocks,
+              # NOT `grep -q ... && exit 1` -- the latter returns 1 when
+              # grep finds nothing (the success case) and trips `set -e`.
               bash -n ./PKGBUILD || { echo "ERROR: systemd PKGBUILD syntax broken after edits"; exit 1; }
               for _sub in systemd-resolvconf systemd-tests systemd-ukify; do
-                grep -q "$_sub" ./PKGBUILD && { echo "ERROR: $_sub still present in PKGBUILD after edits"; exit 1; }
+                if grep -q "$_sub" ./PKGBUILD; then
+                  echo "ERROR: $_sub still present in PKGBUILD after edits"
+                  exit 1
+                fi
               done
               echo "MESON_EXTRA_CONFIGURE_OPTIONS=-Dapparmor=disabled -Dbootloader=disabled -Dsysupdated=disabled -Dsysupdate=disabled -Dnss-mymachines=disabled -Dnss-resolve=disabled -Dresolve=false -Dtimesyncd=false -Doomd=false -Dcoredump=false -Dnetworkd=false -Dhomed=disabled -Dportabled=false -Dmachined=false -Dsysext=false -Dnsresourced=false -Dmountfsd=false -Dimportd=disabled -Dvmspawn=disabled -Dstoragetm=false -Dquotacheck=false -Drepart=disabled -Dpstore=false -Dfirstboot=false -Dinstall-tests=false -Dukify=disabled" >> $GITHUB_ENV
 
