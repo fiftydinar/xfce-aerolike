@@ -17,10 +17,13 @@ jobs:
             repo: https://gitlab.archlinux.org/archlinux/packaging/packages/linux.git
             skippgpcheck: true
             prepare: |
+              # NOTE: the first line must be a command, not a comment --
+              # this step runs as `cd /build && $prepare`, so a leading
+              # '#' would leave `&&` with nothing to execute.
+              sed -i '/^  "$pkgbase-docs"$/d' ./PKGBUILD
               # Drop the linux-docs subpackage (documentation only, not
               # needed at runtime). The eval loop generates one package
               # function per pkgname entry, so removing it is sufficient.
-              sed -i '/^  "$pkgbase-docs"$/d' ./PKGBUILD
               # Assertion: fail loudly if the edit didn't take effect
               # (upstream PKGBUILD structure changed).
               bash -n ./PKGBUILD || { echo "ERROR: linux PKGBUILD syntax broken after edits"; exit 1; }
