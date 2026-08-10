@@ -16,6 +16,11 @@ jobs:
             enabled: true
             repo: https://gitlab.archlinux.org/archlinux/packaging/packages/linux.git
             skippgpcheck: true
+            prepare: |
+              # Drop the linux-docs subpackage (documentation only, not
+              # needed at runtime). The eval loop generates one package
+              # function per pkgname entry, so removing it is sufficient.
+              sed -i '/^  "$pkgbase-docs"$/d' ./PKGBUILD
             patch: |
               SRCDIR=$(find "${BUILDDIR:-/build}/src" -maxdepth 1 -type d -name 'linux-*' | head -1)
               [ -n "$SRCDIR" ] || { echo "ERROR: source dir not found"; exit 1; }
@@ -115,7 +120,18 @@ jobs:
             skippgpcheck: true
             prepare: |
               sed -i 's|rm |rm -f |' ./PKGBUILD
-              echo "MESON_EXTRA_CONFIGURE_OPTIONS=-Dapparmor=disabled -Dbootloader=disabled -Dsysupdated=disabled -Dsysupdate=disabled -Dnss-mymachines=disabled -Dnss-resolve=disabled -Dresolve=false -Dtimesyncd=false -Doomd=false -Dcoredump=false -Dnetworkd=false -Dhomed=disabled -Dportabled=false -Dmachined=false -Dsysext=false -Dnsresourced=false -Dmountfsd=false -Dimportd=disabled -Dvmspawn=disabled -Dstoragetm=false -Dquotacheck=false -Drepart=disabled -Dpstore=false -Dfirstboot=false" >> $GITHUB_ENV
+              # Drop the subpackages we don't need. systemd-resolvconf is a
+              # dangling symlink (resolvectl) when resolved is disabled;
+              # systemd-tests and systemd-ukify are not used at runtime
+              # (this image boots GRUB/bootupd, not systemd-boot).
+              sed -i "/'systemd-ukify')/s/'systemd-ukify')/)/" ./PKGBUILD
+              sed -i "/'systemd-resolvconf'/d; /'systemd-tests'/d" ./PKGBUILD
+              sed -i '/^package_systemd-resolvconf() {/,/^}/d; /^package_systemd-tests() {/,/^}/d; /^package_systemd-ukify() {/,/^}/d' ./PKGBUILD
+              sed -i "/'systemd-ukify: combine kernel and initrd into a signed Unified Kernel Image'/d" ./PKGBUILD
+              sed -i '/^  # ukify shipped in separate package$/,/systemd-ukify\/install.d$/d' ./PKGBUILD
+              sed -i '/^  # files shipped with systemd-resolvconf$/,/resolvconf\.1}$/d' ./PKGBUILD
+              sed -i '/^  # tests shipped with systemd-tests (for upstream)$/,/mv "\$pkgdir"\/usr\/lib\/systemd\/tests systemd-tests\/$/d' ./PKGBUILD
+              echo "MESON_EXTRA_CONFIGURE_OPTIONS=-Dapparmor=disabled -Dbootloader=disabled -Dsysupdated=disabled -Dsysupdate=disabled -Dnss-mymachines=disabled -Dnss-resolve=disabled -Dresolve=false -Dtimesyncd=false -Doomd=false -Dcoredump=false -Dnetworkd=false -Dhomed=disabled -Dportabled=false -Dmachined=false -Dsysext=false -Dnsresourced=false -Dmountfsd=false -Dimportd=disabled -Dvmspawn=disabled -Dstoragetm=false -Dquotacheck=false -Drepart=disabled -Dpstore=false -Dfirstboot=false -Dinstall-tests=false -Dukify=disabled" >> $GITHUB_ENV
 
           - name: dwarfs-bin
             enabled: true
