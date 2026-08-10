@@ -17,6 +17,7 @@ jobs:
             repo: https://gitlab.archlinux.org/archlinux/packaging/packages/linux.git
             skippgpcheck: true
             prepare: |
+              set -x
               # NOTE: the first line must be a command, not a comment --
               # this step runs as `cd /build && $prepare`, so a leading
               # '#' would leave `&&` with nothing to execute.
