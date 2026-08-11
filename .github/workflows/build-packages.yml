@@ -21,16 +21,22 @@ jobs:
               # NOTE: the first line must be a command, not a comment --
               # this step runs as `cd /build && $prepare`, so a leading
               # '#' would leave `&&` with nothing to execute.
+              sed -i '/^  "$pkgbase-headers"$/d' ./PKGBUILD
               sed -i '/^  "$pkgbase-docs"$/d' ./PKGBUILD
-              # Drop the linux-docs subpackage (documentation only, not
-              # needed at runtime). The eval loop generates one package
-              # function per pkgname entry, so removing it is sufficient.
+              # Drop the linux-headers and linux-docs subpackages (headers
+              # and documentation only, not needed at runtime). The eval
+              # loop generates one package function per pkgname entry, so
+              # removing them is sufficient.
               # Assertion: fail loudly if the edit didn't take effect
               # (upstream PKGBUILD structure changed). Note: this must be
               # an `if` block, NOT `grep -q ... && exit 1` -- the latter
               # returns 1 when grep finds nothing (the success case) and
               # trips `set -e`.
               bash -n ./PKGBUILD || { echo "ERROR: linux PKGBUILD syntax broken after edits"; exit 1; }
+              if grep -q 'pkgbase-headers' ./PKGBUILD; then
+                echo "ERROR: linux-headers still present in PKGBUILD after edits"
+                exit 1
+              fi
               if grep -q 'pkgbase-docs' ./PKGBUILD; then
                 echo "ERROR: linux-docs still present in PKGBUILD after edits"
                 exit 1
