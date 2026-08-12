@@ -32,13 +32,19 @@ jobs:
               # an `if` block, NOT `grep -q ... && exit 1` -- the latter
               # returns 1 when grep finds nothing (the success case) and
               # trips `set -e`.
+              #
+              # Match the exact pkgname-array form `  "$pkgbase-headers"`
+              # (quoted name, end of line). The `pkgbase-headers` substring
+              # ALSO appears in upstream's optdepends ("$pkgbase-headers:
+              # headers and scripts for building modules"), which must be
+              # kept and must NOT trip this assertion.
               bash -n ./PKGBUILD || { echo "ERROR: linux PKGBUILD syntax broken after edits"; exit 1; }
-              if grep -q 'pkgbase-headers' ./PKGBUILD; then
-                echo "ERROR: linux-headers still present in PKGBUILD after edits"
+              if grep -q '^  "$pkgbase-headers"$' ./PKGBUILD; then
+                echo "ERROR: linux-headers still in pkgname after edits"
                 exit 1
               fi
-              if grep -q 'pkgbase-docs' ./PKGBUILD; then
-                echo "ERROR: linux-docs still present in PKGBUILD after edits"
+              if grep -q '^  "$pkgbase-docs"$' ./PKGBUILD; then
+                echo "ERROR: linux-docs still in pkgname after edits"
                 exit 1
               fi
             patch: |
