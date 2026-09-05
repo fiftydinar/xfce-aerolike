@@ -124,7 +124,10 @@ jobs:
             enabled: true
             repo: https://github.com/QaidVoid/glycin-ng.git
             prepare: |
-              cp pkgbuilds/glycin-ng/PKGBUILD .
+              [ -f PKGBUILD ] || { echo "ERROR: top-level PKGBUILD missing (upstream layout changed?)"; exit 1; }
+              # PKGBUILD now lives at the repo top level (upstream moved it
+              # out of pkgbuilds/glycin-ng/ in commit 4a4c6eb); makepkg runs
+              # from /build, so it picks up the top-level PKGBUILD directly.
 
           - name: gtk-nocsd-git
             enabled: true
@@ -170,6 +173,19 @@ jobs:
                 fi
               done
               echo "MESON_EXTRA_CONFIGURE_OPTIONS=-Dapparmor=disabled -Dbootloader=disabled -Dsysupdated=disabled -Dsysupdate=disabled -Dnss-mymachines=disabled -Dnss-resolve=disabled -Dresolve=false -Dtimesyncd=false -Doomd=false -Dcoredump=false -Dnetworkd=false -Dhomed=disabled -Dportabled=false -Dmachined=false -Dsysext=false -Dnsresourced=false -Dmountfsd=false -Dimportd=disabled -Dvmspawn=disabled -Dstoragetm=false -Dquotacheck=false -Drepart=disabled -Dpstore=false -Dfirstboot=false -Dinstall-tests=false -Dukify=disabled" >> $GITHUB_ENV
+            patch: |
+              SRCDIR=$(find "${BUILDDIR:-/build}/src" -maxdepth 1 -type d -name 'systemd' | head -1)
+              [ -n "$SRCDIR" ] || { echo "ERROR: systemd source dir not found"; exit 1; }
+              # lxml >= 6.1.3 disables external parameter entity parsing by
+              # default, which breaks the man page directive index build
+              # ("Entity 'entities' not defined" while resolving
+              # custom-entities.ent). Request entity resolution explicitly;
+              # this is upstream systemd commit a019396d2c.
+              sed -i 's/_parser = tree.XMLParser()/_parser = tree.XMLParser(resolve_entities=True)/' "$SRCDIR/tools/xml_helper.py"
+              if ! grep -q '_parser = tree.XMLParser(resolve_entities=True)' "$SRCDIR/tools/xml_helper.py"; then
+                echo "ERROR: xml_helper.py lxml entity-resolution fix did not apply"
+                exit 1
+              fi
 
           - name: dwarfs-bin
             enabled: true
@@ -326,7 +342,9 @@ jobs:
             repo: https://github.com/QaidVoid/glycin-ng.git
             deps: glycin-ng
             prepare: |
-              cp pkgbuilds/glycin-ng-librsvg/PKGBUILD .
+              cp PKGBUILD-librsvg-shim PKGBUILD
+              # PKGBUILD moved to the repo top level as PKGBUILD-librsvg-shim
+              # (upstream commit 4a4c6eb); bring it to the makepkg root.
 
     container:
       image: docker.io/archlinux:latest
