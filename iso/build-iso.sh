@@ -138,6 +138,49 @@ echo "[build-iso] Mounted /dev"
 # Ensure /var/tmp exists (dracut uses it as default TMPDIR)
 mkdir -p "${AIROOTFS}/var/tmp"
 
+# Remove mkinitcpio before upgrading: its pacman hooks would otherwise try to
+# regenerate initramfs images during the rootfs upgrade below (the live medium
+# uses dracut), and a failing hook aborts the whole transaction.
+chroot "${AIROOTFS}" pacman -Rdd --noconfirm mkinitcpio mkinitcpio-archiso 2>/dev/null || true
+# The bootc image can be days or weeks old while Arch mirrors only keep the
+# current versions of every package. With a stale sync database pacman asks for
+# files that no longer exist (HTTP 404: kwidgetsaddons, kpmcore, ki18n,
+# kcoreaddons...) and rejects freshly signed packages because the keyring is
+# outdated. Refresh the keyring and upgrade the rootfs first, so the packages
+# installed below resolve against the live repositories and stay
+# library-compatible with each other (and with the Calamares build).
+#
+# Packages this repository builds itself (see build-packages.yml, shipped in the
+# "packages" release) are held back:
+#   - linux: the bcachefs-enabled kernel the live medium boots. Official Arch
+#     kernels carry no bcachefs (dropped from mainline), so upgrading it would
+#     leave the ISO unable to create or mount the filesystem it installs onto.
+#   - systemd: trimmed build (no resolved/networkd/homed/...), matching the
+#     image's unbound-based DNS setup.
+#   - gtk2, compiz, emerald, libwnck, xfdesktop, xfce4-screensaver,
+#     glycin-ng*, gtk-nocsd-git, oomd-git, dwarfs-bin,
+#     xfce4-docklike-plugin-git, xfce-aero-lang-changer,
+#     networkmanager-dispatcher-chrony: carry local patches.
+#   - bcachefs-tools, rust-bindgen: keep the pinned tooling consistent.
+LOCAL_PKGS="linux,linux-headers,linux-docs,systemd,systemd-libs,"
+LOCAL_PKGS="${LOCAL_PKGS}systemd-sysvcompat,bcachefs-tools,rust-bindgen,"
+LOCAL_PKGS="${LOCAL_PKGS}gtk2,libwnck,compiz,emerald,glycin-ng,"
+LOCAL_PKGS="${LOCAL_PKGS}glycin-ng-librsvg,gtk-nocsd-git,oomd-git,dwarfs-bin,"
+LOCAL_PKGS="${LOCAL_PKGS}xfdesktop,xfce4-screensaver,xfce4-docklike-plugin-git,"
+LOCAL_PKGS="${LOCAL_PKGS}xfce-aero-lang-changer,networkmanager-dispatcher-chrony"
+
+echo "[build-iso] Refreshing pacman keyring and upgrading rootfs..."
+chroot "${AIROOTFS}" pacman --noconfirm -Sy --needed archlinux-keyring
+chroot "${AIROOTFS}" pacman --noconfirm --ignore "${LOCAL_PKGS}" -Syu
+
+# Fail loudly if the kernel no longer carries bcachefs: the live medium must be
+# able to create and mount bcachefs during installation.
+if ! chroot "${AIROOTFS}" sh -c 'ls /usr/lib/modules/*/kernel/fs/bcachefs/bcachefs.ko* >/dev/null 2>&1'; then
+    echo "ERROR: installed kernel has no bcachefs module; refusing to build a broken ISO"
+    exit 1
+fi
+echo "[build-iso] Rootfs upgraded"
+
 # Disable bootc auto-update timer in live environment
 chroot "${AIROOTFS}" systemctl mask bootc-fetch-apply-updates.timer 2>/dev/null || true
 echo "[build-iso] Masked bootc auto-update timer"
@@ -166,8 +209,6 @@ exit $rc
 BCACHEFSWRAPPER
 chmod +x "${AIROOTFS}/usr/bin/bcachefs"
 
-# Remove mkinitcpio if present to avoid conflicts
-chroot "${AIROOTFS}" pacman -Rdd --noconfirm mkinitcpio mkinitcpio-archiso 2>/dev/null || true
 echo "[build-iso] Package install complete"
 
 # Configure podman storage to use fuse-overlayfs as mount_program.
@@ -449,8 +490,12 @@ KVER=$(find "${AIROOTFS}/usr/lib/modules" -maxdepth 1 -type d -name "[0-9]*" -pr
 echo "[build-iso] Kernel version: ${KVER}"
 
 if [ -n "$KVER" ]; then
-    # Ensure /boot/vmlinuz-linux exists (kernel binary from container)
-    if [ ! -f "${AIROOTFS}/boot/vmlinuz-linux" ] && [ -f "${AIROOTFS}/usr/lib/modules/${KVER}/vmlinuz" ]; then
+    # Keep /boot/vmlinuz-linux in sync with the kernel we build the initramfs
+    # for: the rootfs upgrade above may have pulled a newer linux package,
+    # and a stale (or dangling-symlink) kernel image would produce a live
+    # medium that boots a kernel its modules do not match.
+    if [ -f "${AIROOTFS}/usr/lib/modules/${KVER}/vmlinuz" ]; then
+        rm -f "${AIROOTFS}/boot/vmlinuz-linux"
         cp "${AIROOTFS}/usr/lib/modules/${KVER}/vmlinuz" "${AIROOTFS}/boot/vmlinuz-linux"
     fi
     chroot "${AIROOTFS}" env TMPDIR=/tmp dracut --force --add archiso --install "/etc/passwd /etc/shadow" /boot/initramfs-linux.img "${KVER}"
@@ -525,6 +570,13 @@ if [ -f "$BRANDING_FILE" ]; then
     sed -i.bak "s/@ISO_VERSION@/${ISO_VERSION}/g" "$BRANDING_FILE"
     echo "[build-iso] Branding version substituted: ${ISO_VERSION}"
 fi
+
+# The rootfs upgrade and the package installs above filled the pacman cache;
+# that cache is dead weight inside the live medium (the image already ships
+# the same packages for the offline install).
+rm -rf "${AIROOTFS}/var/cache/pacman/pkg"/* "${AIROOTFS}/tmp"/*
+mkdir -p "${AIROOTFS}/var/cache/pacman/pkg"
+echo "[build-iso] Pruned pacman cache and /tmp"
 
 echo "=== Step 7: Build ISO ==="
 echo "[build-iso] Creating marker to skip mkarchiso pacstrap (rootfs already prepared)..."
