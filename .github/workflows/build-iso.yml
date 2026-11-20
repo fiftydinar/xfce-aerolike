@@ -115,7 +115,10 @@ jobs:
               echo "WARNING: no image found for branch ${{ github.ref_name }}, falling back to latest"
               IMAGE_TAG="latest"
             fi
-            ISO_VERSION_SUFFIX="-${{ github.ref_name }}"
+            # Branch names contain '/' (fix/foo), which must not leak into the
+            # version string: it ends up in the ISO file name and volume label
+            # and breaks path handling downstream. Sanitize it.
+            ISO_VERSION_SUFFIX="-${GITHUB_REF_NAME//\//-}"
           fi
           echo "Using image tag: ${IMAGE_TAG}"
           export ISO_VERSION_SUFFIX

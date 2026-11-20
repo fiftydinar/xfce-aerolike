@@ -572,8 +572,13 @@ echo "[build-iso] Calamares config directory created"
 # Substitute @ISO_VERSION@ placeholder in branding file
 BRANDING_FILE="${PROFILE_DIR}/airootfs/etc/calamares/branding/xfce-aerolike/branding.desc"
 if [ -f "$BRANDING_FILE" ]; then
+    # Use a delimiter that cannot appear in ${ISO_VERSION}: it embeds
+    # ISO_VERSION_SUFFIX, which for branch builds is the branch name, and
+    # branch names routinely contain '/' (fix/foo). A '/' delimiter made sed
+    # read the tail of the name as flags and abort the build:
+    #   sed: -e expression #1, char 30: unknown option to 's'
     ISO_VERSION="$(date --date="@${SOURCE_DATE_EPOCH:-$(date +%s)}" +%Y%m%d)${ISO_VERSION_SUFFIX:-}"
-    sed -i.bak "s/@ISO_VERSION@/${ISO_VERSION}/g" "$BRANDING_FILE"
+    sed -i.bak "s|@ISO_VERSION@|${ISO_VERSION}|g" "$BRANDING_FILE"
     echo "[build-iso] Branding version substituted: ${ISO_VERSION}"
 fi
 
