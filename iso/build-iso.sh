@@ -142,6 +142,7 @@ mkdir -p "${AIROOTFS}/var/tmp"
 # regenerate initramfs images during the rootfs upgrade below (the live medium
 # uses dracut), and a failing hook aborts the whole transaction.
 chroot "${AIROOTFS}" pacman -Rdd --noconfirm mkinitcpio mkinitcpio-archiso 2>/dev/null || true
+
 # The bootc image can be days or weeks old while Arch mirrors only keep the
 # current versions of every package. With a stale sync database pacman asks for
 # files that no longer exist (HTTP 404: kwidgetsaddons, kpmcore, ki18n,
@@ -170,16 +171,21 @@ LOCAL_PKGS="${LOCAL_PKGS}xfdesktop,xfce4-screensaver,xfce4-docklike-plugin-git,"
 LOCAL_PKGS="${LOCAL_PKGS}xfce-aero-lang-changer,networkmanager-dispatcher-chrony"
 
 echo "[build-iso] Refreshing pacman keyring and upgrading rootfs..."
+IMAGE_KERNEL=$(chroot "${AIROOTFS}" pacman -Q linux)
 chroot "${AIROOTFS}" pacman --noconfirm -Sy --needed archlinux-keyring
 chroot "${AIROOTFS}" pacman --noconfirm --ignore "${LOCAL_PKGS}" -Syu
 
-# Fail loudly if the kernel no longer carries bcachefs: the live medium must be
-# able to create and mount bcachefs during installation.
-if ! chroot "${AIROOTFS}" sh -c 'ls /usr/lib/modules/*/kernel/fs/bcachefs/bcachefs.ko* >/dev/null 2>&1'; then
-    echo "ERROR: installed kernel has no bcachefs module; refusing to build a broken ISO"
+# The live medium must boot a kernel that can create and mount bcachefs (the
+# installer's default filesystem). bcachefs is built into the kernel image
+# (CONFIG_BCACHEFS_FS=y), not a module, so verify the image's kernel survived
+# the upgrade rather than probing for a .ko.
+if [ "$(chroot "${AIROOTFS}" pacman -Q linux)" != "${IMAGE_KERNEL}" ]; then
+    echo "ERROR: linux was upgraded during the rootfs refresh (was '${IMAGE_KERNEL}',"
+    echo "       now '$(chroot "${AIROOTFS}" pacman -Q linux)'); the official Arch kernel"
+    echo "       has no bcachefs support, so the ISO could not install onto bcachefs"
     exit 1
 fi
-echo "[build-iso] Rootfs upgraded"
+echo "[build-iso] Rootfs upgraded, kernel held at ${IMAGE_KERNEL}"
 
 # Disable bootc auto-update timer in live environment
 chroot "${AIROOTFS}" systemctl mask bootc-fetch-apply-updates.timer 2>/dev/null || true
