@@ -50,8 +50,47 @@ modules:
         - noto-fonts-emoji
         - noto-fonts-extra
         # Desktop environment
-        - xorg
-        - xorg-drivers
+        #
+        # The X server is xorg-server-phoenix (dec05eba's fork), installed from
+        # the prebuilt package tarball further down together with its matching
+        # xf86-input-libinput-phoenix. Arch's `xorg` and `xorg-drivers` are
+        # deliberately not listed:
+        #   - xorg-drivers would pull every xf86-video-* / xf86-input-* module,
+        #     which are built against VIDEODRV ABI 25 / XINPUT ABI 24 while the
+        #     fork requires 28 / 26. They cannot load, and the input ones would
+        #     leave the image without a keyboard or mouse in the live session.
+        #   - the fork targets the modesetting driver, which is built into the
+        #     server, so no xf86-video-* is needed for accelerated output.
+        # The X utilities are therefore listed explicitly instead of via the
+        # `xorg` group, which also carries xorg-server and would conflict.
+        - xorg-xrandr
+        - xorg-xrdb
+        - xorg-xmodmap
+        - xorg-xinit
+        - xorg-xauth
+        - xorg-iceauth
+        - xorg-setxkbmap
+        - xorg-xkbcomp
+        - xorg-xset
+        - xorg-xsetroot
+        - xorg-xprop
+        - xorg-xwininfo
+        - xorg-xdpyinfo
+        - xorg-xinput
+        - xorg-xhost
+        - xorg-xkill
+        - xorg-xbacklight
+        - xorg-xgamma
+        - xorg-xrefresh
+        - xorg-xev
+        - xorg-xvinfo
+        - xorg-xdriinfo
+        - xorg-xlsclients
+        - xorg-xwd
+        - xorg-sessreg
+        - xorg-mkfontscale
+        - xorg-font-util
+        - xorg-fonts-encodings
         - xfce4
         - xfce4-screenshooter
         - obsidian-icon-theme
@@ -131,7 +170,38 @@ modules:
       - |
         PKGS_URL="https://github.com/fiftydinar/xfce-aerolike/releases/download/packages/xfce-aerolike-packages.tar.gz"
         wget --retry-connrefused --tries=10 "$PKGS_URL" -O /tmp/pkgs.tar.gz && tar -xzf /tmp/pkgs.tar.gz -C /tmp/
+        # Swap Arch's X server for xorg-server-phoenix. lightdm and several X
+        # utilities depend on xorg-server, so Arch's copy is pulled in by the
+        # package list above; the phoenix packages conflict with it and with
+        # xf86-input-libinput, so they are removed first and our packages then
+        # satisfy those dependencies through their provides.
+        #
+        # Both packages must be present before anything is removed. The server
+        # alone is not enough: the fork's input ABI is 26 while Arch's libinput
+        # driver is built for 24, so the two cannot be mixed - swapping only the
+        # server would leave a session with no keyboard or mouse. Requiring the
+        # pair means a run where either build failed degrades to Arch's server
+        # plus Arch's driver, which is a working combination.
+        PHOENIX_SWAP=0
+        if ls /tmp/packages/xorg-server-phoenix-*.pkg.tar.zst >/dev/null 2>&1 \
+           && ls /tmp/packages/xf86-input-libinput-phoenix-*.pkg.tar.zst >/dev/null 2>&1; then
+            PHOENIX_SWAP=1
+            pacman -Rdd --noconfirm xorg-server xorg-server-common 2>/dev/null || true
+            pacman -Rdd --noconfirm xf86-input-libinput 2>/dev/null || true
+        else
+            echo "WARNING: the package tarball is missing xorg-server-phoenix and/or"
+            echo "         xf86-input-libinput-phoenix; keeping Arch's xorg-server + driver"
+        fi
         pacman -U --noconfirm --ask 4 /tmp/packages/*.pkg.tar.zst
+        # Assert the end state matches what was intended. A mismatch here means
+        # the image boots the wrong X server, or no input driver at all, which is
+        # not obvious until someone looks at a session.
+        if [ "$PHOENIX_SWAP" = 1 ]; then
+            pacman -Q xorg-server-phoenix >/dev/null 2>&1 || { echo "ERROR: xorg-server-phoenix is not installed"; exit 1; }
+            pacman -Q xf86-input-libinput-phoenix >/dev/null 2>&1 || { echo "ERROR: xf86-input-libinput-phoenix is not installed"; exit 1; }
+            if pacman -Q xorg-server >/dev/null 2>&1; then echo "ERROR: Arch xorg-server is still installed alongside the fork"; exit 1; fi
+            if pacman -Q xf86-input-libinput >/dev/null 2>&1; then echo "ERROR: stock xf86-input-libinput present, ABI mismatch with the fork"; exit 1; fi
+        fi
         rm -rf /tmp/packages/ /tmp/pkgs.tar.gz
       # Generate unbound-control TLS certificates (chown at runtime)
       - "unbound-control-setup"
