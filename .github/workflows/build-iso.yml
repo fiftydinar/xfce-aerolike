@@ -108,10 +108,17 @@ jobs:
           else
             IMAGE_TAG=$(skopeo list-tags "docker://ghcr.io/fiftydinar/xfce-aerolike" | jq -r '.Tags[] | select(. | startswith("br-${{ github.ref_name }}-"))' | sort -r | head -1)
             if [ -z "$IMAGE_TAG" ]; then
-              echo "ERROR: no image found for branch ${{ github.ref_name }}"
-              exit 1
+              # No image published for this branch: fall back to the main image.
+              # The ISO job mostly exercises iso/build-iso.sh (chroot setup,
+              # rootfs upgrade, dracut, mkarchiso), which is worth validating on
+              # a branch even when a branch-specific image does not exist yet.
+              echo "WARNING: no image found for branch ${{ github.ref_name }}, falling back to latest"
+              IMAGE_TAG="latest"
             fi
-            ISO_VERSION_SUFFIX="-${{ github.ref_name }}"
+            # Branch names contain '/' (fix/foo), which must not leak into the
+            # version string: it ends up in the ISO file name and volume label
+            # and breaks path handling downstream. Sanitize it.
+            ISO_VERSION_SUFFIX="-${GITHUB_REF_NAME//\//-}"
           fi
           echo "Using image tag: ${IMAGE_TAG}"
           export ISO_VERSION_SUFFIX
@@ -155,6 +162,7 @@ jobs:
           fi
 
       - name: Delete old ISO releases (keep 30)
+        if: github.ref == 'refs/heads/main'
         run: |
           API_URL="https://api.github.com/repos/${{ github.repository }}/releases?per_page=100"
           curl -sS -H "Authorization: token ${{ github.token }}" "$API_URL" \
@@ -168,6 +176,7 @@ jobs:
             done
 
       - name: Create ISO release
+        if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.iso.outputs.tag }}

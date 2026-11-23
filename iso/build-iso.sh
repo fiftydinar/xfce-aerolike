@@ -138,6 +138,55 @@ echo "[build-iso] Mounted /dev"
 # Ensure /var/tmp exists (dracut uses it as default TMPDIR)
 mkdir -p "${AIROOTFS}/var/tmp"
 
+# Remove mkinitcpio before upgrading: its pacman hooks would otherwise try to
+# regenerate initramfs images during the rootfs upgrade below (the live medium
+# uses dracut), and a failing hook aborts the whole transaction.
+chroot "${AIROOTFS}" pacman -Rdd --noconfirm mkinitcpio mkinitcpio-archiso 2>/dev/null || true
+
+# The bootc image can be days or weeks old while Arch mirrors only keep the
+# current versions of every package. With a stale sync database pacman asks for
+# files that no longer exist (HTTP 404: kwidgetsaddons, kpmcore, ki18n,
+# kcoreaddons...) and rejects freshly signed packages because the keyring is
+# outdated. Refresh the keyring and upgrade the rootfs first, so the packages
+# installed below resolve against the live repositories and stay
+# library-compatible with each other (and with the Calamares build).
+#
+# Packages this repository builds itself (see build-packages.yml, shipped in the
+# "packages" release) are held back:
+#   - linux: the bcachefs-enabled kernel the live medium boots. Official Arch
+#     kernels carry no bcachefs (dropped from mainline), so upgrading it would
+#     leave the ISO unable to create or mount the filesystem it installs onto.
+#   - systemd: trimmed build (no resolved/networkd/homed/...), matching the
+#     image's unbound-based DNS setup.
+#   - gtk2, compiz, emerald, libwnck, xfdesktop, xfce4-screensaver,
+#     glycin-ng*, gtk-nocsd-git, oomd-git, dwarfs-bin,
+#     xfce4-docklike-plugin-git, xfce-aero-lang-changer,
+#     networkmanager-dispatcher-chrony: carry local patches.
+#   - bcachefs-tools, rust-bindgen: keep the pinned tooling consistent.
+LOCAL_PKGS="linux,linux-headers,linux-docs,systemd,systemd-libs,"
+LOCAL_PKGS="${LOCAL_PKGS}systemd-sysvcompat,bcachefs-tools,rust-bindgen,"
+LOCAL_PKGS="${LOCAL_PKGS}gtk2,libwnck,compiz,emerald,glycin-ng,"
+LOCAL_PKGS="${LOCAL_PKGS}glycin-ng-librsvg,gtk-nocsd-git,oomd-git,dwarfs-bin,"
+LOCAL_PKGS="${LOCAL_PKGS}xfdesktop,xfce4-screensaver,xfce4-docklike-plugin-git,"
+LOCAL_PKGS="${LOCAL_PKGS}xfce-aero-lang-changer,networkmanager-dispatcher-chrony"
+
+echo "[build-iso] Refreshing pacman keyring and upgrading rootfs..."
+IMAGE_KERNEL=$(chroot "${AIROOTFS}" pacman -Q linux)
+chroot "${AIROOTFS}" pacman --noconfirm -Sy --needed archlinux-keyring
+chroot "${AIROOTFS}" pacman --noconfirm --ignore "${LOCAL_PKGS}" -Syu
+
+# The live medium must boot a kernel that can create and mount bcachefs (the
+# installer's default filesystem). bcachefs is built into the kernel image
+# (CONFIG_BCACHEFS_FS=y), not a module, so verify the image's kernel survived
+# the upgrade rather than probing for a .ko.
+if [ "$(chroot "${AIROOTFS}" pacman -Q linux)" != "${IMAGE_KERNEL}" ]; then
+    echo "ERROR: linux was upgraded during the rootfs refresh (was '${IMAGE_KERNEL}',"
+    echo "       now '$(chroot "${AIROOTFS}" pacman -Q linux)'); the official Arch kernel"
+    echo "       has no bcachefs support, so the ISO could not install onto bcachefs"
+    exit 1
+fi
+echo "[build-iso] Rootfs upgraded, kernel held at ${IMAGE_KERNEL}"
+
 # Disable bootc auto-update timer in live environment
 chroot "${AIROOTFS}" systemctl mask bootc-fetch-apply-updates.timer 2>/dev/null || true
 echo "[build-iso] Masked bootc auto-update timer"
@@ -166,8 +215,6 @@ exit $rc
 BCACHEFSWRAPPER
 chmod +x "${AIROOTFS}/usr/bin/bcachefs"
 
-# Remove mkinitcpio if present to avoid conflicts
-chroot "${AIROOTFS}" pacman -Rdd --noconfirm mkinitcpio mkinitcpio-archiso 2>/dev/null || true
 echo "[build-iso] Package install complete"
 
 # Configure podman storage to use fuse-overlayfs as mount_program.
@@ -449,8 +496,12 @@ KVER=$(find "${AIROOTFS}/usr/lib/modules" -maxdepth 1 -type d -name "[0-9]*" -pr
 echo "[build-iso] Kernel version: ${KVER}"
 
 if [ -n "$KVER" ]; then
-    # Ensure /boot/vmlinuz-linux exists (kernel binary from container)
-    if [ ! -f "${AIROOTFS}/boot/vmlinuz-linux" ] && [ -f "${AIROOTFS}/usr/lib/modules/${KVER}/vmlinuz" ]; then
+    # Keep /boot/vmlinuz-linux in sync with the kernel we build the initramfs
+    # for: the rootfs upgrade above may have pulled a newer linux package,
+    # and a stale (or dangling-symlink) kernel image would produce a live
+    # medium that boots a kernel its modules do not match.
+    if [ -f "${AIROOTFS}/usr/lib/modules/${KVER}/vmlinuz" ]; then
+        rm -f "${AIROOTFS}/boot/vmlinuz-linux"
         cp "${AIROOTFS}/usr/lib/modules/${KVER}/vmlinuz" "${AIROOTFS}/boot/vmlinuz-linux"
     fi
     chroot "${AIROOTFS}" env TMPDIR=/tmp dracut --force --add archiso --install "/etc/passwd /etc/shadow" /boot/initramfs-linux.img "${KVER}"
@@ -521,10 +572,22 @@ echo "[build-iso] Calamares config directory created"
 # Substitute @ISO_VERSION@ placeholder in branding file
 BRANDING_FILE="${PROFILE_DIR}/airootfs/etc/calamares/branding/xfce-aerolike/branding.desc"
 if [ -f "$BRANDING_FILE" ]; then
+    # Use a delimiter that cannot appear in ${ISO_VERSION}: it embeds
+    # ISO_VERSION_SUFFIX, which for branch builds is the branch name, and
+    # branch names routinely contain '/' (fix/foo). A '/' delimiter made sed
+    # read the tail of the name as flags and abort the build:
+    #   sed: -e expression #1, char 30: unknown option to 's'
     ISO_VERSION="$(date --date="@${SOURCE_DATE_EPOCH:-$(date +%s)}" +%Y%m%d)${ISO_VERSION_SUFFIX:-}"
-    sed -i.bak "s/@ISO_VERSION@/${ISO_VERSION}/g" "$BRANDING_FILE"
+    sed -i.bak "s|@ISO_VERSION@|${ISO_VERSION}|g" "$BRANDING_FILE"
     echo "[build-iso] Branding version substituted: ${ISO_VERSION}"
 fi
+
+# The rootfs upgrade and the package installs above filled the pacman cache;
+# that cache is dead weight inside the live medium (the image already ships
+# the same packages for the offline install).
+rm -rf "${AIROOTFS}/var/cache/pacman/pkg"/* "${AIROOTFS}/tmp"/*
+mkdir -p "${AIROOTFS}/var/cache/pacman/pkg"
+echo "[build-iso] Pruned pacman cache and /tmp"
 
 echo "=== Step 7: Build ISO ==="
 echo "[build-iso] Creating marker to skip mkarchiso pacstrap (rootfs already prepared)..."

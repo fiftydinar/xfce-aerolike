@@ -66,16 +66,21 @@ jobs:
               BCACHEFS_TAG=$(git ls-remote --tags --refs https://evilpiepirate.org/git/bcachefs-tools.git | grep -o 'v[0-9.]*$' | sort -V | tail -1)
               git clone --depth 1 --branch "$BCACHEFS_TAG" https://evilpiepirate.org/git/bcachefs-tools.git /tmp/bcachefs-tools
 
-              # Copy kernel module source into kernel tree
-              rm -rf "$SRCDIR/fs/bcachefs"
-              mkdir -p "$SRCDIR/fs/bcachefs"
-              cp -r /tmp/bcachefs-tools/fs/* "$SRCDIR/fs/bcachefs/"
+              # bcachefs is maintained out of mainline, so a kernel with bcachefs
+              # support has to get the filesystem source back into its tree.
+              # Upstream ships scripts/install-to-kernel.sh for exactly this: it
+              # copies the checkout's fs/ to fs/bcachefs/ and wires it into
+              # fs/Kconfig + fs/Makefile (idempotent, anchored on btrfs). Prefer
+              # it over the hand-rolled cp/sed we used to do, so kernel-tree
+              # changes on the bcachefs side are picked up automatically.
+              sh /tmp/bcachefs-tools/scripts/install-to-kernel.sh "$SRCDIR"
 
-              # Patch fs/Kconfig to add bcachefs entry
-              sed -i '/source "fs\/zonefs\/Kconfig"/a source "fs/bcachefs\/Kconfig"' "$SRCDIR/fs/Kconfig"
-
-              # Patch fs/Makefile to build bcachefs
-              echo 'obj-$(CONFIG_BCACHEFS_FS)  += bcachefs/' >> "$SRCDIR/fs/Makefile"
+              # Assertions: if the layout of either the upstream script or the
+              # kernel tree changes, fail loudly instead of shipping a kernel
+              # without bcachefs.
+              [ -f "$SRCDIR/fs/bcachefs/Kconfig" ] || { echo "ERROR: fs/bcachefs/Kconfig missing after install-to-kernel.sh"; exit 1; }
+              grep -q '^source "fs/bcachefs/Kconfig"$' "$SRCDIR/fs/Kconfig" || { echo "ERROR: fs/Kconfig does not source bcachefs"; exit 1; }
+              grep -q 'CONFIG_BCACHEFS_FS' "$SRCDIR/fs/Makefile" || { echo "ERROR: fs/Makefile does not build bcachefs"; exit 1; }
 
               # Enable bcachefs kernel options, disable debug info to save space
               cd "$SRCDIR"
@@ -231,6 +236,27 @@ jobs:
               curl -sfLO https://archive.archlinux.org/packages/r/rust-bindgen/rust-bindgen-0.72.1-3-x86_64.pkg.tar.zst
               pacman -U --noconfirm rust-bindgen-0.72.1-3-x86_64.pkg.tar.zst
               bindgen --version | awk '{print $2}' | grep -qx '0.72.1' || { echo "ERROR: rust-bindgen downgrade to 0.72.1 failed"; exit 1; }
+
+              # linux-api-headers 7.3 (core, 2026-10-19) renamed
+              # bvec_iter.bi_bvec_done to bi_offset. bcachefs-tools compiles
+              # its bundled kernel code against the *host* kernel version
+              # (fs/bcachefs.h includes <linux/version.h>), but ships its own
+              # pre-7.3 copy of struct bvec_iter in include/linux/bvec.h, so
+              # the 7.3+ code paths fail with "struct bvec_iter has no member
+              # named 'bi_offset'" (fs/data/read.c, fs/vfs/buffered.c,
+              # fs/util/util.c, fs/vendor/bio_iov_iter.c).
+              # Alias the two names so both code paths compile against the
+              # vendored struct; drop this once upstream syncs bvec.h.
+              SRCDIR=$(find "${BUILDDIR:-/build}/src" -maxdepth 1 -type d -name 'bcachefs-tools*' | head -1)
+              [ -n "$SRCDIR" ] || { echo "ERROR: bcachefs-tools source dir not found"; exit 1; }
+              BVEC="$SRCDIR/include/linux/bvec.h"
+              [ -f "$BVEC" ] || { echo "ERROR: $BVEC not found (upstream layout changed)"; exit 1; }
+              if grep -q 'bi_offset' "$BVEC"; then
+                echo "bvec.h already provides bi_offset, skipping compat shim"
+              else
+                printf '\n/* kernel >= 7.3 renamed this field to bi_offset */\n#define bi_offset bi_bvec_done\n' >> "$BVEC"
+                grep -q '^#define bi_offset bi_bvec_done$' "$BVEC" || { echo "ERROR: bi_offset compat shim not applied"; exit 1; }
+              fi
 
 
     container:
