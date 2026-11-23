@@ -130,11 +130,38 @@ jobs:
           - name: compiz
             enabled: true
             repo: https://aur.archlinux.org/compiz.git
+            # The plugin list is the Aero-like set. Note that decor, move,
+            # resize, place, snap, compiztoolbox and extrawm all hard-require
+            # the composite plugin in their <deps>, so compiz cannot run as a
+            # window manager with compositing disabled. That is why the X
+            # server's own compositing is turned off instead, in
+            # files/etc/X11/xorg.conf.d/20-compositing.conf, so compiz owns it.
+            # See that file for what the fork consequently cannot do (direct
+            # scanout, per-window HDR) and why the alternative is not viable.
             prepare: |
               awk -i inplace 'BEGIN{rc=1} /-DCOMPIZ_DEFAULT_PLUGINS=/{sub(/-DCOMPIZ_DEFAULT_PLUGINS=.*/,"-DCOMPIZ_DEFAULT_PLUGINS=\"composite,opengl,decor,grid,move,place,regex,resize,snap,text,compiztoolbox,ring,wall,animation,blur,extrawm\""); rc=0} 1; END{exit rc}' ./PKGBUILD
             patch: |
               SRCDIR=$(find "${BUILDDIR:-/build}/src" -maxdepth 1 -type d -name 'compiz*' | head -1)
               [ -n "$SRCDIR" ] || { echo "ERROR: source dir not found"; exit 1; }
+              # 0001 sets two composite-plugin defaults that interact with the
+              # phoenix server; both are deliberate, see the patch itself:
+              #
+              # force_independent_output_painting=true. Read at
+              # plugins/composite/src/screen.cpp:975 via the generated accessor
+              # optionGetForceIndependentOutputPainting(). It only matters when
+              # outputs overlap (clone/mirror): false paints one fullscreen pass,
+              # true paints each output separately. Coherent with a server that
+              # keeps per-monitor framebuffers.
+              #
+              # unredirect_fullscreen_windows=false. That was to avoid tearing on
+              # upstream Xorg, where an unredirected fullscreen window draws
+              # straight to the screen with no tear-free mechanism. The phoenix
+              # server removes that rationale - per-monitor framebuffers are
+              # tear-free even uncomposited - but enabling it still would not give
+              # direct scanout, because the server only scans out windows it
+              # redirected itself. So it would only save a composite pass at the
+              # risk of the known multi-monitor unredirect glitches. Left off on
+              # purpose; do not flip it back without real multi-monitor hardware.
               for p in 0001-compiz-defaults 0002-auto-fullscreen 0003-invert-keybindings 0004-fix-ccsm-reset-profile 0005-fix-ccsm-reset-settings 0006-ignore-client-self-minimize 0007-fix-cache-content-hash 0008-set-fullscreen-keybinding; do
                 curl -sLO "https://raw.githubusercontent.com/fiftydinar/xfce-aerolike/refs/heads/main/patches/compiz/${p}.patch"
                 cd "$SRCDIR"
