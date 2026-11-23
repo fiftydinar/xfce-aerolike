@@ -135,7 +135,24 @@ jobs:
             patch: |
               SRCDIR=$(find "${BUILDDIR:-/build}/src" -maxdepth 1 -type d -name 'compiz*' | head -1)
               [ -n "$SRCDIR" ] || { echo "ERROR: source dir not found"; exit 1; }
-              for p in 0001-compiz-defaults 0002-auto-fullscreen 0003-invert-keybindings 0004-fix-ccsm-reset-profile 0005-fix-ccsm-reset-settings 0006-ignore-client-self-minimize 0007-fix-cache-content-hash 0008-set-fullscreen-keybinding; do
+              # 0009 sets opengl/"always_swap_buffers" to false. With it on, every
+              # frame, full-screen or not, goes through glXSwapBuffers. With it
+              # off, non-full-screen frames use the blit path and only the damaged
+              # region is copied - less GPU work for the same result. It used to be
+              # kept on for smoothness and to avoid tearing, and neither reason
+              # applies here: the phoenix server presents whatever the compositor
+              # produced at each monitor's vblank without tearing.
+              #
+              # 0010 replaces the composite plugin's "detect_refresh_rate" and
+              # "refresh_rate" options with pacing derived from the enabled
+              # outputs. A single screen-wide rate is meaningless when the server
+              # keeps a framebuffer per monitor, and it was queried with the
+              # deprecated XRRGetScreenInfo/XRRConfigCurrentRate pair, which
+              # reports an arbitrary output on a multi-monitor setup. Pacing now
+              # follows the fastest enabled output. That is the rate compiz
+              # *produces* frames at; the server keeps every monitor tear-free at
+              # any rate, so this is a frame-rate question, not a tearing one.
+              for p in 0001-compiz-defaults 0002-auto-fullscreen 0003-invert-keybindings 0004-fix-ccsm-reset-profile 0005-fix-ccsm-reset-settings 0006-ignore-client-self-minimize 0007-fix-cache-content-hash 0008-set-fullscreen-keybinding 0009-always-swap-buffers 0010-detect-refresh-rate-per-output; do
                 curl -sLO "https://raw.githubusercontent.com/fiftydinar/xfce-aerolike/refs/heads/main/patches/compiz/${p}.patch"
                 cd "$SRCDIR"
                 patch -p1 -F100 < "/build/${p}.patch"
