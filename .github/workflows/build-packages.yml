@@ -204,10 +204,6 @@ jobs:
             enabled: true
             repo: https://aur.archlinux.org/dwarfs-bin.git
 
-          - name: yserver-git
-            enabled: false
-            repo: https://aur.archlinux.org/yserver-git.git
-
           - name: bcachefs-tools
             enabled: true
             repo: https://gitlab.archlinux.org/archlinux/packaging/packages/bcachefs-tools.git
