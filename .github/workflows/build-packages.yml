@@ -162,6 +162,15 @@ jobs:
               # redirected itself. So it would only save a composite pass at the
               # risk of the known multi-monitor unredirect glitches. Left off on
               # purpose; do not flip it back without real multi-monitor hardware.
+              #
+              # 0002-auto-fullscreen: detects windows that size themselves to
+              # fill the screen without setting _NET_WM_STATE_FULLSCREEN. It used
+              # to compare against screen->fullscreenOutput(), which compiz sets
+              # to (0, 0, screenW, screenH) - the bounding box of all monitors -
+              # so it missed a window filling exactly one monitor, the normal
+              # case on a per-monitor server, and matched a window spanning every
+              # monitor instead. It now tests containment against each
+              # screen->outputDevs() entry, which covers both.
               for p in 0001-compiz-defaults 0002-auto-fullscreen 0003-invert-keybindings 0004-fix-ccsm-reset-profile 0005-fix-ccsm-reset-settings 0006-ignore-client-self-minimize 0007-fix-cache-content-hash 0008-set-fullscreen-keybinding; do
                 curl -sLO "https://raw.githubusercontent.com/fiftydinar/xfce-aerolike/refs/heads/main/patches/compiz/${p}.patch"
                 cd "$SRCDIR"
