@@ -482,7 +482,11 @@ chmod -R +x "$DRACUT_MODDIR"
 mkdir -p "${AIROOTFS}/etc/dracut.conf.d"
 cat > "${AIROOTFS}/etc/dracut.conf.d/50-archiso.conf" << 'CONFEOF'
 add_dracutmodules+=" archiso "
-omit_dracutmodules+=" dmsquash-live dmsquash-live-autooverlay livenet "
+# The live root is mounted by archiso-root.service, not as a bootc/ostree
+# sysroot.mount. Those modules add bootc-root-setup.service to
+# initrd-root-fs.target.requires; it Requires=sysroot.mount and prevents
+# initrd-root-fs.target (and therefore switch-root) from starting here.
+omit_dracutmodules+=" dmsquash-live dmsquash-live-autooverlay livenet bootc ostree "
 hostonly="no"
 compress="zstd"
 CONFEOF
