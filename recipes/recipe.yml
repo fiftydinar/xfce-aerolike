@@ -176,27 +176,30 @@ modules:
         # xf86-input-libinput, so they are removed first and our packages then
         # satisfy those dependencies through their provides.
         #
-        # Guarded on the tarball actually containing phoenix: on a run where the
-        # package build did not produce it (first build after adding it, or a
-        # failed job), removing the only X server would leave an image that
-        # cannot start a graphical session. Keeping Arch's server is the safe
-        # degradation.
-        if ls /tmp/packages/xorg-server-phoenix-*.pkg.tar.zst >/dev/null 2>&1; then
+        # Both packages must be present before anything is removed. The server
+        # alone is not enough: the fork's input ABI is 26 while Arch's libinput
+        # driver is built for 24, so the two cannot be mixed - swapping only the
+        # server would leave a session with no keyboard or mouse. Requiring the
+        # pair means a run where either build failed degrades to Arch's server
+        # plus Arch's driver, which is a working combination.
+        PHOENIX_SWAP=0
+        if ls /tmp/packages/xorg-server-phoenix-*.pkg.tar.zst >/dev/null 2>&1 \
+           && ls /tmp/packages/xf86-input-libinput-phoenix-*.pkg.tar.zst >/dev/null 2>&1; then
+            PHOENIX_SWAP=1
             pacman -Rdd --noconfirm xorg-server xorg-server-common 2>/dev/null || true
             pacman -Rdd --noconfirm xf86-input-libinput 2>/dev/null || true
         else
-            echo "WARNING: no xorg-server-phoenix in the package tarball, keeping Arch's xorg-server"
+            echo "WARNING: the package tarball is missing xorg-server-phoenix and/or"
+            echo "         xf86-input-libinput-phoenix; keeping Arch's xorg-server + driver"
         fi
         pacman -U --noconfirm --ask 4 /tmp/packages/*.pkg.tar.zst
-        # Assert the intended server is the one that ended up installed. A
-        # mismatch here means the image boots the wrong X server, which is not
-        # obvious until someone looks at a session.
-        if ls /tmp/packages/xorg-server-phoenix-*.pkg.tar.zst >/dev/null 2>&1; then
+        # Assert the end state matches what was intended. A mismatch here means
+        # the image boots the wrong X server, or no input driver at all, which is
+        # not obvious until someone looks at a session.
+        if [ "$PHOENIX_SWAP" = 1 ]; then
             pacman -Q xorg-server-phoenix >/dev/null 2>&1 || { echo "ERROR: xorg-server-phoenix is not installed"; exit 1; }
             pacman -Q xf86-input-libinput-phoenix >/dev/null 2>&1 || { echo "ERROR: xf86-input-libinput-phoenix is not installed"; exit 1; }
             if pacman -Q xorg-server >/dev/null 2>&1; then echo "ERROR: Arch xorg-server is still installed alongside the fork"; exit 1; fi
-            # The fork's input ABI is 26. Arch's libinput driver is built for 24
-            # and silently fails to load, leaving no pointer or keyboard.
             if pacman -Q xf86-input-libinput >/dev/null 2>&1; then echo "ERROR: stock xf86-input-libinput present, ABI mismatch with the fork"; exit 1; fi
         fi
         rm -rf /tmp/packages/ /tmp/pkgs.tar.gz
