@@ -95,7 +95,7 @@ jobs:
             patch: |
               SRCDIR=$(find "${BUILDDIR:-/build}/src" -maxdepth 1 -type d -name 'xfce4-screensaver*' | head -1)
               [ -n "$SRCDIR" ] || { echo "ERROR: source dir not found at ${BUILDDIR:-/build}/src"; exit 1; }
-              curl -sLO https://raw.githubusercontent.com/fiftydinar/xfce-aerolike/refs/heads/main/patches/xfce4-screensaver/0001-set-default-wallpaper.patch
+              curl -fsSLO --retry 3 "https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/patches/xfce4-screensaver/0001-set-default-wallpaper.patch" || { echo "ERROR: could not fetch 0001-set-default-wallpaper.patch"; exit 1; }
               cd "$SRCDIR"
               patch -p1 < /build/0001-set-default-wallpaper.patch
               cd /build
@@ -152,8 +152,15 @@ jobs:
               # follows the fastest enabled output. That is the rate compiz
               # *produces* frames at; the server keeps every monitor tear-free at
               # any rate, so this is a frame-rate question, not a tearing one.
+              # Patches are fetched at the commit being built, not from main. A
+              # branch or PR build must test the patches in that branch;
+              # pinning to refs/heads/main silently tested whatever main had, so
+              # a changed patch looked verified while the old one was applied.
+              # The -f flag matters too: without it curl writes a 404 body into
+              # the patch file and patch reports "Only garbage was found in the
+              # patch input".
               for p in 0001-compiz-defaults 0002-auto-fullscreen 0003-invert-keybindings 0004-fix-ccsm-reset-profile 0005-fix-ccsm-reset-settings 0006-ignore-client-self-minimize 0007-fix-cache-content-hash 0008-set-fullscreen-keybinding 0009-always-swap-buffers 0010-detect-refresh-rate-per-output; do
-                curl -sLO "https://raw.githubusercontent.com/fiftydinar/xfce-aerolike/refs/heads/main/patches/compiz/${p}.patch"
+                curl -fsSLO --retry 3 "https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/patches/compiz/${p}.patch" || { echo "ERROR: could not fetch ${p}.patch"; exit 1; }
                 cd "$SRCDIR"
                 patch -p1 -F100 < "/build/${p}.patch"
                 cd /build
