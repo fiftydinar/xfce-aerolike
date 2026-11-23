@@ -114,6 +114,19 @@ jobs:
             enabled: true
             repo: https://aur.archlinux.org/gtk2.git
 
+          # dec05eba's Xorg fork ("phoenix"): server-side compositing, HDR,
+          # per-monitor framebuffers, per-monitor DPI. Built here because it is
+          # AUR-only and because its driver ABI differs from Arch's server, so
+          # it must ship together with xf86-input-libinput-phoenix (see
+          # build-chain); Arch's prebuilt xf86-input-* / xf86-video-* modules
+          # declare older ABIs and will not load against it.
+          # Split package: also produces xorg-server-common-phoenix,
+          # xorg-server-devel-phoenix (needed to build libinput-phoenix) and the
+          # xephyr/xvfb/xnest/src variants. All land in this artifact.
+          - name: xorg-server-phoenix
+            enabled: true
+            repo: https://aur.archlinux.org/xorg-server-phoenix.git
+
           - name: compiz
             enabled: true
             repo: https://aur.archlinux.org/compiz.git
@@ -383,6 +396,15 @@ jobs:
               cp PKGBUILD-librsvg-shim PKGBUILD
               # PKGBUILD moved to the repo top level as PKGBUILD-librsvg-shim
               # (upstream commit 4a4c6eb); bring it to the makepkg root.
+
+          # Input driver for the phoenix server. Its XInput ABI is 26, while
+          # Arch's xf86-input-libinput is built against 24, so the stock package
+          # fails to load and the image would end up with no keyboard or mouse.
+          # It needs xorg-server-devel-phoenix to compile, which is why this is
+          # in build-chain with the server as its dependency.
+          - name: xf86-input-libinput-phoenix
+            repo: https://aur.archlinux.org/xf86-input-libinput-phoenix.git
+            deps: xorg-server-phoenix
 
     container:
       image: docker.io/archlinux:latest
