@@ -202,6 +202,25 @@ modules:
             if pacman -Q xorg-server >/dev/null 2>&1; then echo "ERROR: Arch xorg-server is still installed alongside the fork"; exit 1; fi
             if pacman -Q xf86-input-libinput >/dev/null 2>&1; then echo "ERROR: stock xf86-input-libinput present, ABI mismatch with the fork"; exit 1; fi
         fi
+        # Xorg's CAP_SYS_NICE is a file capability - the security.capability xattr
+        # on /usr/lib/Xorg - applied by the package's post_install hook, not by the
+        # build. pacman -U above runs that hook, so it should be set; check anyway,
+        # because everything after this point copies files: buildah commits the
+        # layer, chunkah chunks it, and the install converts the image to an
+        # ostree/composefs commit. Any of those can drop an xattr, and a missing
+        # capability is silent - the server just logs "Realtime scheduling:
+        # no (needs CAP_SYS_NICE)" and runs its threads at normal priority.
+        if [ -e /usr/lib/Xorg ]; then
+            if getcap /usr/lib/Xorg 2>/dev/null | grep -q cap_sys_nice; then
+                echo "xorg cap_sys_nice: present"
+            elif setcap cap_sys_nice+ep /usr/lib/Xorg 2>/dev/null; then
+                echo "xorg cap_sys_nice: re-applied (the package hook did not leave it set)"
+            else
+                echo "ERROR: could not set CAP_SYS_NICE on /usr/lib/Xorg"; exit 1
+            fi
+        else
+            echo "ERROR: /usr/lib/Xorg is missing, no server to give CAP_SYS_NICE to"; exit 1
+        fi
         rm -rf /tmp/packages/ /tmp/pkgs.tar.gz
       # Generate unbound-control TLS certificates (chown at runtime)
       - "unbound-control-setup"
