@@ -74,7 +74,11 @@ echo "[build-iso] Creating container from image..."
 CID=$(podman create "${IMAGE_REF}" 2>/dev/null)
 echo "[build-iso] Container ID: ${CID}"
 echo "[build-iso] Exporting container filesystem (this may take a while)..."
-podman export "${CID}" | tar -xf- -C "${AIROOTFS}"
+# --xattrs matters: podman export writes file capabilities as the
+# security.capability xattr, and GNU tar drops every xattr without it. Without
+# this flag /usr/lib/Xorg loses CAP_SYS_NICE in the live medium, so its threads
+# and GPU work silently run at normal priority.
+podman export "${CID}" | tar --xattrs -xf- -C "${AIROOTFS}"
 echo "[build-iso] Container exported, removing..."
 podman rm "${CID}" >/dev/null 2>&1 || true
 echo "[build-iso] Container removed"
@@ -214,6 +218,22 @@ rc=$?
 exit $rc
 BCACHEFSWRAPPER
 chmod +x "${AIROOTFS}/usr/bin/bcachefs"
+
+# Re-assert Xorg's CAP_SYS_NICE rather than trusting it to have survived the
+# export. The capability is a file xattr applied by the package's post_install
+# hook, so it travels through the image layer, the export and this extraction -
+# three places that can each drop it. Setting it here is idempotent and removes
+# the dependency on all three.
+if [ -e "${AIROOTFS}/usr/lib/Xorg" ]; then
+    if chroot "${AIROOTFS}" getcap /usr/lib/Xorg 2>/dev/null | grep -q cap_sys_nice; then
+        echo "[build-iso] Xorg has CAP_SYS_NICE"
+    elif chroot "${AIROOTFS}" setcap cap_sys_nice+ep /usr/lib/Xorg 2>/dev/null; then
+        echo "[build-iso] Xorg CAP_SYS_NICE re-applied (it was lost on the way here)"
+    else
+        echo "[build-iso] WARNING: could not give Xorg CAP_SYS_NICE;"
+        echo "[build-iso]          its threads and GPU work will use normal priority"
+    fi
+fi
 
 echo "[build-iso] Package install complete"
 
