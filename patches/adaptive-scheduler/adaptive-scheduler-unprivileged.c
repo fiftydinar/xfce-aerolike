@@ -119,12 +119,29 @@ static bool pid_belongs_to_me(pid_t pid) {
     return match;
 }
 
+/* Open a predictable /tmp staging file without following a planted symlink.
+ * A plain O_CREAT (worse, O_TRUNC) on a name in /tmp lets any local user point
+ * that name at a file of theirs, or at one of ours, and have it followed or
+ * truncated. O_EXCL refuses to reuse an existing entry; O_NOFOLLOW refuses to
+ * follow a symlink left at the name. If someone wins the race and creates the
+ * entry between the failed open and our unlink, the retry fails and the caller
+ * skips this pass rather than writing to an unknown file. */
+static int open_tmp_file(const char *tmp) {
+    int fd = open(tmp, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC,
+                  0644);
+    if (fd >= 0) return fd;
+    if (errno != EEXIST) return -1;
+    unlink(tmp);
+    return open(tmp, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC,
+                0644);
+}
+
 /* Write a /tmp file atomically (tmp file + rename) so a concurrent reader
  * (the root daemon, or us) never sees a torn write. */
 static void atomic_write(const char *path, const char *data) {
     char tmp[PATH_MAX];
     snprintf(tmp, sizeof tmp, "%s.tmp", path);
-    int fd = open(tmp, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    int fd = open_tmp_file(tmp);
     if (fd < 0) return;
     size_t len = strlen(data);
     ssize_t w = len ? write(fd, data, len) : 0;
@@ -294,8 +311,17 @@ static void collect_ranges(void) {
 
     FILE *fp = fopen(tpath, "r");
     if (!fp) return;
-    FILE *out = fopen(rtmp, "w");
+    /* Same reason as open_tmp_file(): a predictable name under /tmp must not
+     * be opened by following whatever is there. */
+    int outfd = open_tmp_file(rtmp);
+    if (outfd < 0) {
+        fclose(fp);
+        return;
+    }
+    FILE *out = fdopen(outfd, "w");
     if (!out) {
+        close(outfd);
+        unlink(rtmp);
         fclose(fp);
         return;
     }

@@ -1,48 +1,70 @@
 #!/bin/bash
+#
+# Tune the kernel's dirty page writeback thresholds for the disk the system is
+# installed on. Runs once at boot from dirty-centisecs-aerolike.service.
 
-OS_INSTALLED_DISK=$(lsblk -ls | awk '$NF == "/boot" { m = 1; next } m && $NF == "disk" { print $1 ; exit}')
+# Resolve the disk from /boot, whether it is its own partition or part of the
+# root filesystem. The previous lsblk -ls | awk pipeline depended on the exact
+# column layout and on /boot appearing as a mountpoint in that listing; findmnt
+# asks the question directly and lsblk's PKNAME gives the parent disk for both
+# partitions and device-mapper devices.
+BOOT_DEVICE=$(findmnt -no SOURCE /boot 2>/dev/null)
+if [[ -n "${BOOT_DEVICE}" ]]; then
+  OS_INSTALLED_DISK=$(lsblk -no PKNAME "${BOOT_DEVICE}" 2>/dev/null)
+  if [[ -z "${OS_INSTALLED_DISK}" ]]; then
+    # No parent, so the device is the disk itself
+    OS_INSTALLED_DISK=$(basename "${BOOT_DEVICE}")
+  fi
+fi
 
 if [[ -z "${OS_INSTALLED_DISK}" ]]; then
   echo "Cannot determine OS installed disk, leaving dirty centisecs at defaults"
   exit 0
 fi
 
-# Check if the disk is rotational
-if [[ -e "/sys/block/${OS_INSTALLED_DISK}/queue/rotational" ]]; then
-  ROTATION=$(cat "/sys/block/${OS_INSTALLED_DISK}/queue/rotational")
-  if [[ "${ROTATION}" == 1 ]]; then
-    ROTATIONAL=true
-  else
-    ROTATIONAL=false
-  fi
+# Check if the disk is rotational. If the attribute cannot be read, skip tuning
+# rather than guessing: the previous version left ROTATIONAL unset in that case
+# and then ran `! "${ROTATIONAL}"`, which executes "" as a command name.
+if ! ROTATION=$(cat "/sys/block/${OS_INSTALLED_DISK}/queue/rotational" 2>/dev/null); then
+  echo "There is no rotational value for the OS installed disk, leaving dirty centisecs at defaults"
+  exit 0
+fi
+
+if [[ "${ROTATION}" == 1 ]]; then
+  ROTATIONAL=true
 else
-  echo "There is no rotational value for the OS installed disk."
+  ROTATIONAL=false
 fi
 
-if [[ "${OS_INSTALLED_DISK}" == nvme?n? ]] && ! "${ROTATIONAL}"; then
-  echo "Writing 'vm.dirty_expire_centisecs' value to 500 for NVME."
-  sysctl -w "vm.dirty_expire_centisecs=500"
-  echo "Writing 'vm.dirty_writeback_centisecs' value to 250 for NVME."
-  sysctl -w "vm.dirty_writeback_centisecs=250"
-fi
-
-if [[ "${OS_INSTALLED_DISK}" == mmcblk? ]]; then
-  echo "Writing 'vm.dirty_expire_centisecs' value to 3000 for microSD/eMMC."
-  sysctl -w "vm.dirty_expire_centisecs=3000"
-  echo "Writing 'vm.dirty_writeback_centisecs' value to 1500 for microSD/eMMC."
-  sysctl -w "vm.dirty_writeback_centisecs=1500"
-fi
-
-if [[ "${OS_INSTALLED_DISK}" == sd? ]] && ! "${ROTATIONAL}"; then
-  echo "Writing 'vm.dirty_expire_centisecs' value to 500 for SATA SSD."
-  sysctl -w "vm.dirty_expire_centisecs=500"
-  echo "Writing 'vm.dirty_writeback_centisecs' value to 250 for SATA SSD."
-  sysctl -w "vm.dirty_writeback_centisecs=250"
-fi
-
-if [[ "${OS_INSTALLED_DISK}" == sd? ]] && "${ROTATIONAL}"; then
-  echo "Writing 'vm.dirty_expire_centisecs' value to 3000 for HDD."
-  sysctl -w "vm.dirty_expire_centisecs=3000"
-  echo "Writing 'vm.dirty_writeback_centisecs' value to 1500 for HDD."
-  sysctl -w "vm.dirty_writeback_centisecs=1500"
-fi
+# The device-name patterns are deliberately loose. The old ones were
+# nvme?n?, mmcblk? and sd?, which match only single-digit names: nvme10n1,
+# mmcblk10 and sdaa all fell through and got no tuning at all.
+case "${OS_INSTALLED_DISK}" in
+  nvme*n*)
+    if [[ "${ROTATIONAL}" == false ]]; then
+      echo "Writing 'vm.dirty_expire_centisecs' value to 500 for NVME."
+      sysctl -w "vm.dirty_expire_centisecs=500"
+      echo "Writing 'vm.dirty_writeback_centisecs' value to 250 for NVME."
+      sysctl -w "vm.dirty_writeback_centisecs=250"
+    fi
+    ;;
+  mmcblk*)
+    echo "Writing 'vm.dirty_expire_centisecs' value to 3000 for microSD/eMMC."
+    sysctl -w "vm.dirty_expire_centisecs=3000"
+    echo "Writing 'vm.dirty_writeback_centisecs' value to 1500 for microSD/eMMC."
+    sysctl -w "vm.dirty_writeback_centisecs=1500"
+    ;;
+  sd*)
+    if [[ "${ROTATIONAL}" == false ]]; then
+      echo "Writing 'vm.dirty_expire_centisecs' value to 500 for SATA SSD."
+      sysctl -w "vm.dirty_expire_centisecs=500"
+      echo "Writing 'vm.dirty_writeback_centisecs' value to 250 for SATA SSD."
+      sysctl -w "vm.dirty_writeback_centisecs=250"
+    else
+      echo "Writing 'vm.dirty_expire_centisecs' value to 3000 for HDD."
+      sysctl -w "vm.dirty_expire_centisecs=3000"
+      echo "Writing 'vm.dirty_writeback_centisecs' value to 1500 for HDD."
+      sysctl -w "vm.dirty_writeback_centisecs=1500"
+    fi
+    ;;
+esac

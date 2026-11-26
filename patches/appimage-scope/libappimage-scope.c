@@ -482,7 +482,10 @@ int execle(const char *path, const char *arg, ...) {
     envp = va_arg(ap, char **);
     va_end(ap);
     if (!argv) { errno = ENOMEM; return -1; }
-    int r = execvpe(path, argv, envp);
+    /* execle takes a pathname, exactly like execve; execvpe would search PATH
+     * and can therefore run a different binary. Go through our own execve so
+     * the scope logic still applies. */
+    int r = execve(path, argv, envp);
     free(argv);
     return r;
 }
