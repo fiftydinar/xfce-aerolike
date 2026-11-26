@@ -5,6 +5,8 @@ name: Build compiz (branch check)
 # is a copy of the compiz entry in build-packages.yml.
 
 on:
+  pull_request:
+    branches: [main]
   workflow_dispatch:
     inputs:
       ref:
@@ -38,8 +40,11 @@ jobs:
           echo "BUILDDIR=/build" >> $GITHUB_ENV
 
       - name: Clone compiz
+        env:
+          REF: ${{ inputs.ref }}
         run: |
-          git clone --depth 1 --branch "${{ inputs.ref }}" \
+          [ -n "$REF" ] || REF=fix/review-followup
+          git clone --depth 1 --branch "$REF" \
             https://github.com/fiftydinar/compiz-xfce-aerolike.git /build
           git -C /build log --oneline -3
 
