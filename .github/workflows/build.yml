@@ -26,9 +26,25 @@ jobs:
         recipe:
           - recipe.yml
     steps:
+      # Check out first so the recipe on disk can be rewritten before the build
+      # reads it, and tell the action not to check out again (skip_checkout).
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # The recipe fetches the scheduler and shim sources over HTTPS at build
+      # time. Pinning them to this commit means the image contains the sources
+      # this recipe was committed with, instead of whatever main happens to hold
+      # when the build runs - the same class of bug as the compiz patch step,
+      # where a branch build silently tested main's files.
+      - name: Pin fetched sources to this commit
+        run: sed -i "s|__SOURCE_REF__|${GITHUB_SHA}|g" "recipes/${{ matrix.recipe }}"
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+
       - name: Build Custom Image
         uses: blue-build/github-action@v1.14
         with:
+          skip_checkout: true
           recipe: ${{ matrix.recipe }}
           cosign_private_key: ${{ secrets.SIGNING_SECRET }}
           registry_token: ${{ github.token }}
