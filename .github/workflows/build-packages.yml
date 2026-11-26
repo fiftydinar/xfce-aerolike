@@ -4,22 +4,37 @@ on:
     - cron: "00 03 * * *"
   workflow_dispatch:
 
-# The bcachefs version, in one place, used by both consumers: the kernel module
-# spliced into linux, and the bcachefs-tools package. Those two jobs run in the
-# same matrix and therefore in parallel, and each would otherwise resolve
-# "newest tag" at its own moment - a tag pushed between the two lookups would
-# build the kernel module and the userspace tools from different versions, which
-# is an on-disk format mismatch between the kernel and the tools that write it.
-# Pinning also means a new upstream tag cannot silently break the kernel build
-# the way v1.39.7 did when Linux 7.3.6 renamed workqueue::system_unbound.
-#
-# To bump: change this, then run the workflow and confirm both jobs pass.
-env:
-  BCACHEFS_VERSION: v1.39.7
-
 jobs:
+  # bcachefs has two consumers here: the module source spliced into linux, and the
+  # bcachefs-tools package. They are two entries in the same matrix, so they run
+  # in parallel, and each used to resolve "newest tag" with its own ls-remote - a
+  # release tagged between those two lookups would build the kernel module and the
+  # userspace tools from different versions, which is an on-disk format mismatch
+  # between the tools that write it and the kernel that reads it.
+  #
+  # Resolving once here and handing the result to both removes that race without
+  # hardcoding a version: it still follows the newest upstream release. The result
+  # is exported as BCACHEFS_TAG into each consumer job's environment, because env
+  # is not available inside strategy.matrix for the per-package scripts.
+  resolve-bcachefs:
+    name: Resolve bcachefs version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.tag.outputs.version }}
+    steps:
+      - name: Find the newest bcachefs-tools release tag
+        id: tag
+        run: |
+          VERSION=$(git ls-remote --tags --refs https://evilpiepirate.org/git/bcachefs-tools.git \
+                    | sed -n 's|.*refs/tags/\(v[0-9][0-9.]*\)$|\1|p' \
+                    | sort -V | tail -1)
+          [ -n "$VERSION" ] || { echo "ERROR: no bcachefs-tools release tag found upstream"; exit 1; }
+          echo "Resolved bcachefs-tools version: $VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
   build-foundation:
     name: ${{ matrix.pkg.name }}
+    needs: resolve-bcachefs
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -76,11 +91,11 @@ jobs:
               pacman -S --noconfirm --needed git
 
               # Clone bcachefs-tools for the kernel module source (latest release tag)
-              BCACHEFS_TAG="${{ env.BCACHEFS_VERSION }}"
+              : "${BCACHEFS_TAG:?bcachefs version was not resolved by resolve-bcachefs}"
               git ls-remote --tags --refs https://evilpiepirate.org/git/bcachefs-tools.git "$BCACHEFS_TAG" | grep -q . \
                 || { echo "ERROR: bcachefs-tools tag $BCACHEFS_TAG does not exist upstream"; exit 1; }
               git clone --depth 1 --branch "$BCACHEFS_TAG" https://evilpiepirate.org/git/bcachefs-tools.git /tmp/bcachefs-tools
-              echo "bcachefs kernel module source: $BCACHEFS_TAG (pinned)"
+              echo "bcachefs kernel module source: $BCACHEFS_TAG (resolved once for both consumers)"
 
               # bcachefs is maintained out of mainline, so a kernel with bcachefs
               # support has to get the filesystem source back into its tree.
@@ -257,11 +272,11 @@ jobs:
             repo: https://gitlab.archlinux.org/archlinux/packaging/packages/bcachefs-tools.git
             skippgpcheck: true
             prepare: |
-              BCACHEFS_TAG="${{ env.BCACHEFS_VERSION }}"
+              : "${BCACHEFS_TAG:?bcachefs version was not resolved by resolve-bcachefs}"
               git ls-remote --tags --refs https://evilpiepirate.org/git/bcachefs-tools.git "$BCACHEFS_TAG" | grep -q . \
                 || { echo "ERROR: bcachefs-tools tag $BCACHEFS_TAG does not exist upstream"; exit 1; }
               BCACHEFS_VER=${BCACHEFS_TAG#v}
-              echo "bcachefs userspace tools: $BCACHEFS_TAG (pinned, same as the kernel module)"
+              echo "bcachefs userspace tools: $BCACHEFS_TAG (same as the kernel module)"
               # Switch source from GitHub to evilpiepirate (matches kernel module source)
               # Range ends at the closing ') of the b2sums array (which spans two lines)
               sed -i "/^source=(/,/')$/c source=(\"git+https://evilpiepirate.org/git/bcachefs-tools.git#tag=${BCACHEFS_TAG}\")" PKGBUILD
@@ -363,6 +378,10 @@ jobs:
             git clone --depth 1 "$url" /build
           fi
           ls -la /build/
+
+      - name: Export the resolved bcachefs version
+        if: ${{ matrix.pkg.enabled && (matrix.pkg.name == 'linux' || matrix.pkg.name == 'bcachefs-tools') }}
+        run: echo "BCACHEFS_TAG=${{ needs.resolve-bcachefs.outputs.version }}" >> "$GITHUB_ENV"
 
       - name: Apply patches
         if: ${{ matrix.pkg.enabled && matrix.pkg.prepare }}
