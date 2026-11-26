@@ -166,9 +166,9 @@ chroot "${AIROOTFS}" pacman -Rdd --noconfirm mkinitcpio mkinitcpio-archiso 2>/de
 #     glycin-ng*, gtk-nocsd-git, oomd-git, dwarfs-bin,
 #     xfce4-docklike-plugin-git, xfce-aero-lang-changer,
 #     networkmanager-dispatcher-chrony: carry local patches.
-#   - bcachefs-tools, rust-bindgen: keep the pinned tooling consistent.
+#   - bcachefs-tools: built here, pinned to the same version as the kernel module.
 LOCAL_PKGS="linux,linux-headers,linux-docs,systemd,systemd-libs,"
-LOCAL_PKGS="${LOCAL_PKGS}systemd-sysvcompat,bcachefs-tools,rust-bindgen,"
+LOCAL_PKGS="${LOCAL_PKGS}systemd-sysvcompat,bcachefs-tools,"
 LOCAL_PKGS="${LOCAL_PKGS}gtk2,libwnck,compiz,emerald,glycin-ng,"
 LOCAL_PKGS="${LOCAL_PKGS}glycin-ng-librsvg,gtk-nocsd-git,oomd-git,dwarfs-bin,"
 LOCAL_PKGS="${LOCAL_PKGS}xfdesktop,xfce4-screensaver,xfce4-docklike-plugin-git,"
