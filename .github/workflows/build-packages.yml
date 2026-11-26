@@ -493,9 +493,18 @@ jobs:
           # fails to load and the image would end up with no keyboard or mouse.
           # It needs xorg-server-devel-phoenix to compile, which is why this is
           # in build-chain with the server as its dependency.
+          #
+          # xorg-server-phoenix depends on this driver at runtime, so the pair
+          # is circular: installing the server to get xorg-server-devel-phoenix
+          # fails with "cannot resolve xf86-input-libinput-phoenix, a dependency
+          # of xorg-server-phoenix", because the driver is what this job is about
+          # to build. Let pacman treat the driver as already present for that
+          # transaction; the real package is produced here and installed together
+          # with the server when the image is assembled.
           - name: xf86-input-libinput-phoenix
             repo: https://aur.archlinux.org/xf86-input-libinput-phoenix.git
             deps: xorg-server-phoenix
+            assume_installed: xf86-input-libinput-phoenix=0
 
     container:
       image: docker.io/archlinux:latest
@@ -541,8 +550,17 @@ jobs:
 
       - name: Install pre-built AUR deps
         if: ${{ matrix.pkg.deps }}
+        env:
+          ASSUME_INSTALLED: ${{ matrix.pkg.assume_installed }}
         run: |
-          pacman -U --noconfirm /deps/*.pkg.tar.zst
+          # A package can depend on the one being built (e.g. the phoenix server
+          # requires the phoenix libinput driver). --assume-installed lets the
+          # dependency-specific transaction complete without installing it.
+          if [ -n "$ASSUME_INSTALLED" ]; then
+            pacman -U --noconfirm --assume-installed "$ASSUME_INSTALLED" /deps/*.pkg.tar.zst
+          else
+            pacman -U --noconfirm /deps/*.pkg.tar.zst
+          fi
 
       - name: Clone ${{ matrix.pkg.name }}
         run: |
