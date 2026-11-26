@@ -166,9 +166,9 @@ chroot "${AIROOTFS}" pacman -Rdd --noconfirm mkinitcpio mkinitcpio-archiso 2>/de
 #     glycin-ng*, gtk-nocsd-git, oomd-git, dwarfs-bin,
 #     xfce4-docklike-plugin-git, xfce-aero-lang-changer,
 #     networkmanager-dispatcher-chrony: carry local patches.
-#   - bcachefs-tools, rust-bindgen: keep the pinned tooling consistent.
+#   - bcachefs-tools: built here, pinned to the same version as the kernel module.
 LOCAL_PKGS="linux,linux-headers,linux-docs,systemd,systemd-libs,"
-LOCAL_PKGS="${LOCAL_PKGS}systemd-sysvcompat,bcachefs-tools,rust-bindgen,"
+LOCAL_PKGS="${LOCAL_PKGS}systemd-sysvcompat,bcachefs-tools,"
 LOCAL_PKGS="${LOCAL_PKGS}gtk2,libwnck,compiz,emerald,glycin-ng,"
 LOCAL_PKGS="${LOCAL_PKGS}glycin-ng-librsvg,gtk-nocsd-git,oomd-git,dwarfs-bin,"
 LOCAL_PKGS="${LOCAL_PKGS}xfdesktop,xfce4-screensaver,xfce4-docklike-plugin-git,"
@@ -515,9 +515,39 @@ cat > "${AIROOTFS}/etc/dracut.conf.d/99-initramfs-root.conf" << 'CONFEOF'
 install_items+=" /etc/passwd /etc/shadow "
 CONFEOF
 
-# Find kernel version and regenerate initramfs with dracut
-KVER=$(find "${AIROOTFS}/usr/lib/modules" -maxdepth 1 -type d -name "[0-9]*" -printf "%f\n" | sort -V | tail -1)
+# Find kernel version and regenerate initramfs with dracut.
+#
+# Pick a directory that actually has modules.dep, not simply the highest-sorting
+# one. The base image ships Arch's official linux and our package replaces it,
+# which can leave the old /usr/lib/modules/<version> behind; a leftover sorts
+# higher than the kernel we installed, and dracut then tries to build an
+# initramfs for a kernel with no module metadata:
+#   dracut[W]: /usr/lib/modules/7.3.6-arch1-1/modules.dep is missing. Did you run depmod?
+#   dracut[E]: Module 'archiso' depends on module 'overlayfs', which can't be installed
+KVER=$(for d in "${AIROOTFS}"/usr/lib/modules/*/; do
+           [ -f "${d}modules.dep" ] && basename "$d"
+       done | sort -V | tail -1)
+if [ -z "$KVER" ]; then
+    echo "ERROR: no kernel with modules.dep under ${AIROOTFS}/usr/lib/modules:"
+    ls -la "${AIROOTFS}/usr/lib/modules" 2>/dev/null
+    exit 1
+fi
 echo "[build-iso] Kernel version: ${KVER}"
+
+# The chosen kernel must be the one the installed linux package provides. If it
+# is not, every module dracut installs would come from the wrong tree.
+chroot "${AIROOTFS}" pacman -Ql linux 2>/dev/null | grep -q "/usr/lib/modules/${KVER}/" \
+    || { echo "ERROR: ${KVER} is not owned by the installed linux package ($(chroot "${AIROOTFS}" pacman -Q linux 2>/dev/null))"; exit 1; }
+
+# Drop the stale ones so nothing else picks them up later.
+for _d in "${AIROOTFS}"/usr/lib/modules/*/; do
+    _v=$(basename "$_d")
+    [ "$_v" = "$KVER" ] && continue
+    if [ ! -f "${_d}modules.dep" ]; then
+        echo "[build-iso] Removing stale module directory ${_v} (no modules.dep)"
+        rm -rf "$_d"
+    fi
+done
 
 if [ -n "$KVER" ]; then
     # Keep /boot/vmlinuz-linux in sync with the kernel we build the initramfs

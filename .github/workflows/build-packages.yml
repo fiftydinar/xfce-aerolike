@@ -5,8 +5,36 @@ on:
   workflow_dispatch:
 
 jobs:
+  # bcachefs has two consumers here: the module source spliced into linux, and the
+  # bcachefs-tools package. They are two entries in the same matrix, so they run
+  # in parallel, and each used to resolve "newest tag" with its own ls-remote - a
+  # release tagged between those two lookups would build the kernel module and the
+  # userspace tools from different versions, which is an on-disk format mismatch
+  # between the tools that write it and the kernel that reads it.
+  #
+  # Resolving once here and handing the result to both removes that race without
+  # hardcoding a version: it still follows the newest upstream release. The result
+  # is exported as BCACHEFS_TAG into each consumer job's environment, because env
+  # is not available inside strategy.matrix for the per-package scripts.
+  resolve-bcachefs:
+    name: Resolve bcachefs version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.tag.outputs.version }}
+    steps:
+      - name: Find the newest bcachefs-tools release tag
+        id: tag
+        run: |
+          VERSION=$(git ls-remote --tags --refs https://evilpiepirate.org/git/bcachefs-tools.git \
+                    | sed -n 's|.*refs/tags/\(v[0-9][0-9.]*\)$|\1|p' \
+                    | sort -V | tail -1)
+          [ -n "$VERSION" ] || { echo "ERROR: no bcachefs-tools release tag found upstream"; exit 1; }
+          echo "Resolved bcachefs-tools version: $VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
   build-foundation:
     name: ${{ matrix.pkg.name }}
+    needs: resolve-bcachefs
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -48,13 +76,15 @@ jobs:
                 exit 1
               fi
             patch: |
-              # rust-bindgen 0.73.0 (Arch, 2026-09-05) changed opaque-array
-              # codegen to #[repr(C, align(n))], which breaks bcachefs's
-              # packed structs (E0588) and its layout size checks (E0080).
-              # Pin 0.72.1 from the Arch archive until upstream adapts.
-              curl -sfLO https://archive.archlinux.org/packages/r/rust-bindgen/rust-bindgen-0.72.1-3-x86_64.pkg.tar.zst
-              pacman -U --noconfirm rust-bindgen-0.72.1-3-x86_64.pkg.tar.zst
-              bindgen --version | awk '{print $2}' | grep -qx '0.72.1' || { echo "ERROR: rust-bindgen downgrade to 0.72.1 failed"; exit 1; }
+              # rust-bindgen needs no pin: v1.39.5 of bcachefs-tools fixed the
+              # breakage with 0.73 ("Builds against bindgen 0.73, which broke both
+              # the userspace and the DKMS builds outright on distros that had
+              # it"), and v1.39.5 is the oldest version this could be building.
+              # The pin also had a side effect worth losing: the .pkg.tar.zst was
+              # downloaded into /build, so it matched the artifact upload glob and
+              # was shipped inside the package tarball as a runtime package. It is
+              # a build tool and has no business in the image.
+              bindgen --version
 
               SRCDIR=$(find "${BUILDDIR:-/build}/src" -maxdepth 1 -type d -name 'linux-*' | head -1)
               [ -n "$SRCDIR" ] || { echo "ERROR: source dir not found"; exit 1; }
@@ -63,8 +93,11 @@ jobs:
               pacman -S --noconfirm --needed git
 
               # Clone bcachefs-tools for the kernel module source (latest release tag)
-              BCACHEFS_TAG=$(git ls-remote --tags --refs https://evilpiepirate.org/git/bcachefs-tools.git | grep -o 'v[0-9.]*$' | sort -V | tail -1)
+              : "${BCACHEFS_TAG:?bcachefs version was not resolved by resolve-bcachefs}"
+              git ls-remote --tags --refs https://evilpiepirate.org/git/bcachefs-tools.git "$BCACHEFS_TAG" | grep -q . \
+                || { echo "ERROR: bcachefs-tools tag $BCACHEFS_TAG does not exist upstream"; exit 1; }
               git clone --depth 1 --branch "$BCACHEFS_TAG" https://evilpiepirate.org/git/bcachefs-tools.git /tmp/bcachefs-tools
+              echo "bcachefs kernel module source: $BCACHEFS_TAG (resolved once for both consumers)"
 
               # bcachefs is maintained out of mainline, so a kernel with bcachefs
               # support has to get the filesystem source back into its tree.
@@ -81,6 +114,30 @@ jobs:
               [ -f "$SRCDIR/fs/bcachefs/Kconfig" ] || { echo "ERROR: fs/bcachefs/Kconfig missing after install-to-kernel.sh"; exit 1; }
               grep -q '^source "fs/bcachefs/Kconfig"$' "$SRCDIR/fs/Kconfig" || { echo "ERROR: fs/Kconfig does not source bcachefs"; exit 1; }
               grep -q 'CONFIG_BCACHEFS_FS' "$SRCDIR/fs/Makefile" || { echo "ERROR: fs/Makefile does not build bcachefs"; exit 1; }
+
+              # bcachefs's Rust code calls kernel::workqueue::system_unbound() for its
+              # in-tree build. Linux 7.3.6 renamed that function to system_dfl() - the
+              # default queue is the unbound one, which is what bcachefs's own comment
+              # says about the C side: "system_dfl_wq: the default, unbound". So the
+              # build broke the moment Arch moved from 7.3.5 to 7.3.6, with
+              #   error[E0425]: cannot find function `system_unbound` in module
+              #   `kernel::workqueue`
+              # Decide from the kernel tree we are building rather than from a version
+              # number, so this keeps working if the rename is reverted or bcachefs
+              # adapts upstream (then the call is gone and nothing is rewritten).
+              WQ="$SRCDIR/rust/kernel/workqueue.rs"
+              AEXEC="$SRCDIR/fs/bcachefs/fs/util/async_exec.rs"
+              if [ -f "$WQ" ] && ! grep -q 'pub fn system_unbound(' "$WQ"; then
+                if grep -q 'kernel::workqueue::system_unbound()' "$AEXEC"; then
+                  sed -i 's|kernel::workqueue::system_unbound()|kernel::workqueue::system_dfl()|g' "$AEXEC"
+                  echo "bcachefs: workqueue::system_unbound -> system_dfl (kernel renamed it)"
+                fi
+                # If bcachefs still calls the old name here, the build would fail later
+                # with a message that does not say why.
+                if grep -q 'kernel::workqueue::system_unbound()' "$AEXEC"; then
+                  echo "ERROR: bcachefs still calls system_unbound(), and this kernel has system_dfl()"; exit 1
+                fi
+              fi
 
               # Enable bcachefs kernel options, disable debug info to save space
               cd "$SRCDIR"
@@ -217,8 +274,11 @@ jobs:
             repo: https://gitlab.archlinux.org/archlinux/packaging/packages/bcachefs-tools.git
             skippgpcheck: true
             prepare: |
-              BCACHEFS_TAG=$(git ls-remote --tags --refs https://evilpiepirate.org/git/bcachefs-tools.git | grep -o 'v[0-9.]*$' | sort -V | tail -1)
+              : "${BCACHEFS_TAG:?bcachefs version was not resolved by resolve-bcachefs}"
+              git ls-remote --tags --refs https://evilpiepirate.org/git/bcachefs-tools.git "$BCACHEFS_TAG" | grep -q . \
+                || { echo "ERROR: bcachefs-tools tag $BCACHEFS_TAG does not exist upstream"; exit 1; }
               BCACHEFS_VER=${BCACHEFS_TAG#v}
+              echo "bcachefs userspace tools: $BCACHEFS_TAG (same as the kernel module)"
               # Switch source from GitHub to evilpiepirate (matches kernel module source)
               # Range ends at the closing ') of the b2sums array (which spans two lines)
               sed -i "/^source=(/,/')$/c source=(\"git+https://evilpiepirate.org/git/bcachefs-tools.git#tag=${BCACHEFS_TAG}\")" PKGBUILD
@@ -233,13 +293,15 @@ jobs:
               # prepare() references a dkms patch no longer in source; neutralize it
               sed -i '/^prepare() {/,/^}/c prepare() {\n  cd ${pkgname}\n}' PKGBUILD
             patch: |
-              # rust-bindgen 0.73.0 (Arch, 2026-09-05) changed opaque-array
-              # codegen to #[repr(C, align(n))], which breaks bcachefs's
-              # packed structs (E0588) and its layout size checks (E0080).
-              # Pin 0.72.1 from the Arch archive until upstream adapts.
-              curl -sfLO https://archive.archlinux.org/packages/r/rust-bindgen/rust-bindgen-0.72.1-3-x86_64.pkg.tar.zst
-              pacman -U --noconfirm rust-bindgen-0.72.1-3-x86_64.pkg.tar.zst
-              bindgen --version | awk '{print $2}' | grep -qx '0.72.1' || { echo "ERROR: rust-bindgen downgrade to 0.72.1 failed"; exit 1; }
+              # rust-bindgen needs no pin: v1.39.5 of bcachefs-tools fixed the
+              # breakage with 0.73 ("Builds against bindgen 0.73, which broke both
+              # the userspace and the DKMS builds outright on distros that had
+              # it"), and v1.39.5 is the oldest version this could be building.
+              # The pin also had a side effect worth losing: the .pkg.tar.zst was
+              # downloaded into /build, so it matched the artifact upload glob and
+              # was shipped inside the package tarball as a runtime package. It is
+              # a build tool and has no business in the image.
+              bindgen --version
 
               # linux-api-headers 7.3 (core, 2026-10-19) renamed
               # bvec_iter.bi_bvec_done to bi_offset. bcachefs-tools compiles
@@ -320,6 +382,10 @@ jobs:
             git clone --depth 1 "$url" /build
           fi
           ls -la /build/
+
+      - name: Export the resolved bcachefs version
+        if: ${{ matrix.pkg.enabled && (matrix.pkg.name == 'linux' || matrix.pkg.name == 'bcachefs-tools') }}
+        run: echo "BCACHEFS_TAG=${{ needs.resolve-bcachefs.outputs.version }}" >> "$GITHUB_ENV"
 
       - name: Apply patches
         if: ${{ matrix.pkg.enabled && matrix.pkg.prepare }}
