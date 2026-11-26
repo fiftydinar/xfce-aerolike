@@ -351,7 +351,11 @@ jobs:
       - name: Prepare build container
         if: ${{ matrix.pkg.enabled }}
         run: |
-          pacman -Sy --noconfirm base-devel git sudo pacman-contrib ccache github-cli
+          # Full upgrade, not just -Sy: Arch is rolling and partial upgrades
+          # are unsupported. A newly installed package can be built against
+          # a newer glibc than the base image ships, which breaks the build
+          # (meson's python fails on libm.so.6 missing GLIBC_2.44).
+          pacman -Syu --noconfirm base-devel git sudo pacman-contrib ccache github-cli
           useradd -m builder && echo 'builder ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
           mkdir -p /ccache && chown builder:builder /ccache
           sed -i 's/!ccache/ccache/' /etc/makepkg.conf
@@ -415,7 +419,7 @@ jobs:
         run: |
           cd /build
           . ./PKGBUILD
-          pacman -Sy --noconfirm --needed base-devel ${depends[@]} ${makedepends[@]} 2>/dev/null || true
+          pacman -Syu --noconfirm --needed base-devel ${depends[@]} ${makedepends[@]} 2>/dev/null || true
 
       - name: Build patched package
         if: ${{ matrix.pkg.enabled && matrix.pkg.patch }}
@@ -513,7 +517,11 @@ jobs:
     steps:
       - name: Prepare build container
         run: |
-          pacman -Sy --noconfirm base-devel git sudo pacman-contrib ccache github-cli
+          # Full upgrade, not just -Sy: Arch is rolling and partial upgrades
+          # are unsupported. A newly installed package can be built against
+          # a newer glibc than the base image ships, which breaks the build
+          # (meson's python fails on libm.so.6 missing GLIBC_2.44).
+          pacman -Syu --noconfirm base-devel git sudo pacman-contrib ccache github-cli
           useradd -m builder && echo 'builder ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
           mkdir -p /ccache && chown builder:builder /ccache
           sed -i 's/!ccache/ccache/' /etc/makepkg.conf
@@ -585,7 +593,7 @@ jobs:
         run: |
           cd /build
           . ./PKGBUILD
-          pacman -Sy --noconfirm --needed base-devel ${depends[@]} ${makedepends[@]} 2>/dev/null || true
+          pacman -Syu --noconfirm --needed base-devel ${depends[@]} ${makedepends[@]} 2>/dev/null || true
 
       - name: Build ${{ matrix.pkg.name }}
         run: |
