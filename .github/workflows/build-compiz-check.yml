@@ -1,0 +1,63 @@
+name: Build compiz (branch check)
+
+# Temporary: builds the compiz repository from a branch instead of its main, so a
+# change to the compositor can be compiled before it is merged. Everything else
+# is a copy of the compiz entry in build-packages.yml.
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch or tag of fiftydinar/compiz-xfce-aerolike to build
+        required: true
+        default: main
+
+jobs:
+  compiz:
+    name: compiz (${{ inputs.ref }})
+    runs-on: ubuntu-latest
+    container:
+      image: docker.io/archlinux:latest
+      options: --cap-add=SYS_ADMIN --tmpfs /build:size=14G,exec
+    steps:
+      - name: Prepare build container
+        run: |
+          pacman -Sy --noconfirm base-devel git sudo ccache
+          useradd -m builder && echo 'builder ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
+          mkdir -p /ccache && chown builder:builder /ccache
+          sed -i 's/!ccache/ccache/' /etc/makepkg.conf
+          sed -i '/^OPTIONS=(/ { s/ !debug//g; s/ debug/ !debug/; }' /etc/makepkg.conf
+
+      - name: Configure compiler flags
+        run: |
+          echo "MAKEFLAGS=-j$(nproc)" >> $GITHUB_ENV
+          echo "CCACHE_DIR=/ccache" >> $GITHUB_ENV
+          echo "CCACHE_COMPRESS=1" >> $GITHUB_ENV
+          echo "CFLAGS=-pipe" >> $GITHUB_ENV
+          echo "CXXFLAGS=-pipe" >> $GITHUB_ENV
+          echo "BUILDDIR=/build" >> $GITHUB_ENV
+
+      - name: Clone compiz
+        run: |
+          git clone --depth 1 --branch "${{ inputs.ref }}" \
+            https://github.com/fiftydinar/compiz-xfce-aerolike.git /build
+          git -C /build log --oneline -3
+
+      - name: Install official dependencies
+        run: |
+          cd /build
+          . ./PKGBUILD
+          pacman -Sy --noconfirm --needed base-devel ${depends[@]} ${makedepends[@]}
+
+      - name: Build compiz
+        run: |
+          cd /build
+          chown -R builder:builder /build
+          sudo -E -u builder makepkg --noconfirm --syncdeps --nocheck
+
+      - name: Upload package
+        uses: actions/upload-artifact@v7
+        with:
+          name: compiz
+          path: /build/*.pkg.tar.zst
+          compression-level: 0
