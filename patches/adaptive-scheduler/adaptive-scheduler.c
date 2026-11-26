@@ -133,7 +133,10 @@ static const int NICE_LONG_IDLE  = 10;  /* very background */
  * DE -- only CPU priority. */
 static const int NICE_DESKTOP = -5;
 
-#define MAX_PIDS 256
+/* Per-scope PID array starts small and grows; the old fixed 256 silently
+ * truncated cgroup.procs, so a browser or Electron app with more processes
+ * than that had the rest ignored by classification. */
+#define INITIAL_PIDS 64
 #define MAX_IOVEC 1024
 #define MAX_SESSIONS 64
 
@@ -216,7 +219,8 @@ typedef struct {
 
 typedef struct ScopeEnt {
     char path[PATH_MAX];
-    ProcJiff procs[MAX_PIDS];
+    ProcJiff *procs;
+    int procs_cap;
     int npids;
     int idle_count;
     Tier last_tier;
@@ -249,6 +253,7 @@ static void prune_scopes(void) {
         struct stat st;
         if (stat(e->path, &st) != 0) {
             *pp = e->next;
+            free(e->procs);
             free(e);
         } else {
             pp = &e->next;
@@ -433,6 +438,23 @@ static unsigned long long memlow_bytes(Tier tier, unsigned long long total_ram) 
 
 /* ---------- IPC: publish to / read from the per-user helper ---------- */
 
+/* Open a predictable /tmp staging file without following a planted symlink.
+ * A plain O_CREAT (worse, O_TRUNC) on a name in /tmp lets any local user point
+ * that name at a file of theirs, or at one of ours, and have it followed or
+ * truncated. O_EXCL refuses to reuse an existing entry; O_NOFOLLOW refuses to
+ * follow a symlink left at the name. If someone wins the race and creates the
+ * entry between the failed open and our unlink, the retry fails and the caller
+ * skips this pass rather than writing to an unknown file. */
+static int open_tmp_file(const char *tmp) {
+    int fd = open(tmp, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC,
+                  0644);
+    if (fd >= 0) return fd;
+    if (errno != EEXIST) return -1;
+    unlink(tmp);
+    return open(tmp, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC,
+                0644);
+}
+
 static void write_uid_file(const char *kind, const char *uid_str,
                            const char *buf, size_t len) {
     /* Write atomically (tmp file + rename) so the per-user helper never
@@ -441,7 +463,7 @@ static void write_uid_file(const char *kind, const char *uid_str,
     char tmp[80];
     snprintf(path, sizeof path, "/tmp/aerolike-%s-%s", kind, uid_str);
     snprintf(tmp, sizeof tmp, "%s.tmp", path);
-    int fd = open(tmp, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    int fd = open_tmp_file(tmp);
     if (fd < 0) return;
     if (len && write(fd, buf, len) != (ssize_t)len) {
         close(fd);
@@ -492,11 +514,19 @@ static void process_scope(ScopeEnt *e, SessionInfo *sessions, int nsess,
     procs[n] = 0;
 
     tok = strtok_r(procs, "\n", &save);
-    ProcJiff cur[MAX_PIDS];
+    ProcJiff *cur = NULL;
+    int cur_cap = 0;
     int ncur = 0;
-    while (tok && ncur < MAX_PIDS) {
+    while (tok) {
         pid_t pid = (pid_t)strtol(tok, NULL, 10);
         if (pid > 0) {
+            if (ncur == cur_cap) {
+                int next_cap = cur_cap ? cur_cap * 2 : INITIAL_PIDS;
+                ProcJiff *grown = realloc(cur, (size_t)next_cap * sizeof *cur);
+                if (!grown) break;   /* keep what was collected so far */
+                cur = grown;
+                cur_cap = next_cap;
+            }
             if (pid_is_foreground(pid, sessions, nsess))
                 has_foreground = true;
             /* Match jiffy state by pid: cgroup.procs order is not stable
@@ -516,7 +546,12 @@ static void process_scope(ScopeEnt *e, SessionInfo *sessions, int nsess,
         }
         tok = strtok_r(NULL, "\n", &save);
     }
-    memcpy(e->procs, cur, sizeof cur[0] * (size_t)ncur);
+    /* Swap the arrays instead of copying into a fixed buffer. Reusing the
+     * previous array's storage would mean writing into it while the lookup
+     * loop above reads it. */
+    free(e->procs);
+    e->procs = cur;
+    e->procs_cap = cur_cap;
     e->npids = ncur;
 
     /* Classify tier. Foreground wins over everything; else active; else
