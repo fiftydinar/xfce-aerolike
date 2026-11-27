@@ -281,6 +281,32 @@ jobs:
               grep -q "^  cd $SRCNAME\$" PKGBUILD
               grep -q "arch-meson $SRCNAME build" PKGBUILD
 
+          # Qt5 gets the same feature, but ported rather than copied: the fork's
+          # work is written against Qt6 and the Qt4 -> Qt5 shapes differ in ways
+          # that matter (no cached devicePixelRatio in QWindow, no std::optional,
+          # qmake instead of CMake for the xcb plugin). See
+          # patches/qt5-base/README.md. The Arch package builds KDE's qtbase at a
+          # pinned commit, so the patch is checked against that tree.
+          - name: qt5-base
+            enabled: true
+            repo: https://gitlab.archlinux.org/archlinux/packaging/packages/qt5-base
+            prepare: |
+              set -eux
+              curl -fsSL "https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/patches/qt5-base/qt5-base-dpi.patch" \
+                -o qt5-base-dpi.patch
+              # A truncated or 404 body would otherwise be fed to patch. Look for
+              # the symbol this feature adds.
+              grep -q 'readHighDpiScaleFactor' qt5-base-dpi.patch
+              # prepare() cds into the source tree and applies the PKGBUILD's own
+              # patches with ../<file> paths; append ours after them so it is the
+              # one closest to the tree that gets built.
+              sed -i '/^prepare() {$/,/^}$/ s|^}$|  patch -p1 < ../qt5-base-dpi.patch # Per-monitor fractional scaling on X11\n}|' PKGBUILD
+              # Same version, patched: the pkgrel has to sort above the repository
+              # package or pacman -U in the image build leaves Arch's copy in place.
+              sed -i 's/^pkgrel=1$/pkgrel=2/' PKGBUILD
+              sed -n '/^prepare() {$/,/^}$/p' PKGBUILD | grep -q 'qt5-base-dpi.patch'
+              grep -q '^pkgrel=2$' PKGBUILD
+
           - name: xfce4-docklike-plugin-git
             enabled: true
             repo: https://aur.archlinux.org/xfce4-docklike-plugin-git.git
