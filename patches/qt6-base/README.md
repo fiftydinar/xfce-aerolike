@@ -16,3 +16,12 @@ output property "DPI" (RR_PROPERTY_DPI); this reads it per output, turns it into
 a per-screen scale factor instead of one screen-wide one derived from the
 physical size, and rescales a window when it is moved to an output with a
 different DPI.
+
+One fix on top of the fork's commits: QHighDpiScaling::m_screenFactorSet was
+latched. The factor is read from the compositor and the property can go away -
+output unplugged, property deleted, compositor restarted - but once the flag was
+set nothing ever cleared it, so scaling stayed active with a factor nothing
+published any more and m_active stayed true for the rest of the session.
+Recomputed each pass now, with a separate flag for a factor that really was
+configured through setScreenFactor() / QT_SCREEN_SCALE_FACTORS, which does
+persist.

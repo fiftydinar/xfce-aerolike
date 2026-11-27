@@ -27,41 +27,57 @@ index c7ff2a6d..6d3a65d3 100644
  }
  
 diff --git a/src/gui/kernel/qhighdpiscaling.cpp b/src/gui/kernel/qhighdpiscaling.cpp
-index a433e94c..46f491ef 100644
+index a433e94c..1bb8c5ee 100644
 --- a/src/gui/kernel/qhighdpiscaling.cpp
 +++ b/src/gui/kernel/qhighdpiscaling.cpp
-@@ -252,7 +252,7 @@ bool QHighDpiScaling::m_active = false; //"overall active" - is there any scale
+@@ -252,7 +252,8 @@ bool QHighDpiScaling::m_active = false; //"overall active" - is there any scale
  bool QHighDpiScaling::m_usePixelDensity = false; // use scale factor from platform plugin
  bool QHighDpiScaling::m_pixelDensityScalingActive = false; // pixel density scale factor > 1
  bool QHighDpiScaling::m_globalScalingActive = false; // global scale factor is active
 -bool QHighDpiScaling::m_screenFactorSet = false; // QHighDpiScaling::setScreenFactor has been used
 +bool QHighDpiScaling::m_screenFactorSet = false; // a per-screen scale factor != 1 is in use
++bool QHighDpiScaling::m_screenFactorConfigured = false; // setScreenFactor() was called
  
  /*
      Initializes the QHighDpiScaling global variables. Called before the
-@@ -506,6 +506,21 @@ void QHighDpiScaling::updateHighDpiScaling()
+@@ -506,6 +507,28 @@ void QHighDpiScaling::updateHighDpiScaling()
              }
          }
      }
 +    // A platform plugin that publishes a per-output factor makes this a
 +    // per-screen setup even when setScreenFactor() was never called, so the
 +    // screen-aware code paths below (and m_active) have to be taken.
-+    if (!m_screenFactorSet) {
++    //
++    // Recompute instead of latching: the factor comes from the compositor and can
++    // be withdrawn - output unplugged, property removed - and a latched flag keeps
++    // scaling on with a factor nothing publishes any more. A factor set through
++    // setScreenFactor() is a configuration and does persist.
++    if (!m_screenFactorConfigured) {
++        bool anyPlatformFactor = false;
 +        const auto screens = QGuiApplication::screens();
 +        for (const QScreen *screen : screens) {
 +            const QPlatformScreen *platformScreen = screen->handle();
 +            if (platformScreen && platformScreen->hasHighDpiScaleFactor()
 +                && !qFuzzyCompare(roundScaleFactor(platformScreen->highDpiScaleFactor()), qreal(1))) {
-+                m_screenFactorSet = true;
++                anyPlatformFactor = true;
 +                break;
 +            }
 +        }
++        m_screenFactorSet = anyPlatformFactor;
 +    }
 +
      if (qEnvironmentVariableIsSet(screenFactorsEnvVar)) {
          int i = 0;
          const QString spec = qEnvironmentVariable(screenFactorsEnvVar);
-@@ -648,6 +663,12 @@ qreal QHighDpiScaling::screenSubfactor(const QPlatformScreen *screen)
+@@ -569,6 +592,7 @@ void QHighDpiScaling::setScreenFactor(QScreen *screen, qreal factor)
+ {
+     if (!qFuzzyCompare(factor, qreal(1))) {
+         m_screenFactorSet = true;
++        m_screenFactorConfigured = true;
+         m_active = true;
+     }
+ 
+@@ -648,6 +672,12 @@ qreal QHighDpiScaling::screenSubfactor(const QPlatformScreen *screen)
      if (!screen)
          return factor;
  
@@ -74,6 +90,18 @@ index a433e94c..46f491ef 100644
      // Unlike the other code where factors are combined by multiplication,
      // factors from QT_SCREEN_SCALE_FACTORS takes precedence over the factor
      // computed from platform plugin DPI. The rationale is that the user is
+diff --git a/src/gui/kernel/qhighdpiscaling_p.h b/src/gui/kernel/qhighdpiscaling_p.h
+index 5b02c5d6..0a84ef0d 100644
+--- a/src/gui/kernel/qhighdpiscaling_p.h
++++ b/src/gui/kernel/qhighdpiscaling_p.h
+@@ -128,6 +128,7 @@ private:
+     static bool m_globalScalingActive;
+     static bool m_pixelDensityScalingActive;
+     static bool m_screenFactorSet;
++    static bool m_screenFactorConfigured;
+     static QDpi m_logicalDpi;
+ };
+ 
 diff --git a/src/gui/kernel/qplatformscreen.cpp b/src/gui/kernel/qplatformscreen.cpp
 index 952bcd70..202c3248 100644
 --- a/src/gui/kernel/qplatformscreen.cpp

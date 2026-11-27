@@ -12,19 +12,20 @@ index 447498d2..57f0a13c 100644
      resetCachedDevicePixelRatio();
  }
 diff --git a/src/gui/kernel/qhighdpiscaling.cpp b/src/gui/kernel/qhighdpiscaling.cpp
-index 15a9afa3..257428a0 100644
+index 15a9afa3..64c71956 100644
 --- a/src/gui/kernel/qhighdpiscaling.cpp
 +++ b/src/gui/kernel/qhighdpiscaling.cpp
-@@ -233,7 +233,7 @@ bool QHighDpiScaling::m_active = false; //"overall active" - is there any scale
+@@ -233,7 +233,8 @@ bool QHighDpiScaling::m_active = false; //"overall active" - is there any scale
  bool QHighDpiScaling::m_usePlatformPluginDpi = false; // use scale factor based on platform plugin DPI
  bool QHighDpiScaling::m_platformPluginDpiScalingActive  = false; // platform plugin DPI gives a scale factor > 1
  bool QHighDpiScaling::m_globalScalingActive = false; // global scale factor is active
 -bool QHighDpiScaling::m_screenFactorSet = false; // QHighDpiScaling::setScreenFactor has been used
 +bool QHighDpiScaling::m_screenFactorSet = false; // a per-screen scale factor != 1 is in use
++bool QHighDpiScaling::m_screenFactorConfigured = false; // setScreenFactor() was called
  bool QHighDpiScaling::m_usePhysicalDpi = false;
  QVector<QHighDpiScaling::ScreenFactor> QHighDpiScaling::m_screenFactors;
  QHighDpiScaling::DpiAdjustmentPolicy QHighDpiScaling::m_dpiAdjustmentPolicy = QHighDpiScaling::DpiAdjustmentPolicy::Unset;
-@@ -361,6 +361,14 @@ qreal QHighDpiScaling::roundScaleFactor(qreal rawFactor)
+@@ -361,6 +362,14 @@ qreal QHighDpiScaling::roundScaleFactor(qreal rawFactor)
      return roundedFactor;
  }
  
@@ -39,11 +40,15 @@ index 15a9afa3..257428a0 100644
  QDpi QHighDpiScaling::effectiveLogicalDpi(const QPlatformScreen *screen, qreal rawFactor, qreal roundedFactor)
  {
      // Apply DPI adjustment policy, if needed. If enabled this will change the
-@@ -502,6 +510,13 @@ void QHighDpiScaling::updateHighDpiScaling()
+@@ -502,6 +511,17 @@ void QHighDpiScaling::updateHighDpiScaling()
          }
      }
  
-+    if (!m_screenFactorSet) {
++    // Recompute instead of latching. The factor comes from the compositor and can
++    // be withdrawn - output unplugged, property removed - and a latched flag keeps
++    // scaling on with a factor nothing publishes any more. A factor set through
++    // setScreenFactor() is a configuration and does persist.
++    if (!m_screenFactorConfigured) {
 +        const auto screens = QGuiApplication::screens();
 +        m_screenFactorSet = std::any_of(screens.cbegin(), screens.cend(), [](const QScreen *screen) {
 +            return !qFuzzyCompare(platformScreenFactor(screen->handle()).value_or(qreal(1)), qreal(1));
@@ -53,7 +58,15 @@ index 15a9afa3..257428a0 100644
      // Check if any screens (now) has a scale factor != 1 and set
      // m_platformPluginDpiScalingActive if so.
      if (m_usePlatformPluginDpi && !m_platformPluginDpiScalingActive ) {
-@@ -596,6 +611,9 @@ qreal QHighDpiScaling::screenSubfactor(const QPlatformScreen *screen)
+@@ -556,6 +576,7 @@ void QHighDpiScaling::setScreenFactor(QScreen *screen, qreal factor)
+ 
+     if (!qFuzzyCompare(factor, qreal(1))) {
+         m_screenFactorSet = true;
++        m_screenFactorConfigured = true;
+         m_active = true;
+     }
+ 
+@@ -596,6 +617,9 @@ qreal QHighDpiScaling::screenSubfactor(const QPlatformScreen *screen)
      if (!screen)
          return factor;
  
@@ -63,6 +76,18 @@ index 15a9afa3..257428a0 100644
      // Unlike the other code where factors are combined by multiplication,
      // factors from QT_SCREEN_SCALE_FACTORS takes precedence over the factor
      // computed from platform plugin DPI. The rationale is that the user is
+diff --git a/src/gui/kernel/qhighdpiscaling_p.h b/src/gui/kernel/qhighdpiscaling_p.h
+index 938f682d..c3617d41 100644
+--- a/src/gui/kernel/qhighdpiscaling_p.h
++++ b/src/gui/kernel/qhighdpiscaling_p.h
+@@ -111,6 +111,7 @@ private:
+     static bool m_platformPluginDpiScalingActive;
+     static bool m_globalScalingActive;
+     static bool m_screenFactorSet;
++    static bool m_screenFactorConfigured;
+     static bool m_usePhysicalDpi;
+     static QVector<ScreenFactor> m_screenFactors;
+     static DpiAdjustmentPolicy m_dpiAdjustmentPolicy;
 diff --git a/src/gui/kernel/qplatformscreen.cpp b/src/gui/kernel/qplatformscreen.cpp
 index da1ca285..55d855f8 100644
 --- a/src/gui/kernel/qplatformscreen.cpp

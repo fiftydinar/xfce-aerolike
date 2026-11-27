@@ -35,6 +35,20 @@ output); this reads it per output, turns it into a per-screen scale factor
 instead of one screen-wide one derived from the physical size, and rescales a
 window when it is moved to an output with a different DPI.
 
+Two departures from the Qt6 patch. The first is a consequence of the port; the
+second is a bug the Qt6 patch had too, fixed in both:
+
+- a factor can be withdrawn, not only set. Qt6 gets that from `std::optional`,
+  which Qt5 does not have here, so the factor is a `bool` plus a `qreal` and
+  `clearHighDpiScaleFactor()` is called when the property is gone. Without it
+  the stale factor stayed and the "unchanged" comparison could never match
+  again, so every later `setOutput()` re-ran a full rescale.
+- `QHighDpiScaling::m_screenFactorSet` is recomputed each pass instead of being
+  latched, with a separate flag for a factor that really was configured through
+  `setScreenFactor()` / `QT_SCREEN_SCALE_FACTORS`. A latched flag kept scaling
+  active with a factor nothing published any more and left `m_active` true for
+  the rest of the session.
+
 Regenerate from a fork that carries the Qt6 version:
 
     git -C <qt6 fork clone> diff 3f81ad0f93..HEAD      # the specification
