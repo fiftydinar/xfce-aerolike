@@ -1,0 +1,754 @@
+diff --git a/src/gui/kernel/qguiapplication.cpp b/src/gui/kernel/qguiapplication.cpp
+index c7ff2a6d..6d3a65d3 100644
+--- a/src/gui/kernel/qguiapplication.cpp
++++ b/src/gui/kernel/qguiapplication.cpp
+@@ -3209,6 +3209,23 @@ void QGuiApplicationPrivate::processScreenLogicalDotsPerInchChange(QWindowSystem
+     emit s->logicalDotsPerInchChanged(s->logicalDotsPerInch());
+     s->d_func()->updateGeometriesWithSignals();
+ 
++    // A new scale factor means the windows on this screen have a different logical
++    // geometry even though nothing moved in native pixels; tell them, or they keep
++    // laying out for the old size.
++    const auto windows = QGuiApplication::allWindows();
++    for (QWindow *window : windows) {
++        if (window->screen() == s && window->handle()) {
++            // A child window's native geometry is relative to its parent, so only
++            // a top-level one is converted from screen pixels.
++            const QRect nativeGeometry = window->handle()->geometry();
++            QWindowSystemInterfacePrivate::GeometryChangeEvent gce(window,
++                        window->isTopLevel()
++                            ? QHighDpi::fromNativePixels(nativeGeometry, window)
++                            : QHighDpi::fromNativeLocalPosition(nativeGeometry, window));
++            processGeometryChangeEvent(&gce);
++        }
++    }
++
+     resetCachedDevicePixelRatio();
+ }
+ 
+diff --git a/src/gui/kernel/qhighdpiscaling.cpp b/src/gui/kernel/qhighdpiscaling.cpp
+index a433e94c..1bb8c5ee 100644
+--- a/src/gui/kernel/qhighdpiscaling.cpp
++++ b/src/gui/kernel/qhighdpiscaling.cpp
+@@ -252,7 +252,8 @@ bool QHighDpiScaling::m_active = false; //"overall active" - is there any scale
+ bool QHighDpiScaling::m_usePixelDensity = false; // use scale factor from platform plugin
+ bool QHighDpiScaling::m_pixelDensityScalingActive = false; // pixel density scale factor > 1
+ bool QHighDpiScaling::m_globalScalingActive = false; // global scale factor is active
+-bool QHighDpiScaling::m_screenFactorSet = false; // QHighDpiScaling::setScreenFactor has been used
++bool QHighDpiScaling::m_screenFactorSet = false; // a per-screen scale factor != 1 is in use
++bool QHighDpiScaling::m_screenFactorConfigured = false; // setScreenFactor() was called
+ 
+ /*
+     Initializes the QHighDpiScaling global variables. Called before the
+@@ -506,6 +507,28 @@ void QHighDpiScaling::updateHighDpiScaling()
+             }
+         }
+     }
++    // A platform plugin that publishes a per-output factor makes this a
++    // per-screen setup even when setScreenFactor() was never called, so the
++    // screen-aware code paths below (and m_active) have to be taken.
++    //
++    // Recompute instead of latching: the factor comes from the compositor and can
++    // be withdrawn - output unplugged, property removed - and a latched flag keeps
++    // scaling on with a factor nothing publishes any more. A factor set through
++    // setScreenFactor() is a configuration and does persist.
++    if (!m_screenFactorConfigured) {
++        bool anyPlatformFactor = false;
++        const auto screens = QGuiApplication::screens();
++        for (const QScreen *screen : screens) {
++            const QPlatformScreen *platformScreen = screen->handle();
++            if (platformScreen && platformScreen->hasHighDpiScaleFactor()
++                && !qFuzzyCompare(roundScaleFactor(platformScreen->highDpiScaleFactor()), qreal(1))) {
++                anyPlatformFactor = true;
++                break;
++            }
++        }
++        m_screenFactorSet = anyPlatformFactor;
++    }
++
+     if (qEnvironmentVariableIsSet(screenFactorsEnvVar)) {
+         int i = 0;
+         const QString spec = qEnvironmentVariable(screenFactorsEnvVar);
+@@ -569,6 +592,7 @@ void QHighDpiScaling::setScreenFactor(QScreen *screen, qreal factor)
+ {
+     if (!qFuzzyCompare(factor, qreal(1))) {
+         m_screenFactorSet = true;
++        m_screenFactorConfigured = true;
+         m_active = true;
+     }
+ 
+@@ -648,6 +672,12 @@ qreal QHighDpiScaling::screenSubfactor(const QPlatformScreen *screen)
+     if (!screen)
+         return factor;
+ 
++    // The factor the platform plugin read for this output comes first: it is what
++    // the compositor is actually going to show the window at. QT_SCREEN_SCALE_FACTORS
++    // is still consulted below for outputs that do not publish one.
++    if (screen->hasHighDpiScaleFactor())
++        return roundScaleFactor(screen->highDpiScaleFactor());
++
+     // Unlike the other code where factors are combined by multiplication,
+     // factors from QT_SCREEN_SCALE_FACTORS takes precedence over the factor
+     // computed from platform plugin DPI. The rationale is that the user is
+diff --git a/src/gui/kernel/qhighdpiscaling_p.h b/src/gui/kernel/qhighdpiscaling_p.h
+index 5b02c5d6..0a84ef0d 100644
+--- a/src/gui/kernel/qhighdpiscaling_p.h
++++ b/src/gui/kernel/qhighdpiscaling_p.h
+@@ -128,6 +128,7 @@ private:
+     static bool m_globalScalingActive;
+     static bool m_pixelDensityScalingActive;
+     static bool m_screenFactorSet;
++    static bool m_screenFactorConfigured;
+     static QDpi m_logicalDpi;
+ };
+ 
+diff --git a/src/gui/kernel/qplatformscreen.cpp b/src/gui/kernel/qplatformscreen.cpp
+index 952bcd70..202c3248 100644
+--- a/src/gui/kernel/qplatformscreen.cpp
++++ b/src/gui/kernel/qplatformscreen.cpp
+@@ -231,6 +231,34 @@ qreal QPlatformScreen::devicePixelRatio() const
+     return 1.0;
+ }
+ 
++bool QPlatformScreen::hasHighDpiScaleFactor() const
++{
++    Q_D(const QPlatformScreen);
++    return d->highDpiScaleFactorSet;
++}
++
++qreal QPlatformScreen::highDpiScaleFactor() const
++{
++    Q_D(const QPlatformScreen);
++    return d->highDpiScaleFactor;
++}
++
++void QPlatformScreen::setHighDpiScaleFactor(qreal factor)
++{
++    Q_D(QPlatformScreen);
++    d->highDpiScaleFactorSet = true;
++    d->highDpiScaleFactor = factor;
++}
++
++// Needed because the property this is read from can disappear again: the output
++// has to go back to whatever the screen-wide logic derives.
++void QPlatformScreen::clearHighDpiScaleFactor()
++{
++    Q_D(QPlatformScreen);
++    d->highDpiScaleFactorSet = false;
++    d->highDpiScaleFactor = 1.0;
++}
++
+ /*!
+     Reimplement this function in subclass to return the pixel density of the
+     screen. This is the scale factor needed to make a low-dpi application
+diff --git a/src/gui/kernel/qplatformscreen.h b/src/gui/kernel/qplatformscreen.h
+index 0be76460..ffc2a2b7 100644
+--- a/src/gui/kernel/qplatformscreen.h
++++ b/src/gui/kernel/qplatformscreen.h
+@@ -119,6 +119,11 @@ public:
+     virtual QDpi logicalDpi() const;
+     virtual QDpi logicalBaseDpi() const;
+     virtual qreal devicePixelRatio() const;
++
++    // Scale this output asks for, when the platform plugin can read one per
++    // output instead of deriving a single factor for the whole screen.
++    bool hasHighDpiScaleFactor() const;
++    qreal highDpiScaleFactor() const;
+     virtual qreal pixelDensity()  const;
+ 
+     virtual qreal refreshRate() const;
+@@ -167,6 +172,8 @@ public:
+ 
+ protected:
+     void resizeMaximizedWindows();
++    void setHighDpiScaleFactor(qreal factor);
++    void clearHighDpiScaleFactor();
+ 
+     QScopedPointer<QPlatformScreenPrivate> d_ptr;
+ 
+diff --git a/src/gui/kernel/qplatformscreen_p.h b/src/gui/kernel/qplatformscreen_p.h
+index d5dc7b47..f10c0842 100644
+--- a/src/gui/kernel/qplatformscreen_p.h
++++ b/src/gui/kernel/qplatformscreen_p.h
+@@ -61,6 +61,11 @@ class QPlatformScreenPrivate
+ {
+ public:
+     QPointer<QScreen> screen;
++
++    // Per-output scale factor, if the platform plugin has one. Qt 5 has a
++    // single screen-wide factor otherwise; see QPlatformScreen::setHighDpiScaleFactor.
++    bool highDpiScaleFactorSet = false;
++    qreal highDpiScaleFactor = 1.0;
+ };
+ 
+ QT_END_NAMESPACE
+diff --git a/src/plugins/platforms/xcb/qxcbatom.cpp b/src/plugins/platforms/xcb/qxcbatom.cpp
+index c4e2fa2a..11e45f7e 100644
+--- a/src/plugins/platforms/xcb/qxcbatom.cpp
++++ b/src/plugins/platforms/xcb/qxcbatom.cpp
+@@ -237,6 +237,7 @@ static const char *xcb_atomnames = {
+     "EDID\0"
+     "EDID_DATA\0"
+     "XFree86_DDC_EDID1_RAWDATA\0"
++    "DPI\0"
+     // \0\0 terminates loop.
+ };
+ 
+diff --git a/src/plugins/platforms/xcb/qxcbatom.h b/src/plugins/platforms/xcb/qxcbatom.h
+index 3b6b6bc1..1e3ecdeb 100644
+--- a/src/plugins/platforms/xcb/qxcbatom.h
++++ b/src/plugins/platforms/xcb/qxcbatom.h
+@@ -243,6 +243,8 @@ public:
+         EDID_DATA,
+         XFree86_DDC_EDID1_RAWDATA,
+ 
++        DPI,
++
+         NAtoms
+     };
+ 
+diff --git a/src/plugins/platforms/xcb/qxcbconnection.cpp b/src/plugins/platforms/xcb/qxcbconnection.cpp
+index ab3d3f6f..7d8cf62b 100644
+--- a/src/plugins/platforms/xcb/qxcbconnection.cpp
++++ b/src/plugins/platforms/xcb/qxcbconnection.cpp
+@@ -737,7 +737,11 @@ void QXcbConnection::handleXcbEvent(xcb_generic_event_t *event)
+         for (QXcbVirtualDesktop *virtualDesktop : qAsConst(m_virtualDesktops))
+             virtualDesktop->handleXFixesSelectionNotify(notify_event);
+     } else if (isXRandrType(response_type, XCB_RANDR_NOTIFY)) {
+-        updateScreens(reinterpret_cast<xcb_randr_notify_event_t *>(event));
++        auto notify_event = reinterpret_cast<xcb_randr_notify_event_t *>(event);
++        if (notify_event->subCode == XCB_RANDR_NOTIFY_OUTPUT_PROPERTY)
++            handleOutputPropertyChange(notify_event->u.op);
++        else
++            updateScreens(notify_event);
+     } else if (isXRandrType(response_type, XCB_RANDR_SCREEN_CHANGE_NOTIFY)) {
+         auto change_event = reinterpret_cast<xcb_randr_screen_change_notify_event_t *>(event);
+         if (auto virtualDesktop = virtualDesktopForRootWindow(change_event->root))
+diff --git a/src/plugins/platforms/xcb/qxcbconnection.h b/src/plugins/platforms/xcb/qxcbconnection.h
+index bf8ae1a1..d91fcae1 100644
+--- a/src/plugins/platforms/xcb/qxcbconnection.h
++++ b/src/plugins/platforms/xcb/qxcbconnection.h
+@@ -253,6 +253,7 @@ private:
+     QXcbScreen* findScreenForOutput(xcb_window_t rootWindow, xcb_randr_output_t output) const;
+     QXcbVirtualDesktop* virtualDesktopForRootWindow(xcb_window_t rootWindow) const;
+     void updateScreens(const xcb_randr_notify_event_t *event);
++    void handleOutputPropertyChange(const xcb_randr_output_property_t &property);
+     bool checkOutputIsPrimary(xcb_window_t rootWindow, xcb_randr_output_t output);
+     void updateScreen(QXcbScreen *screen, const xcb_randr_output_change_t &outputChange);
+     QXcbScreen *createScreen(QXcbVirtualDesktop *virtualDesktop,
+diff --git a/src/plugins/platforms/xcb/qxcbconnection_screens.cpp b/src/plugins/platforms/xcb/qxcbconnection_screens.cpp
+index 9cee3bc5..ae113d8f 100644
+--- a/src/plugins/platforms/xcb/qxcbconnection_screens.cpp
++++ b/src/plugins/platforms/xcb/qxcbconnection_screens.cpp
+@@ -184,6 +184,15 @@ void QXcbConnection::updateScreens(const xcb_randr_notify_event_t *event)
+     }
+ }
+ 
++void QXcbConnection::handleOutputPropertyChange(const xcb_randr_output_property_t &property)
++{
++    if (property.atom != atom(QXcbAtom::DPI))
++        return;
++
++    if (QXcbScreen *screen = findScreenForOutput(property.window, property.output))
++        screen->updateHighDpiScaleFactor();
++}
++
+ bool QXcbConnection::checkOutputIsPrimary(xcb_window_t rootWindow, xcb_randr_output_t output)
+ {
+     auto primary = Q_XCB_REPLY(xcb_randr_get_output_primary, xcb_connection(), rootWindow);
+diff --git a/src/plugins/platforms/xcb/qxcbscreen.cpp b/src/plugins/platforms/xcb/qxcbscreen.cpp
+index e27d043e..1ed3cbe5 100644
+--- a/src/plugins/platforms/xcb/qxcbscreen.cpp
++++ b/src/plugins/platforms/xcb/qxcbscreen.cpp
+@@ -582,6 +582,8 @@ QXcbScreen::QXcbScreen(QXcbConnection *connection, QXcbVirtualDesktop *virtualDe
+                                     "edid data: " << edid;
+         }
+     }
++
++    updateHighDpiScaleFactor();
+ }
+ 
+ QXcbScreen::~QXcbScreen()
+@@ -752,6 +754,7 @@ void QXcbScreen::setOutput(xcb_randr_output_t outputId,
+     m_mode = XCB_NONE;
+     m_outputName = getOutputName(outputInfo);
+     // TODO: Send an event to the QScreen instance that the screen changed its name
++    updateHighDpiScaleFactor();
+ }
+ 
+ int QXcbScreen::virtualDesktopNumberStatic(const QScreen *screen)
+@@ -847,6 +850,35 @@ void QXcbScreen::updateRefreshRate(xcb_randr_mode_t mode)
+     }
+ }
+ 
++void QXcbScreen::updateHighDpiScaleFactor()
++{
++    qreal factor;
++    const bool hasFactor = readHighDpiScaleFactor(&factor);
++
++    if (hasFactor == hasHighDpiScaleFactor() && (!hasFactor || qFuzzyCompare(factor, highDpiScaleFactor())))
++        return;
++
++    const qreal oldFactor = QHighDpiScaling::factor(this);
++    if (hasFactor)
++        setHighDpiScaleFactor(factor);
++    else
++        clearHighDpiScaleFactor();
++
++    // QXcbScreen::screen() returns xcb_screen_t*, which hides this one.
++    QScreen *qscreen = QPlatformScreen::screen();
++    if (!qscreen)
++        return;
++
++    // The factor is read lazily by QHighDpiScaling, so this only recomputes the
++    // global bookkeeping; the new value is picked up by factor(this) below.
++    QHighDpiScaling::updateHighDpiScaling();
++
++    const QDpi dpi = logicalDpi();
++    QXcbWindow::rescale(windows(), oldFactor, QHighDpiScaling::factor(this), [qscreen, dpi] {
++        QWindowSystemInterface::handleScreenLogicalDotsPerInchChange(qscreen, dpi.first, dpi.second);
++    });
++}
++
+ static inline bool translate(xcb_connection_t *connection, xcb_window_t child, xcb_window_t parent,
+                              int *x, int *y)
+ {
+@@ -969,6 +1001,26 @@ QByteArray QXcbScreen::getEdid() const
+     return result;
+ }
+ 
++bool QXcbScreen::readHighDpiScaleFactor(qreal *factor) const
++{
++    if (!connection()->hasXRandr() || m_output == XCB_NONE)
++        return false;
++
++    // The phoenix server publishes the scale each output is meant to be shown at
++    // as a RandR output property, because it cannot scale X11 clients itself.
++    auto reply = Q_XCB_REPLY(xcb_randr_get_output_property, xcb_connection(),
++                             m_output, atom(QXcbAtom::DPI), XCB_ATOM_INTEGER, 0, 1, false, false);
++    if (!reply || reply->type != XCB_ATOM_INTEGER || reply->format != 32 || reply->num_items != 1)
++        return false;
++
++    const int32_t dpi = *reinterpret_cast<const int32_t *>(xcb_randr_get_output_property_data(reply.get()));
++    if (dpi <= 0)
++        return false;
++
++    *factor = dpi / logicalBaseDpi().first;
++    return true;
++}
++
+ static inline void formatRect(QDebug &debug, const QRect r)
+ {
+     debug << r.width() << 'x' << r.height()
+diff --git a/src/plugins/platforms/xcb/qxcbscreen.h b/src/plugins/platforms/xcb/qxcbscreen.h
+index c3a59dc9..83a319cc 100644
+--- a/src/plugins/platforms/xcb/qxcbscreen.h
++++ b/src/plugins/platforms/xcb/qxcbscreen.h
+@@ -204,6 +204,7 @@ public:
+     void updateGeometry(xcb_timestamp_t timestamp = XCB_TIME_CURRENT_TIME);
+     void updateAvailableGeometry();
+     void updateRefreshRate(xcb_randr_mode_t mode);
++    void updateHighDpiScaleFactor();
+ 
+     QFontEngine::HintStyle hintStyle() const { return m_virtualDesktop->hintStyle(); }
+     QFontEngine::SubpixelAntialiasingType subpixelType() const { return m_virtualDesktop->subpixelType(); }
+@@ -216,6 +217,7 @@ private:
+     int forcedDpi() const;
+ 
+     QByteArray getOutputProperty(xcb_atom_t atom) const;
++    bool readHighDpiScaleFactor(qreal *factor) const;
+     QByteArray getEdid() const;
+ 
+     QXcbVirtualDesktop *m_virtualDesktop;
+diff --git a/src/plugins/platforms/xcb/qxcbwindow.cpp b/src/plugins/platforms/xcb/qxcbwindow.cpp
+index 1baf5858..27d07cf1 100644
+--- a/src/plugins/platforms/xcb/qxcbwindow.cpp
++++ b/src/plugins/platforms/xcb/qxcbwindow.cpp
+@@ -594,12 +594,7 @@ void QXcbWindow::setGeometry(const QRect &rect)
+         QWindowSystemInterface::handleWindowScreenChanged(window(), newScreen->QPlatformScreen::screen());
+ 
+     if (qt_window_private(window())->positionAutomatic) {
+-        const quint32 mask = XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT;
+-        const qint32 values[] = {
+-            qBound<qint32>(1,           rect.width(),  XCOORD_MAX),
+-            qBound<qint32>(1,           rect.height(), XCOORD_MAX),
+-        };
+-        xcb_configure_window(xcb_connection(), m_window, mask, reinterpret_cast<const quint32*>(values));
++        configureSize(rect.size());
+     } else {
+         const quint32 mask = XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y | XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT;
+         const qint32 values[] = {
+@@ -623,6 +618,16 @@ void QXcbWindow::setGeometry(const QRect &rect)
+     xcb_flush(xcb_connection());
+ }
+ 
++void QXcbWindow::configureSize(const QSize &size)
++{
++    const quint32 mask = XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT;
++    const qint32 values[] = {
++        qBound<qint32>(1, size.width(),  XCOORD_MAX),
++        qBound<qint32>(1, size.height(), XCOORD_MAX),
++    };
++    xcb_configure_window(xcb_connection(), m_window, mask, reinterpret_cast<const quint32*>(values));
++}
++
+ QMargins QXcbWindow::frameMargins() const
+ {
+     if (m_dirtyFrameMargins) {
+@@ -1849,18 +1854,13 @@ void QXcbWindow::handleConfigureNotifyEvent(const xcb_configure_notify_event_t *
+     }
+ 
+     const QRect actualGeometry = QRect(pos, QSize(event->width, event->height));
+-    QPlatformScreen *newScreen = QPlatformWindow::parent() ? QPlatformWindow::parent()->screen() : screenForGeometry(actualGeometry);
+-    if (!newScreen)
++    if (!screen())
+         return;
+ 
++    const bool geometryChanged = actualGeometry != geometry();
+     QWindowSystemInterface::handleGeometryChange(window(), actualGeometry);
+ 
+-    // QPlatformScreen::screen() is updated asynchronously, so we can't compare it
+-    // with the newScreen. Just send the WindowScreenChanged event and QGuiApplication
+-    // will make the comparison later.
+-    QWindowSystemInterface::handleWindowScreenChanged(window(), newScreen->screen());
+-
+-    if (!qFuzzyCompare(QHighDpiScaling::scaleAndOrigin(newScreen).factor, m_sizeHintsScaleFactor))
++    if (!qFuzzyCompare(QHighDpiScaling::scaleAndOrigin(screen()).factor, m_sizeHintsScaleFactor))
+         propagateSizeHints();
+ 
+     // Send the synthetic expose event on resize only when the window is shrinked,
+@@ -1876,6 +1876,16 @@ void QXcbWindow::handleConfigureNotifyEvent(const xcb_configure_notify_event_t *
+         m_syncState = SyncAndConfigureReceived;
+ 
+     m_dirtyFrameMargins = true;
++
++    // QPlatformScreen::screen() is updated asynchronously, so we can't compare it
++    // with the parent screen. Just send the WindowScreenChanged event and QGuiApplication
++    // will make the comparison later.
++    if (QPlatformWindow *parent = QPlatformWindow::parent()) {
++        if (QPlatformScreen *parentPlatformScreen = parent->screen())
++            QWindowSystemInterface::handleWindowScreenChanged(window(), parentPlatformScreen->screen());
++    } else if (geometryChanged) {
++        updateScreenAfterMoveResize();
++    }
+ }
+ 
+ bool QXcbWindow::isExposed() const
+@@ -2305,6 +2315,9 @@ void QXcbWindow::handlePropertyNotifyEvent(const xcb_property_notify_event_t *ev
+             m_windowState = newState;
+             if ((m_windowState & Qt::WindowMinimized) && connection()->mouseGrabber() == this)
+                 connection()->setMouseGrabber(nullptr);
++            // Leaving a maximized or fullscreen state lets the window manager
++            // place the window again, possibly on another output.
++            updateScreen();
+         }
+         return;
+     } else if (event->atom == atom(QXcbAtom::_NET_FRAME_EXTENTS)) {
+diff --git a/src/plugins/platforms/xcb/qxcbwindow.h b/src/plugins/platforms/xcb/qxcbwindow.h
+index e90ebe1f..30b58c03 100644
+--- a/src/plugins/platforms/xcb/qxcbwindow.h
++++ b/src/plugins/platforms/xcb/qxcbwindow.h
+@@ -41,8 +41,11 @@
+ #define QXCBWINDOW_H
+ 
+ #include <qpa/qplatformwindow.h>
++#include <QtCore/QBasicTimer>
+ #include <QtCore/QObject>
+ #include <QtCore/QPointer>
++
++#include <functional>
+ #include <QtGui/QSurfaceFormat>
+ #include <QtGui/QImage>
+ 
+@@ -198,6 +201,9 @@ public:
+     int swapInterval() const { return m_swapInterval; }
+     void setSwapInterval(int swapInterval) { m_swapInterval = swapInterval; }
+ 
++    static void rescale(const QWindowList &windows, qreal oldFactor, qreal newFactor,
++                        std::function<void()> applyScale);
++
+ public Q_SLOTS:
+     void updateSyncRequestCounter();
+ 
+@@ -209,6 +215,17 @@ protected:
+     QXcbScreen *parentScreen();
+     QXcbScreen *initialScreen() const;
+ 
++    void timerEvent(QTimerEvent *event) override;
++    void updateScreenAfterMoveResize();
++    void updateScreen();
++    void switchToScreen(QXcbScreen *screen);
++    bool staysOnScaleAfterRescale(const QXcbScreen *screen) const;
++    bool keepsLogicalSizeOnRescale() const;
++    bool wmControlsSize() const;
++    QRect rescaledGeometry(qreal oldFactor, qreal newFactor) const;
++    void finishRescale(bool keepsLogicalSize);
++    void configureSize(const QSize &size);
++
+     void setNetWmState(bool set, xcb_atom_t one, xcb_atom_t two = 0);
+     void setNetWmState(Qt::WindowFlags flags);
+     void setNetWmState(Qt::WindowStates state);
+@@ -293,6 +310,7 @@ protected:
+     int m_swapInterval = -1;
+ 
+     qreal m_sizeHintsScaleFactor = 1.0;
++    QBasicTimer m_pointerReleaseTimer;
+ 
+     RecreationReasons m_recreationReasons = RecreationNotNeeded;
+ 
+diff --git a/src/plugins/platforms/xcb/qxcbwindow_scale.cpp b/src/plugins/platforms/xcb/qxcbwindow_scale.cpp
+new file mode 100644
+index 00000000..97845b0c
+--- /dev/null
++++ b/src/plugins/platforms/xcb/qxcbwindow_scale.cpp
+@@ -0,0 +1,238 @@
++/****************************************************************************
++**
++** Copyright (C) 2026 The Qt Company Ltd.
++** Contact: https://www.qt.io/licensing/
++**
++** This file is part of the plugins of the Qt Toolkit.
++**
++** $QT_BEGIN_LICENSE:LGPL$
++** Commercial License Usage
++** Licensees holding valid commercial Qt licenses may use this file in
++** accordance with the commercial license agreement provided with the
++** Software or, alternatively, in accordance with the terms contained in
++** a written agreement between you and The Qt Company. For licensing terms
++** and conditions see https://www.qt.io/terms-conditions. For further
++** information use the contact form at https://www.qt.io/contact-us.
++**
++** GNU Lesser General Public License Usage
++** Alternatively, this file may be used under the terms of the GNU Lesser
++** General Public License version 3 as published by the Free Software
++** Foundation and appearing in the file LICENSE.LGPL3 included in the
++** packaging of this file. Please review the following information to
++** ensure the GNU Lesser General Public License version 3 requirements
++** will be met: https://www.gnu.org/licenses/lgpl-3.0.html.
++**
++** GNU General Public License Usage
++** Alternatively, this file may be used under the terms of the GNU
++** General Public License version 2.0 or (at your option) the GNU General
++** Public license version 3 or any later version approved by the KDE Free
++** Qt Foundation. The licenses are as published by the Free Software
++** Foundation and appearing in the file LICENSE.GPL2 and LICENSE.GPL3
++** included in the packaging of this file. Please review the following
++** information to ensure the GNU General Public License requirements will
++** be met: https://www.gnu.org/licenses/gpl-2.0.html and
++** https://www.gnu.org/licenses/gpl-3.0.html.
++**
++** $QT_END_LICENSE$
++**
++****************************************************************************/
++
++// Scaling a window when it moves to an output that asks for a different scale.
++//
++// Nothing in X11 carries a scale: the compositor cannot rescale a client's
++// pixels, and QHighDpiScaling knows a factor per screen but reads it again only
++// for new windows. A window dragged to a monitor with a different DPI therefore
++// keeps the size it had until something else resizes it.
++//
++// The phoenix server publishes the scale of each output as a RandR output
++// property (see QXcbScreen::readHighDpiScaleFactor). When a ConfigureNotify says
++// the window now covers a different output, this measures the window in logical
++// pixels with the old factor and applies them with the new one, so the window
++// keeps the size it looks like it has while the pixels it occupies change.
++
++#include "qxcbwindow.h"
++
++#include "qxcbconnection.h"
++#include "qxcbcursor.h"
++#include "qxcbscreen.h"
++
++#include <QtCore/QTimerEvent>
++#include <QtGui/private/qhighdpiscaling_p.h>
++#include <qpa/qwindowsysteminterface.h>
++
++QT_BEGIN_NAMESPACE
++
++// A window that is being dragged is rescaled only once the drag is over: the
++// window manager owns the geometry during the drag and would undo a resize.
++// Poll the pointer rather than hooking into the drag, which X11 does not report
++// for a window the window manager is moving.
++static const int pointerReleasePollInterval = 100;
++
++namespace {
++
++struct PointerState
++{
++    QXcbScreen *screen;
++    bool buttonPressed;
++};
++
++PointerState queryPointerState(QXcbConnection *connection)
++{
++    QXcbVirtualDesktop *virtualDesktop = nullptr;
++    QPoint pos;
++    int mask = 0;
++    QXcbCursor::queryPointer(connection, &virtualDesktop, &pos, &mask);
++
++    return {
++        virtualDesktop ? virtualDesktop->screenAt(pos) : nullptr,
++        (mask & (XCB_BUTTON_MASK_1 | XCB_BUTTON_MASK_2 | XCB_BUTTON_MASK_3)) != 0,
++    };
++}
++
++}
++
++void QXcbWindow::rescale(const QWindowList &windows, qreal oldFactor, qreal newFactor,
++                         std::function<void()> applyScale)
++{
++    if (qFuzzyCompare(oldFactor, newFactor)) {
++        applyScale();
++        return;
++    }
++
++    struct RescaledWindow
++    {
++        QPointer<QXcbWindow> window;
++        bool keepsLogicalSize;
++    };
++
++    QVector<RescaledWindow> rescaledWindows;
++    for (QWindow *window : windows) {
++        auto *platformWindow = static_cast<QXcbWindow *>(window->handle());
++        if (!platformWindow || platformWindow->isForeignWindow())
++            continue;
++
++        const bool keepsLogicalSize = platformWindow->keepsLogicalSizeOnRescale();
++        if (keepsLogicalSize)
++            platformWindow->QPlatformWindow::setGeometry(platformWindow->rescaledGeometry(oldFactor, newFactor));
++        rescaledWindows.append({ platformWindow, keepsLogicalSize });
++    }
++
++    applyScale();
++
++    for (const RescaledWindow &rescaled : qAsConst(rescaledWindows)) {
++        if (rescaled.window)
++            rescaled.window->finishRescale(rescaled.keepsLogicalSize);
++    }
++}
++
++void QXcbWindow::timerEvent(QTimerEvent *event)
++{
++    if (event->timerId() != m_pointerReleaseTimer.timerId()) {
++        QObject::timerEvent(event);
++        return;
++    }
++
++    const PointerState pointer = queryPointerState(connection());
++    if (pointer.buttonPressed)
++        return;
++
++    m_pointerReleaseTimer.stop();
++    if (pointer.screen && !wmControlsSize())
++        switchToScreen(pointer.screen);
++    else
++        updateScreen();
++}
++
++void QXcbWindow::updateScreenAfterMoveResize()
++{
++    if (m_pointerReleaseTimer.isActive())
++        return;
++
++    if (!m_embedded && !wmControlsSize() && queryPointerState(connection()).buttonPressed)
++        m_pointerReleaseTimer.start(pointerReleasePollInterval, this);
++    else
++        updateScreen();
++}
++
++void QXcbWindow::updateScreen()
++{
++    if (m_pointerReleaseTimer.isActive())
++        return;
++
++    auto *screen = static_cast<QXcbScreen *>(screenForGeometry(geometry()));
++    if (screen && staysOnScaleAfterRescale(screen))
++        switchToScreen(screen);
++}
++
++void QXcbWindow::switchToScreen(QXcbScreen *screen)
++{
++    if (screen == xcbScreen())
++        return;
++
++    QWindowList windows = window()->findChildren<QWindow *>();
++    for (int i = windows.size() - 1; i >= 0; --i) {
++        if (windows.at(i)->isTopLevel())
++            windows.removeAt(i);
++    }
++    windows.prepend(window());
++
++    rescale(windows, QHighDpiScaling::factor(window()), QHighDpiScaling::factor(screen), [this, screen] {
++        QWindowSystemInterface::handleWindowScreenChanged<QWindowSystemInterface::SynchronousDelivery>(
++                window(), screen->QPlatformScreen::screen());
++    });
++}
++
++bool QXcbWindow::staysOnScaleAfterRescale(const QXcbScreen *screen) const
++{
++    const qreal oldFactor = QHighDpiScaling::factor(window());
++    const qreal newFactor = QHighDpiScaling::factor(screen);
++    if (qFuzzyCompare(oldFactor, newFactor) || !keepsLogicalSizeOnRescale())
++        return true;
++
++    // Rescaling can move the window off the output it was heading for, for
++    // instance a window half on each monitor becoming larger than the target.
++    // Switching again would then bounce between the two, so check where it ends
++    // up first.
++    const QPlatformScreen *rescaledScreen = screenForGeometry(rescaledGeometry(oldFactor, newFactor));
++    return rescaledScreen && qFuzzyCompare(QHighDpiScaling::factor(rescaledScreen), newFactor);
++}
++
++bool QXcbWindow::keepsLogicalSizeOnRescale() const
++{
++    if (m_embedded)
++        return false;
++
++    if (QPlatformWindow::parent())
++        return true;
++
++    return !wmControlsSize() && !m_pointerReleaseTimer.isActive();
++}
++
++bool QXcbWindow::wmControlsSize() const
++{
++    return (m_windowState & (Qt::WindowMinimized | Qt::WindowMaximized | Qt::WindowFullScreen)) != 0;
++}
++
++QRect QXcbWindow::rescaledGeometry(qreal oldFactor, qreal newFactor) const
++{
++    const QRect nativeGeometry = geometry();
++    const QPoint origin = QPlatformWindow::parent() ? QPoint() : nativeGeometry.topLeft();
++    return QHighDpi::scale(QHighDpi::fromNative(nativeGeometry, oldFactor, origin), newFactor, origin);
++}
++
++void QXcbWindow::finishRescale(bool keepsLogicalSize)
++{
++    if (QPlatformWindow::parent()) {
++        if (keepsLogicalSize)
++            setGeometry(geometry());
++        return;
++    }
++
++    propagateSizeHints();
++    if (keepsLogicalSize)
++        configureSize(geometry().size());
++
++    xcb_flush(xcb_connection());
++}
++
++QT_END_NAMESPACE
+diff --git a/src/plugins/platforms/xcb/xcb_qpa_lib.pro b/src/plugins/platforms/xcb/xcb_qpa_lib.pro
+index 587bbcef..e1db4754 100644
+--- a/src/plugins/platforms/xcb/xcb_qpa_lib.pro
++++ b/src/plugins/platforms/xcb/xcb_qpa_lib.pro
+@@ -24,6 +24,7 @@ SOURCES = \
+         qxcbmime.cpp \
+         qxcbscreen.cpp \
+         qxcbwindow.cpp \
++        qxcbwindow_scale.cpp \
+         qxcbbackingstore.cpp \
+         qxcbwmsupport.cpp \
+         qxcbnativeinterface.cpp \

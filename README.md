@@ -51,6 +51,7 @@ Now that we know what's the theming base and other defaults, I'll highlight what
 - Force GTK apps to use server-side window decorations through [gtk-nocsd](https://codeberg.org/MorsMortium/gtk-nocsd)
 - Installed and preconfigured Whisker-menu, docklike-taskbar, xfce4-power-manager, network-manager-applet, xfce4-pulseaudio-plugin, system tray, notifier, clock.
 - Installs `qt5ct` and `qt6ct` in addition to Kvantum, so the Qt apps behavior can be modified further.
+- Per-monitor fractional scaling for GTK4, Qt6 and Qt5 apps, from [dec05eba's forks](https://github.com/dec05eba). A compositor cannot scale individual X11 clients, so the toolkit has to: the phoenix server publishes each output's intended scale as the RandR output property `DPI`, and these toolkits read it instead of deriving one screen-wide factor. GTK4 is built from the fork (its work needs a newer `GdkDrawContext` API than the release has); Qt6 is the released 6.12.1 with the fork's 339-line diff applied, and Qt5 is 5.15.19 with the same feature ported to the Qt5 API, so both stay ABI-identical to the other `qt5-*`/`qt6-*` packages. GTK3 and GTK2 are not covered: their scale factor is an `int` throughout, so fractional scaling there is not a patch.
 - Uses the cool teal glass background as the default.
 - Uses Noto Sans as the font, 9 as the size.
 - etc...

@@ -212,6 +212,105 @@ jobs:
             enabled: true
             repo: https://github.com/fiftydinar/compiz-xfce-aerolike.git
 
+          # A compositor cannot scale individual X11 clients, so on a mixed-DPI
+          # desktop the scale has to be applied by the toolkit. The server
+          # publishes the intended scale of each output as the RandR output
+          # property "DPI" (RR_PROPERTY_DPI) and dec05eba's forks are what read
+          # it; both of these packages are that fork.
+          #
+          # Qt: the diff is 339 lines and applies cleanly to the released
+          # 6.12.1, so it is carried as a patch on the Arch PKGBUILD's own
+          # source. Building the fork's branch instead would replace QtCore and
+          # QtGui with a 6.13.0-alpha1 development snapshot that every other
+          # qt6-* package in the image is not built against; the patch keeps the
+          # release and adds only the feature.
+          - name: qt6-base
+            enabled: true
+            repo: https://gitlab.archlinux.org/archlinux/packaging/packages/qt6-base
+            prepare: |
+              set -eux
+              curl -fsSL "https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/patches/qt6-base/qt6-base-dpi.patch" \
+                -o qt6-base-dpi.patch
+              # A truncated or 404 body would otherwise be fed to patch. Look for
+              # the symbol this feature adds.
+              grep -q 'readHighDpiScaleFactor' qt6-base-dpi.patch
+              # Inserted as the first line of prepare(). $startdir is the
+              # PKGBUILD directory, which is where the file above was placed.
+              sed -i '/^prepare() {$/a\  patch -d $_pkgfn -p1 < "$startdir/qt6-base-dpi.patch" # Per-monitor fractional scaling on X11' PKGBUILD
+              # Same version, patched: the pkgrel has to sort above the repository
+              # package or pacman -U in the image build leaves Arch's copy in place.
+              sed -i 's/^pkgrel=1$/pkgrel=2/' PKGBUILD
+              grep -q 'qt6-base-dpi.patch' PKGBUILD
+              grep -q '^pkgrel=2$' PKGBUILD
+
+          # GTK: the fork's work cannot be carried as a patch against 4.24.2. It
+          # is written against a newer GdkDrawContext API than the release has
+          # (GdkDrawContextFrame, per-frame damage, color state and depth as out
+          # parameters), so 2 of its 22 files do not apply at all and the rest
+          # would have to be rewritten against the older interface. Build the
+          # fork at a pinned commit instead. Pinning is what makes "behind
+          # upstream" harmless: this is a fixed snapshot, not a moving branch,
+          # and REF is the only thing that changes on a bump.
+          - name: gtk4
+            enabled: true
+            repo: https://gitlab.archlinux.org/archlinux/packaging/packages/gtk4
+            prepare: |
+              set -eux
+              REF=d8d96d111067a3372a0f33feaab3c5cd2270680e
+              SRCNAME="gtk-$REF"
+              URL="https://github.com/dec05eba/gtk/archive/$REF.tar.gz"
+              B2=56b1f5b53550637b36779c46cfdfa317c362022abed5984aa5c29b3564a9f3e15bc7304e9a52986217cd3746182c4bda2fd8a5cee041a5c7c1ac5a846288803d
+              # Read the version out of the fork rather than hardcoding it next to
+              # the commit, so the two cannot disagree.
+              VER=$(curl -fsSL "https://raw.githubusercontent.com/dec05eba/gtk/$REF/meson.build" \
+                      | sed -n "s/^ *version: '\([0-9][0-9.]*\)',\{0,1\}$/\1/p" | head -1)
+              [ -n "$VER" ] || { echo "ERROR: no version in the fork's meson.build"; exit 1; }
+              sed -i "s/^pkgver=.*/pkgver=$VER/" PKGBUILD
+              sed -i "s|^  \"git+https://gitlab.gnome.org/GNOME/gtk.git#tag=\$pkgver\"|  \"$URL\"|" PKGBUILD
+              sed -i "0,/^b2sums=('.*'\$/s||b2sums=('$B2'|" PKGBUILD
+              # The tarball unpacks into gtk-<commit>; prepare() and build() both
+              # name gtk directly.
+              sed -i "s|^  cd gtk\$|  cd $SRCNAME|" PKGBUILD
+              sed -i "s|arch-meson gtk build|arch-meson $SRCNAME build|" PKGBUILD
+              # Every edit is asserted: if Arch restructures the PKGBUILD, this
+              # stops here instead of building the release and shipping it as the
+              # fork.
+              grep -q "^pkgver=$VER\$" PKGBUILD
+              grep -q "$URL" PKGBUILD
+              grep -q "$B2" PKGBUILD
+              grep -q "^  cd $SRCNAME\$" PKGBUILD
+              grep -q "arch-meson $SRCNAME build" PKGBUILD
+
+          # Qt5 gets the same feature, but ported rather than copied: the fork's
+          # work is written against Qt6 and the Qt4 -> Qt5 shapes differ in ways
+          # that matter (no cached devicePixelRatio in QWindow, no std::optional,
+          # qmake instead of CMake for the xcb plugin). See
+          # patches/qt5-base/README.md. The Arch package builds KDE's qtbase at a
+          # pinned commit, so the patch is checked against that tree.
+          - name: qt5-base
+            enabled: true
+            repo: https://gitlab.archlinux.org/archlinux/packaging/packages/qt5-base
+            prepare: |
+              set -eux
+              curl -fsSL "https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/patches/qt5-base/qt5-base-dpi.patch" \
+                -o qt5-base-dpi.patch
+              # A truncated or 404 body would otherwise be fed to patch. Look for
+              # the symbol this feature adds.
+              grep -q 'readHighDpiScaleFactor' qt5-base-dpi.patch
+              # prepare() cds into the source tree and applies the PKGBUILD's own
+              # patches with ../<file> paths - those work because makepkg copies
+              # source=() entries into $srcdir. This file is downloaded into
+              # $startdir instead, so it has to be referred to by that name: a
+              # ../ path would point into $srcdir and not find it. Appended after
+              # the PKGBUILD's own patches, so it is the one closest to the tree
+              # that gets built.
+              sed -i '/^prepare() {$/,/^}$/ s|^}$|  patch -p1 < $startdir/qt5-base-dpi.patch # Per-monitor fractional scaling on X11\n}|' PKGBUILD
+              # Same version, patched: the pkgrel has to sort above the repository
+              # package or pacman -U in the image build leaves Arch's copy in place.
+              sed -i 's/^pkgrel=1$/pkgrel=2/' PKGBUILD
+              sed -n '/^prepare() {$/,/^}$/p' PKGBUILD | grep -q 'qt5-base-dpi.patch'
+              grep -q '^pkgrel=2$' PKGBUILD
+
           - name: xfce4-docklike-plugin-git
             enabled: true
             repo: https://aur.archlinux.org/xfce4-docklike-plugin-git.git
