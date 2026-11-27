@@ -298,9 +298,13 @@ jobs:
               # the symbol this feature adds.
               grep -q 'readHighDpiScaleFactor' qt5-base-dpi.patch
               # prepare() cds into the source tree and applies the PKGBUILD's own
-              # patches with ../<file> paths; append ours after them so it is the
-              # one closest to the tree that gets built.
-              sed -i '/^prepare() {$/,/^}$/ s|^}$|  patch -p1 < ../qt5-base-dpi.patch # Per-monitor fractional scaling on X11\n}|' PKGBUILD
+              # patches with ../<file> paths - those work because makepkg copies
+              # source=() entries into $srcdir. This file is downloaded into
+              # $startdir instead, so it has to be referred to by that name: a
+              # ../ path would point into $srcdir and not find it. Appended after
+              # the PKGBUILD's own patches, so it is the one closest to the tree
+              # that gets built.
+              sed -i '/^prepare() {$/,/^}$/ s|^}$|  patch -p1 < $startdir/qt5-base-dpi.patch # Per-monitor fractional scaling on X11\n}|' PKGBUILD
               # Same version, patched: the pkgrel has to sort above the repository
               # package or pacman -U in the image build leaves Arch's copy in place.
               sed -i 's/^pkgrel=1$/pkgrel=2/' PKGBUILD
